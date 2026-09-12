@@ -37,3 +37,7 @@ config/jwt/
 # Python
 __pycache__/
 *.pyc
+
+# Zrzuty i dzienniki z przeglądarki użytej do sprawdzania interfejsu — artefakty
+# jednego uruchomienia, nie kod.
+.playwright-mcp/
