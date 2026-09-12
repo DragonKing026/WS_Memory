@@ -11,6 +11,37 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 
 ---
 
+## 2026-09-12 17:52 — Wysyłka na serwer domyślna, tryb ręczny jako wyłącznik
+
+Odwrócone domyślne zachowanie. Wcześniej publikacja była czynnością, którą
+trzeba pamiętać; teraz **wszystko, co trafia do lokalnego pałaca, jedzie na
+serwer samo**. Powód: baza wiedzy wypełniana tym, co ktoś akurat uznał za warte
+kliknięcia, wypełnia się prawie niczym.
+
+**D-014** wprowadza **regułę lądowania**, bez której domyślna wysyłka byłaby
+wyciekiem: skrzydło zmapowane → przestrzeń zespołowa, skrzydło niezmapowane →
+prywatna przestrzeń właściciela na serwerze. Potwierdzenie człowieka przenosi
+się z publikacji na **mapowanie**, bo to ono decyduje o widoczności dla innych.
+
+- Nazwane wprost: **tekst zmielonego kodu trafia na serwer** (jako szuflady).
+  Właściwość „kod nie opuszcza laptopa" zmienia się w „kod nie opuszcza serwera
+  firmy". Mielenie pozostaje lokalne, więc serwer nadal nie ma dostępu do
+  repozytoriów ani kluczy do gita.
+- Odsiew powtórzeń: `content_hash` w `memory_entries` z indeksem
+  `(space_id, content_hash)`. Gdy nazwa lokalnego skrzydła odpowiada
+  przestrzeni zespołowej, wtyczka proponuje mapowanie — wtedy trzy osoby
+  mielące to samo repozytorium nie tworzą trzech kopii.
+- Nowa tabela `publish_settings` z `auto_publish` domyślnie `true`;
+  przełącznik również w `userConfig` wtyczki.
+- Filtr sekretów leży teraz na **każdej** ścieżce, nie tylko na świadomie
+  uruchomionej — jego testy stają się krytyczne.
+- Dobór mocy usługi `embeddings`: serwer liczy wektory dla całego strumienia
+  wszystkich maszyn, nie dla wybranych fragmentów.
+- `TODO-012` rozszerzone o wysyłkę automatyczną, regułę lądowania, odsiew
+  powtórzeń i testy negatywne widoczności.
+
+---
+
 ## 2026-09-12 17:30 — Przenośność na inne klienty AI
 
 Pytanie z biura: skoro MemPalace działa nie tylko z Claude, czy struktura

@@ -18,9 +18,15 @@ Powstanie w zadaniu `TODO/000`.
 | Dysk | 40 GB | 100 GB SSD | baza rośnie z wolumenem wiedzy; wektory 1024-wymiarowe |
 | Docker | Engine 24+ z Compose v2 | | |
 
-GPU nie jest potrzebne. Gdyby mielenie dużych repozytoriów okazało się zbyt
-wolne, usługę `embeddings` można przenieść na maszynę z GPU bez zmiany
-czegokolwiek innego — to jedyny komponent liczący wektory.
+GPU nie jest potrzebne. Usługę `embeddings` można przenieść na maszynę z GPU
+bez zmiany czegokolwiek innego — to jedyny komponent liczący wektory.
+
+**Czynnik decydujący o jej mocy:** od D-014 wysyłka z lokalnych pałaców jest
+domyślna, więc serwer liczy wektory dla **całego** strumienia wiedzy wszystkich
+maszyn, a nie dla wybranych fragmentów. Przy kilkunastu osobach mielących
+projekty i rozmowy to stały ruch w tle, nie okazjonalne skoki. Jeśli kolejka
+publikacji zaczyna rosnąć — najpierw dokładamy rdzenie usłudze `embeddings`,
+dopiero potem myślimy o GPU.
 
 ## Uruchomienie
 

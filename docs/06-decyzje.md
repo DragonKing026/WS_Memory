@@ -277,6 +277,7 @@ dokumentu stałby się drugą reprezentacją prawdy.
 ## D-010 — Hybryda: lokalny pałac plus publikacja do wspólnej bazy
 
 **Data:** 2026-09-12 16:38 · **Stan:** Przyjęta
+· **Domyślne zachowanie zmienione przez D-014**
 
 Deweloper może mieć **własny lokalny MemPalace** (własny `init`, własne `mine`,
 własne hooki) i jednocześnie publikować wybraną wiedzę do wspólnej bazy przez
@@ -317,6 +318,12 @@ Lokalny pałac i wspólna baza to dwa magazyny, więc agent pyta dwa razy — sk
 `ws-memory-recall` narzuca kolejność: najpierw wspólna, potem lokalna.
 Scalanie po stronie serwera wymagałoby wysyłania tam wszystkiego, czyli
 rezygnacji z prywatności, która jest tu główną zaletą.
+
+> **Zmiana po D-014:** publikacja nie jest już czynnością, którą trzeba
+> pamiętać — **domyślnie wszystko, co trafia do lokalnego pałaca, jest
+> wysyłane na serwer**. Tryb ręczny został wyłącznikiem w ustawieniach
+> wtyczki. Opisany niżej mechanizm lustra i partii pozostaje w mocy; zmienia
+> się to, co dzieje się bez żadnej konfiguracji.
 
 **Zabezpieczenia lustrzenia** — lustro raz ustawione działa bez nadzoru, więc
 ryzyko wysłania czegoś nieprzewidzianego obsługujemy wprost:
@@ -467,3 +474,58 @@ godziny, nie na tygodnie — i o to chodzi.
 Claude Code. Dla innych klientów ten sam efekt daje polecenie instalacyjne
 plus rejestracja lokalnego serwera MemPalace (`codex mcp add mempalace`);
 MemPalace ma gotowe pakowania dla Codeksa, Cursora i Antigravity.
+
+---
+
+## D-014 — Wysyłka na serwer jest domyślna, tryb ręczny jest wyłącznikiem
+
+**Data:** 2026-09-12 17:52 · **Stan:** Przyjęta
+· **Zmienia domyślne zachowanie z D-010**
+
+**Wszystko, co trafia do lokalnego pałaca, trafia też na serwer** — bez
+klikania, bez pamiętania, bez komendy. Mielenie nadal dzieje się lokalnie;
+zmienia się to, że jego wynik jedzie dalej automatycznie. Kto chce inaczej,
+przełącza `auto_publish` w ustawieniach wtyczki i wraca do `/ws-publish`.
+
+**Reguła lądowania** — bez niej domyślne „wszystko na serwer" byłoby wyciekiem:
+
+| Skrzydło lokalnego pałaca | Ląduje w |
+|---|---|
+| **zmapowane** na przestrzeń zespołową | tej przestrzeni — widoczne dla zespołu |
+| **niezmapowane** | **prywatnej przestrzeni użytkownika na serwerze** |
+
+Wszystko jest więc na serwerze zawsze (kopia zapasowa, wyszukiwanie, dostęp
+z drugiej maszyny), ale **nic nie staje się widoczne dla zespołu bez
+mapowania**. Potwierdzenie człowieka przenosi się z publikacji na **mapowanie**
+— bo to ono decyduje o widoczności, i robi się je raz.
+
+**Dlaczego domyślne „wysyłaj":** baza wiedzy, do której trzeba pamiętać, żeby
+coś wnieść, wypełnia się tym, co ktoś akurat uznał za warte kliknięcia — czyli
+prawie niczym. Wartość powstaje z kompletności. Ręczna publikacja została jako
+wyłącznik dla tych, którzy świadomie chcą trzymać wszystko u siebie.
+
+**Konsekwencja, którą trzeba nazwać wprost:** tekst zmielonego kodu **trafia na
+serwer** (jako szuflady, nie jako repozytorium). Wcześniejsza właściwość „kod
+nie opuszcza laptopa" zmienia się w **„kod nie opuszcza serwera firmy"**.
+Mielenie pozostaje lokalne, więc serwer nadal nie potrzebuje dostępu do
+repozytoriów ani kluczy do gita (D-012 bez zmian).
+
+**Odsiew powtórzeń:** gdy trzy osoby zmielą to samo repozytorium, ta sama treść
+poleci trzy razy. Dlatego:
+
+- `memory_entries` trzyma **skrót treści**; publikacja do przestrzeni, która ma
+  już szufladę o tym samym skrócie, jest pomijana;
+- odsiew działa **w obrębie przestrzeni docelowej**, więc trzy prywatne
+  przestrzenie nadal będą miały trzy kopie — i właśnie dlatego wtyczka
+  **proponuje mapowanie**, gdy nazwa lokalnego skrzydła odpowiada istniejącej
+  przestrzeni zespołowej. Jedno potwierdzenie i kopia jest jedna.
+
+**Skutki operacyjne do uwzględnienia:**
+
+- Serwer liczy embeddingi dla **całego** strumienia z wszystkich maszyn, nie
+  dla wybranych fragmentów. To główny czynnik przy doborze mocy usługi
+  `embeddings` — patrz `docs/05-deployment.md`.
+- Filtr sekretów leży teraz na **każdej** ścieżce, nie tylko na tej, którą ktoś
+  świadomie uruchomił. Jego testy stają się krytyczne.
+- Użytkownik musi w każdej chwili widzieć, **co i gdzie** poleciało: dziennik
+  partii z filtrem po przestrzeni, oraz wycofanie partii jednym działaniem.

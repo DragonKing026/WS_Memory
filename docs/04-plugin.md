@@ -12,9 +12,9 @@ Plugin jest jedyną rzeczą, którą użytkownik instaluje — i **pociąga za s
 wtyczkę MemPalace jako zależność**, więc każdy dostaje lokalny pałac (D-012).
 
 Podział pracy jest przez to prosty: **mielenie dzieje się wyłącznie lokalnie**
-(projekty, dokumenty, transkrypty rozmów), a do wspólnej bazy trafia tylko to,
-co użytkownik opublikuje. Serwer nie mieli niczego i nie przyjmuje surowych
-źródeł.
+(projekty, dokumenty, transkrypty rozmów), a **wynik domyślnie jedzie na
+serwer** — bez klikania i bez pamiętania (D-014). Serwer nie mieli niczego i
+nie przyjmuje surowych źródeł; dostaje gotowe szuflady.
 
 ## Struktura
 
@@ -48,7 +48,8 @@ Trzy mechanizmy Claude Code, na których to stoi:
 temu użytkownik nie musi wiedzieć, że pod spodem jest MemPalace; instaluje
 jedną rzecz.
 
-**`userConfig`** — adres instancji i token są pytane **przy włączeniu wtyczki**,
+**`userConfig`** — adres instancji, token i przełącznik `auto_publish`
+(domyślnie włączony) są pytane **przy włączeniu wtyczki**,
 a token oznaczony jako `sensitive`. Wartości trafiają do konfiguracji MCP jako
 `${user_config.KEY}` i do hooków jako `CLAUDE_PLUGIN_OPTION_*`. Nikt nie
 ustawia zmiennych środowiskowych ręcznie i **token nie trafia do repozytorium**.
@@ -72,6 +73,12 @@ dało się mielić PDF-y i DOCX-y) i wykonujemy pierwsze `mempalace init`.
       "title": "Token agenta",
       "description": "Wystawisz go w WS_Memory → Ustawienia → Tokeny",
       "sensitive": true
+    },
+    "auto_publish": {
+      "type": "boolean",
+      "title": "Wysyłaj automatycznie na serwer",
+      "description": "Domyślnie włączone. Skrzydła bez mapowania trafiają do Twojej prywatnej przestrzeni.",
+      "default": true
     }
   },
   "mcpServers": {
@@ -159,19 +166,37 @@ mempalace mine ~/projekty/nowy-projekt
 
 Kod nie opuszcza laptopa. Nikogo nie musisz o nic prosić.
 
-**Publikacja selektywna** — `/ws-publish`: wybierasz skrzydło, pokój albo
-zakres daty, widzisz podgląd (ile szuflad, co zostanie pominięte i dlaczego),
-potwierdzasz. Serwer przelicza embeddingi swoim modelem i zapisuje z Twoim
-autorstwem.
+**Domyślnie: wysyłka automatyczna.** Wszystko, co trafia do lokalnego pałaca,
+jedzie na serwer po zakończeniu sesji albo po lokalnym mieleniu. Gdzie ląduje:
 
-**Lustro** — mapowanie „skrzydło lokalnego pałaca → przestrzeń", działające
-cyklicznie w tle. Cztery zabezpieczenia, bo lustro pracuje bez nadzoru:
+| Skrzydło lokalnego pałaca | Ląduje w |
+|---|---|
+| **zmapowane** na przestrzeń zespołową | tej przestrzeni — widzi zespół |
+| **niezmapowane** | Twojej **prywatnej przestrzeni na serwerze** |
 
-- **pierwszy przebieg jest podglądem** i wymaga potwierdzenia — lustro nie
-  zaczyna działać samo;
-- **wykluczenia pokoi** (np. skrzydło projektu bez pokoju `diary`);
+Czyli wszystko masz na serwerze zawsze (kopia, wyszukiwanie, dostęp z drugiej
+maszyny), ale nic nie staje się widoczne dla innych, dopóki nie zmapujesz
+skrzydła. Mapowanie potwierdzasz raz — to ono decyduje o widoczności.
+
+Gdy nazwa lokalnego skrzydła odpowiada istniejącej przestrzeni zespołowej,
+wtyczka **zaproponuje mapowanie**. Warto się zgodzić: wtedy odsiew po skrócie
+treści działa i to samo repozytorium zmielone przez trzy osoby nie leży w bazie
+w trzech kopiach.
+
+**Tryb ręczny** — wyłącznik `auto_publish` w ustawieniach wtyczki. Wtedy nic nie
+wychodzi samo, a publikujesz komendą `/ws-publish`: wybierasz skrzydło, temat
+albo zakres dat, widzisz podgląd, potwierdzasz.
+
+**Zabezpieczenia**, skoro wysyłka dzieje się bez nadzoru:
+
+- **mapowanie na przestrzeń zespołową wymaga potwierdzenia** — bez niego treść
+  zostaje w Twojej prywatnej przestrzeni;
+- **wykluczenia tematów** w mapowaniu (np. skrzydło projektu bez dziennika);
 - **filtr sekretów po obu stronach** — klient nie wysyła, serwer i tak sprawdza;
-- **partie do wycofania** jednym działaniem, z raportem pominięć.
+  od D-014 leży on na *każdej* ścieżce, więc jest krytyczny;
+- **dziennik partii** z filtrem po przestrzeni i **wycofaniem jednym
+  działaniem** — w każdej chwili widzisz, co i gdzie poleciało;
+- **pauza i wyłącznik** — globalny oraz per mapowanie.
 
 Czego tryb hybrydowy nie daje: jednego zapytania obejmującego oba magazyny.
 To dwa indeksy, więc agent pyta dwa razy.

@@ -147,7 +147,7 @@ backup systemu: wiki, rewizje, konta, uprawnienia, audyt **i pałac**.
 Serwer nie przyjmuje transkryptów i nie mieli niczego (D-012). Nie ma tu
 endpointu do zabezpieczania, bo nie ma takiej ścieżki.
 
-### E. Publikacja z lokalnego pałaca do wspólnej bazy (D-010)
+### E. Wysyłka z lokalnego pałaca na serwer — **domyślna** (D-010 + D-014)
 
 Jedyna droga, którą wiedza wchodzi do wspólnej bazy poza pisaniem w wiki:
 
@@ -164,8 +164,21 @@ Jedyna droga, którą wiedza wchodzi do wspólnej bazy poza pisaniem w wiki:
    przelicza embeddingi **swoim** modelem i zapisuje z autorem oraz parą
    `(source_replica, source_drawer_id)` — powtórna publikacja aktualizuje,
    nie duplikuje.
-5. Lustro (`ws.mirrors`) robi to samo cyklicznie dla wskazanego skrzydła, ale
-   **dopiero po potwierdzeniu pierwszego podglądu przez człowieka**.
+5. **Dzieje się to bez proszenia.** Domyślnie (`auto_publish = true`) każda
+   nowa szuflada lokalnego pałaca jedzie na serwer po zakończeniu sesji albo
+   po lokalnym mieleniu. Reguła lądowania:
+   - skrzydło **zmapowane** (`ws.mirrors`) → przestrzeń zespołowa, widoczna
+     dla innych; mapowanie wymaga jednorazowego potwierdzenia człowieka;
+   - skrzydło **niezmapowane** → **prywatna przestrzeń użytkownika** na
+     serwerze.
+6. Kto woli decydować sam, wyłącza `auto_publish` w ustawieniach wtyczki
+   i wraca do ręcznego `/ws-publish`.
+
+Wszystko jest więc na serwerze zawsze — kopia zapasowa, wyszukiwanie, dostęp
+z drugiej maszyny — ale nic nie staje się widoczne dla zespołu bez mapowania.
+Konsekwencja nazwana wprost w D-014: **tekst zmielonego kodu trafia na serwer**
+(jako szuflady). Mielenie pozostaje lokalne, więc serwer nadal nie potrzebuje
+dostępu do repozytoriów.
 
 Dlaczego przez API, a nie wprost do bazy: zapis do Postgresa ominąłby token,
 role i audyt — czyli całą warstwę, dla której WS_Memory istnieje. Ten wariant

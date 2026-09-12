@@ -92,28 +92,36 @@ Pełny opis: `docs/01-architektura.md`.
 
 **Serwer nie mieli niczego.** Wtyczka WS_Memory wymaga wtyczki MemPalace jako
 zależności, więc **każdy użytkownik ma lokalny pałac**. Mielenie projektów,
-dokumentów i transkryptów rozmów dzieje się wyłącznie na jego maszynie —
-**kod i rozmowy nie opuszczają laptopa**.
+dokumentów i transkryptów rozmów dzieje się wyłącznie na jego maszynie; serwer
+dostaje gotowe szuflady, nigdy surowe źródła.
 
 Agent ma dwa serwery MCP naraz: `mempalace` (lokalny, prywatny) i `ws_memory`
 (wspólny). Do wspólnej bazy wiedza trafia dwiema drogami:
 
 1. **Pisanie w wiki** — człowiek albo agent, przez `/api` lub `ws_doc_write`.
-2. **Publikacja z lokalnego pałaca** — selektywnie (`/ws-publish`) albo przez
-   **lustro**: mapowanie skrzydła na przestrzeń, działające cyklicznie. Lustro
-   nie startuje bez potwierdzenia pierwszego podglądu przez człowieka.
+2. **Wysyłka z lokalnego pałaca — domyślna, bez udziału użytkownika** (D-014).
+   Wszystko, co trafia do lokalnego pałaca, jedzie na serwer. Reguła lądowania:
+   skrzydło **zmapowane** → przestrzeń zespołowa (mapowanie potwierdza człowiek
+   raz), skrzydło **niezmapowane** → **prywatna przestrzeń właściciela**.
+   Tryb ręczny (`/ws-publish`) to wyłącznik w ustawieniach wtyczki.
 
-Publikacja idzie **zawsze przez API**, nigdy wprost do bazy — inaczej ominęłaby
-token, role i audyt.
+Wszystko jest więc na serwerze zawsze, ale nic nie staje się widoczne dla
+zespołu bez mapowania. Wysyłka idzie **zawsze przez API**, nigdy wprost do
+bazy — inaczej ominęłaby token, role i audyt.
+
+Konsekwencja nazwana wprost: **tekst zmielonego kodu trafia na serwer** (jako
+szuflady). Mielenie pozostaje lokalne, więc serwer nie potrzebuje dostępu do
+repozytoriów ani kluczy do gita.
 
 ## 4. Trzy klasy wiedzy
 
 Rozróżnienie kluczowe — pomylenie ich prowadzi do złych decyzji projektowych.
 
 1. **Pamięć surowa** (główny wolumen, automatyczna): transkrypty sesji,
-   dziennik, graf wiedzy, mining repozytoriów. Powstaje **w lokalnym pałacu**;
-   do wspólnej bazy trafia to, co ktoś opublikuje. Nie wersjonujemy tego — to
-   surowiec.
+   dziennik, graf wiedzy, mining repozytoriów. Powstaje **w lokalnym pałacu**
+   i domyślnie jedzie na serwer — do przestrzeni zespołowej, jeśli skrzydło
+   jest zmapowane, w przeciwnym razie do prywatnej. Nie wersjonujemy tego —
+   to surowiec.
 2. **Ustalenia i notatki**: agent zapisuje wprost przez `ws_remember`.
    Widoczne w aplikacji, oznaczone jako zapisane przez AI. Bez bramki.
 3. **Dokumentacja kanoniczna (wiki)**: dokumenty z pełnymi rewizjami.

@@ -11,9 +11,9 @@ tags: [ws-memory, todo, hybryda, mempalace, publikacja, lustro]
 ## Powód
 
 To jest **jedyna droga**, którą wiedza wchodzi do wspólnej bazy poza pisaniem
-w wiki (D-010 + D-012). Serwer nie mieli niczego; każdy użytkownik ma lokalny
-pałac (wtyczka wymaga MemPalace jako zależności), mieli u siebie i publikuje
-to, co warte zespołu.
+w wiki (D-010 + D-012), i **działa domyślnie, bez udziału użytkownika**
+(D-014). Serwer nie mieli niczego; każdy ma lokalny pałac, mieli u siebie,
+a wynik jedzie na serwer sam.
 
 Dzięki temu kod i rozmowy nie opuszczają laptopa, a nikt nie czeka na
 administratora, żeby dodać źródło.
@@ -39,13 +39,20 @@ Trzy pułapki, które trzeba obsłużyć:
 1. **Duplikaty przy powtórnej publikacji.** Rozwiązanie: unikalna para
    `(source_replica, source_drawer_id)` w `memory_entries` — druga publikacja
    aktualizuje wiersz, nie tworzy drugiego.
-2. **Lustro działa bez nadzoru.** Raz ustawione mapowanie skrzydło → przestrzeń
-   wyśle też to, czego właściciel nie przewidział. Dlatego pierwszy przebieg
-   jest **podglądem wymagającym potwierdzenia**, są wykluczenia pokoi, a partie
-   można wycofać.
+2. **Wysyłka jest domyślna, więc dzieje się bez nadzoru.** Ochroną nie jest
+   pytanie przed każdą wysyłką (to zabiłoby sens domyślności), tylko **reguła
+   lądowania**: bez mapowania treść idzie do prywatnej przestrzeni właściciela,
+   a mapowanie na przestrzeń zespołową wymaga jednorazowego potwierdzenia.
+   Do tego wykluczenia tematów, dziennik partii i wycofanie.
 3. **Sekrety w lokalnym pałacu.** Lokalny `mine` mógł zgarnąć plik, którego nie
    powinno tam być. Filtr sekretów musi działać **po obu stronach** — klient nie
    wysyła, serwer i tak sprawdza. Zaufanie do klienta byłoby tu błędem.
+   Od D-014 filtr leży na **każdej** ścieżce, nie tylko na świadomie
+   uruchomionej — jego testy są krytyczne.
+4. **Powtórzenia między osobami.** Trzy osoby mielące to samo repozytorium
+   przyślą tę samą treść trzy razy. Odsiew po `content_hash` w obrębie
+   przestrzeni docelowej plus propozycja mapowania na przestrzeń zespołową,
+   gdy nazwa skrzydła jej odpowiada.
 
 Czego **nie** robimy: nie dajemy lokalnemu MemPalace dostępu do centralnej bazy
 przez `MEMPALACE_PGVECTOR_DSN`. Byłoby prostsze, ale ominęłoby token, role i
@@ -53,9 +60,10 @@ audyt — odrzucone w D-010.
 
 ## Rozwiązanie
 
-1. Encje `Mirror`, `PublishBatch` + rozszerzenie `memory_entries`
-   (`source_replica`, `source_drawer_id`, `publish_batch_id`) z ograniczeniem
-   unikalności na parze źródłowej.
+1. Encje `Mirror`, `PublishBatch`, `PublishSettings` (`auto_publish` domyślnie
+   `true`) + rozszerzenie `memory_entries` (`source_replica`,
+   `source_drawer_id`, `publish_batch_id`, `content_hash`) z unikalnością na
+   parze źródłowej i indeksem `(space_id, content_hash)` pod odsiew powtórzeń.
 2. `POST /api/publish` — przyjmuje partię szuflad: treść, skrzydło i pokój
    źródłowy, znaczniki czasu, identyfikator repliki i szuflady. Sprawdza rolę
    `writer` w przestrzeni docelowej, przepuszcza przez filtr sekretów,
@@ -66,15 +74,20 @@ audyt — odrzucone w D-010.
 4. Filtr sekretów jako osobny, testowalny serwis (wzorce: `.env`, klucze
    prywatne, `BEGIN * PRIVATE KEY`, hasła w URL-ach, tokeny o typowych
    prefiksach). Raport pominięć jest częścią partii.
-5. Komenda pluginu `/ws-publish` — filtr (skrzydło / pokój / zakres daty),
-   podgląd, potwierdzenie, wysyłka partiami z widocznym postępem.
-6. Lustra: CRUD w `/api`, ekran w interfejsie (mapowanie skrzydło → przestrzeń,
+5. **Wysyłka automatyczna** (domyślna): po sesji i po lokalnym mieleniu
+   zbiera szuflady nowsze niż znacznik, ustala przestrzeń docelową regułą
+   lądowania (mapowanie → zespołowa, brak → prywatna) i wysyła partią.
+6. Komenda `/ws-publish` — dla trybu ręcznego: filtr (skrzydło / temat /
+   zakres daty), podgląd, potwierdzenie, wysyłka z widocznym postępem.
+7. Propozycja mapowania, gdy nazwa lokalnego skrzydła odpowiada istniejącej
+   przestrzeni zespołowej użytkownika.
+8. Lustra: CRUD w `/api`, ekran w interfejsie (mapowanie skrzydło → przestrzeń,
    wykluczenia pokoi, pauza, wyłącznik), pierwszy przebieg jako podgląd.
-7. Lokalny agent lustra w pluginie: uruchamiany hookiem `SessionEnd` albo
+9. Lokalny agent wysyłki w pluginie: uruchamiany hookiem `SessionEnd` albo
    ręcznie, publikuje przyrostowo szuflady nowsze niż `last_drawer_filed_at`.
-8. Skill `ws-memory-recall` uzupełniony o kolejność dwóch źródeł: najpierw
+10. Skill `ws-memory-recall` uzupełniony o kolejność dwóch źródeł: najpierw
    `ws_search` (wspólna baza), potem lokalny `mempalace_search`.
-9. Dokumentacja dla dewelopera: jak postawić lokalny pałac i podłączyć oba
+11. Dokumentacja dla dewelopera: jak postawić lokalny pałac i podłączyć oba
    serwery MCP naraz.
 
 ## Kryteria ukończenia
@@ -86,7 +99,14 @@ audyt — odrzucone w D-010.
 - Publikacja do przestrzeni bez roli `writer` jest odrzucona.
 - Szuflada z podstawionym plikiem `.env` **nie** przechodzi — ani z klienta,
   ani gdy klient ją mimo wszystko wyśle (dwa osobne testy).
-- Lustro bez potwierdzenia pierwszego podglądu nie publikuje nic (test).
+- Przy domyślnych ustawieniach szuflada zapisana lokalnie pojawia się na
+  serwerze **bez żadnej akcji użytkownika**.
+- Skrzydło bez mapowania ląduje w prywatnej przestrzeni właściciela i **nie
+  jest widoczne** dla innych członków zespołu (test negatywny).
+- Mapowanie bez potwierdzenia nie kieruje niczego do przestrzeni zespołowej.
+- Wyłączenie `auto_publish` zatrzymuje wysyłkę całkowicie.
+- Ta sama treść wysłana dwukrotnie do jednej przestrzeni jest zapisana raz
+  (odsiew po `content_hash`).
 - Wykluczony pokój nie trafia do przestrzeni, choć jest w skrzydle źródłowym.
 - Wycofanie partii usuwa szuflady i zostawia partię ze statusem `reverted`.
 - Agent z dwoma serwerami MCP znajduje treść i we wspólnej bazie, i w lokalnym

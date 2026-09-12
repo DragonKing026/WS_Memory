@@ -83,12 +83,18 @@ przy akceptacji zaproszenia.
 `author_agent_token_id`, `document_id` (gdy `kind = document`), `title`,
 `created_at`, `source_replica` (identyfikator lokalnego pałaca, skąd przyszła
 treść — `null` dla zapisów powstałych na serwerze), `source_drawer_id`
-(identyfikator szuflady w tamtym pałacu), `publish_batch_id`.
+(identyfikator szuflady w tamtym pałacu), `publish_batch_id`,
+`content_hash` (skrót treści — odsiew powtórzeń przy automatycznej wysyłce).
 
 > Para `(source_replica, source_drawer_id)` jest **unikalna**. To ona sprawia,
 > że powtórna publikacja tej samej lokalnej szuflady aktualizuje wpis, zamiast
 > tworzyć drugi (D-010). Identyfikator repliki bierzemy z `replica.json`
 > lokalnego pałaca — MemPalace utrzymuje go stabilnie właśnie po to.
+>
+> `content_hash` rozwiązuje inny problem: przy domyślnej automatycznej wysyłce
+> (D-014) trzy osoby mielące to samo repozytorium przysłałyby tę samą treść
+> trzy razy. Indeks `(space_id, content_hash)` sprawia, że druga i trzecia
+> kopia w **tej samej** przestrzeni jest pomijana.
 
 > Po co ta tabela, skoro dane są w pałacu: **żeby uprawnienia i audyt działały
 > w SQL, a nie na wynikach z pałaca.** Filtrujemy przed zapytaniem
@@ -97,12 +103,21 @@ treść — `null` dla zapisów powstałych na serwerze), `source_drawer_id`
 
 ### Hybryda: lokalne pałace i publikacja
 
-**`mirrors`** — definicja lustra: skrzydło lokalnego pałaca → przestrzeń.
-`id`, `user_id`, `source_replica`, `source_wing`, `space_id`,
-`excluded_rooms` (`JSONB`), `is_active`, `is_confirmed` (pierwszy przebieg to
-podgląd — lustro nie działa, dopóki człowiek nie potwierdzi), `paused_at`,
+**`mirrors`** — mapowanie skrzydła lokalnego pałaca na **przestrzeń
+zespołową**. `id`, `user_id`, `source_replica`, `source_wing`, `space_id`,
+`excluded_rooms` (`JSONB`), `is_active`, `is_confirmed`, `paused_at`,
 `last_synced_at`, `last_drawer_filed_at` (znacznik przyrostowości),
 `created_at`.
+
+> Mapowanie jest potrzebne **tylko po to, by treść trafiła do zespołu**.
+> Skrzydło bez mapowania i tak jedzie na serwer — do prywatnej przestrzeni
+> właściciela (D-014). Dlatego potwierdzenie (`is_confirmed`) dotyczy
+> mapowania, a nie wysyłki: to mapowanie decyduje o widoczności dla innych.
+
+**`publish_settings`** — ustawienia wysyłki per użytkownik i replika.
+`id`, `user_id`, `source_replica`, `auto_publish` (domyślnie **`true`**),
+`private_space_id` (gdzie lądują skrzydła bez mapowania),
+`last_watermark` (do której chwili wysłano), `updated_at`.
 
 **`publish_batches`** — jedna partia publikacji, żeby dało się ją wycofać.
 `id`, `user_id`, `mirror_id` (`null` przy publikacji selektywnej), `space_id`,
