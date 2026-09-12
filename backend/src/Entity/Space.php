@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Domain\Space\SpaceId;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
@@ -70,9 +71,9 @@ class Space
      */
     public static function privateFor(User $user): self
     {
-        $slug = 'priv_' . $user->getId()->toRfc4122();
+        $slug = SpaceId::privateFor($user->getId()->toRfc4122());
 
-        $space = new self($slug, 'Prywatna przestrzeń: ' . $user->getDisplayName());
+        $space = new self($slug->value, 'Prywatna przestrzeń: ' . $user->getDisplayName());
         $space->isPrivate = true;
 
         return $space;

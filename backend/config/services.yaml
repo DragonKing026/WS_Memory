@@ -9,6 +9,14 @@
 
 parameters:
     mempalace.base_url: '%env(MEMPALACE_URL)%'
+    # The shared token to the palace. Known to the backend and to nothing else:
+    # an agent authenticates against /mcp with its own token and never sees this
+    # one (inviolable rule 1).
+    mempalace.token: '%env(MEMPALACE_MCP_HTTP_TOKEN)%'
+    # Kept short on purpose. A write holds a database transaction open while it
+    # waits for this call, so a generous timeout would mean a long-held row lock
+    # rather than a more reliable write.
+    mempalace.timeout: '%env(float:MEMPALACE_TIMEOUT)%'
     # Public address used in invitation links. In development it is the local
     # nginx; in production the real domain.
     app.public_base_url: '%env(default:app_default_base_url:WS_PUBLIC_URL)%'
@@ -39,6 +47,22 @@ services:
         arguments:
             $baseUrl: '%mempalace.base_url%'
 
+    # Ports and the adapters behind them. Symfony can infer the alias while
+    # exactly one class implements an interface; written down, a second adapter
+    # — a cache, a read-only double — becomes a one-line change here instead of
+    # a container that suddenly cannot decide.
+    App\Domain\Memory\MemoryStore: '@App\Infrastructure\MemPalace\McpMemoryStore'
+    App\Domain\Memory\MemoryRegistry: '@App\Infrastructure\Doctrine\DoctrineMemoryRegistry'
+    App\Domain\Space\SpaceCatalog: '@App\Infrastructure\Doctrine\DoctrineSpaceCatalog'
+    App\Domain\Space\SpaceMembershipRepository: '@App\Infrastructure\Doctrine\DoctrineSpaceMembershipRepository'
+    App\Domain\Audit\AuditTrail: '@App\Infrastructure\Doctrine\DoctrineAuditTrail'
+
+    App\Infrastructure\MemPalace\MemPalaceClient:
+        arguments:
+            $baseUrl: '%mempalace.base_url%'
+            $token: '%mempalace.token%'
+            $timeoutSeconds: '%mempalace.timeout%'
+
     App\Presentation\Console\InviteUserCommand:
         arguments:
             $publicBaseUrl: '%app.public_base_url%'
@@ -62,3 +86,7 @@ when@test:
             public: true
         App\Domain\Space\SpaceAccessResolver:
             public: true
+        App\Application\Memory\MemoryService:
+            public: true
+        App\Domain\Memory\MemoryRegistry: '@App\Infrastructure\Doctrine\DoctrineMemoryRegistry'
+        App\Domain\Space\SpaceCatalog: '@App\Infrastructure\Doctrine\DoctrineSpaceCatalog'

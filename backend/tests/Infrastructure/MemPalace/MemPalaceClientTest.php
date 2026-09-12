@@ -24,6 +24,9 @@ final class MemPalaceClientTest extends TestCase
 {
     private const TOKEN = 'sekretny-token-do-palaca';
 
+    /** @var list<array{method: string, url: string, headers: string}> */
+    private array $requests = [];
+
     public function testSuccessfulCallReturnsTheToolPayload(): void
     {
         $client = $this->clientAnswering([
@@ -37,24 +40,41 @@ final class MemPalaceClientTest extends TestCase
 
     public function testTheTokenTravelsInTheAuthorizationHeader(): void
     {
-        $seen = null;
-        $http = new MockHttpClient(function (string $method, string $url, array $options) use (&$seen): MockResponse {
-            $seen = ['method' => $method, 'url' => $url, 'headers' => $options['normalized_headers'] ?? []];
+        $http = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
+            $this->requests[] = [
+                'method' => $method,
+                'url' => $url,
+                'headers' => $this->headerLines($options),
+            ];
 
             return new MockResponse($this->envelope(['ok' => true]));
         });
 
         $this->client($http)->call('mempalace_status', []);
 
-        self::assertSame('POST', $seen['method'] ?? null);
-        self::assertSame('http://mempalace:8765/mcp', $seen['url'] ?? null);
-        self::assertStringContainsString(
-            'Bearer ' . self::TOKEN,
-            implode("\n", array_map(
-                static fn (array $lines): string => implode("\n", $lines),
-                $seen['headers'] ?? [],
-            )),
-        );
+        self::assertSame('POST', $this->requests[0]['method']);
+        self::assertSame('http://mempalace:8765/mcp', $this->requests[0]['url']);
+        self::assertStringContainsString('Bearer ' . self::TOKEN, $this->requests[0]['headers']);
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function headerLines(array $options): string
+    {
+        $normalized = $options['normalized_headers'] ?? [];
+        if (!\is_array($normalized)) {
+            return '';
+        }
+
+        $lines = [];
+        foreach ($normalized as $header) {
+            foreach (\is_array($header) ? $header : [$header] as $line) {
+                $lines[] = \is_string($line) ? $line : '';
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     public function testErrorInsideTheToolPayloadIsAFailureAndNotAnEmptyResult(): void
