@@ -70,8 +70,12 @@ jobs:
 
       - name: Backend i sprawdzenie zdrowia
         run: |
-          docker compose up -d --wait --wait-timeout 300 backend worker nginx
+          # Kolejność ma znaczenie: worker konsumuje kolejkę, której tabelę
+          # tworzy dopiero migracja. Wystartowany wcześniej wpada w pętlę
+          # restartów i cały przebieg pada na jego stanie zdrowia.
+          docker compose up -d --wait --wait-timeout 300 backend nginx
           docker compose exec -T backend php bin/console doctrine:migrations:migrate --no-interaction
+          docker compose up -d --wait --wait-timeout 120 worker
           # Tutaj — inaczej niż w szybkim przebiegu — oczekujemy 200:
           # wszystkie zależności mają działać naprawdę.
           kod=$(curl -s -o /tmp/zdrowie.json -w '%{http_code}' http://127.0.0.1:8080/api/health)

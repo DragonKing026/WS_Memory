@@ -111,6 +111,24 @@ jobs:
         env:
           DATABASE_URL: postgresql://ws_app:ci@127.0.0.1:5432/ws_memory?serverVersion=18&charset=utf8
 
+      - name: Składnia konfiguracji Symfony
+        # lint:yaml rozumie znaczniki Symfony, w przeciwieństwie do zwykłego
+        # parsera YAML.
+        working-directory: backend
+        run: php bin/console lint:yaml config --parse-tags
+        env:
+          DATABASE_URL: postgresql://ws_app:ci@127.0.0.1:5432/ws_memory?serverVersion=18&charset=utf8
+
+      - name: Rozgrzej kontener dla analizy
+        # phpstan-symfony czyta skompilowany kontener, żeby znać typy usług.
+        # Lokalnie plik istnieje, bo aplikacja chodzi w Dockerze; na czystym
+        # runnerze trzeba go najpierw wytworzyć.
+        working-directory: backend
+        run: php bin/console cache:warmup --env=dev
+        env:
+          APP_ENV: dev
+          DATABASE_URL: postgresql://ws_app:ci@127.0.0.1:5432/ws_memory?serverVersion=18&charset=utf8
+
       - name: Analiza statyczna
         # CodeQL nie obsługuje PHP, a AI findings szuka podatności, nie błędów
         # poprawności (D-018). PHPStan zamyka tę drugą lukę — a w kodzie
@@ -142,18 +160,20 @@ jobs:
           find backend/src backend/tests backend/migrations -name '*.php' -print0 \
             | xargs -0 -n1 -P4 php -l > /dev/null
 
-      - name: Składnia YAML w konfiguracji
+      - name: Składnia YAML workflowów
+        # Tylko pliki workflow. Konfiguracji Symfony NIE sprawdzamy tutaj:
+        # używa własnych znaczników (!tagged_iterator, !service), których
+        # zwykły parser YAML nie zna i zgłasza jako błąd składni. Od tego jest
+        # `lint:yaml` w zadaniu backendu, który te znaczniki rozumie.
         run: |
           python3 - <<'PY'
           import sys, pathlib
           try:
               import yaml
           except ImportError:
-              sys.exit(0)  # brak pyyaml na runnerze nie ma blokować przebiegu
+              print('brak pyyaml — pomijam'); sys.exit(0)
           bledy = 0
-          for plik in pathlib.Path('.').rglob('*.y*ml'):
-              if 'vendor' in plik.parts or 'node_modules' in plik.parts:
-                  continue
+          for plik in pathlib.Path('.github/workflows').glob('*.y*ml'):
               try:
                   list(yaml.safe_load_all(plik.read_text(encoding='utf-8')))
               except Exception as e:
