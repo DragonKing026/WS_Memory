@@ -32,13 +32,18 @@ complete: `TODO-000` (database, embeddings, memory + proof of Polish semantics),
 `TODO-001` (backend as a pure API), `TODO-002` (accounts, invitations, spaces and
 roles), `TODO-003` (memory access with a hard space filter), `TODO-004` (the MCP gateway
 and agent tokens), `TODO-005` (the wiki with revisions and the review queue),
-`TODO-013` (bilingual documentation) and `TODO-014` (CI).
+`TODO-006` (the frontend foundation), `TODO-013` (bilingual documentation) and
+`TODO-014` (CI).
 
 **An AI agent can already connect**: `ws:agent:token` prints a ready
 `claude mcp add`, and **eleven** `ws_*` tools read and write the shared base behind
 a hard space filter — including the wiki, with its full revision history and
-rollback. The **frontend** is what is missing: for now everything happens through
-the API and the command line. Remaining tasks live in `TODO/`.
+rollback.
+
+**The application for people is up too**: signing in, spaces and agent-token
+management at `http://127.0.0.1:8080`. It is missing search (`TODO-007`) and
+document browsing and the editor (`TODO-008`) — until then the wiki is reachable
+through the API and through agents. Remaining tasks live in `TODO/`.
 
 ## What it gives you
 

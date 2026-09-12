@@ -24,14 +24,18 @@ ukończone `TODO-000` (baza, embeddingi, pamięć + dowód polskiej semantyki),
 `TODO-001` (backend jako czyste API), `TODO-002` (konta, zaproszenia,
 przestrzenie i role), `TODO-003` (dostęp do pamięci z twardym filtrem
 przestrzeni), `TODO-004` (gateway MCP i tokeny agentów), `TODO-005`
-(wiki z rewizjami i kolejką propozycji), `TODO-013` (dokumentacja dwujęzyczna)
-i `TODO-014` (CI).
+(wiki z rewizjami i kolejką propozycji), `TODO-006` (fundament frontendu),
+`TODO-013` (dokumentacja dwujęzyczna) i `TODO-014` (CI).
 
 **Agent AI może się już podłączyć**: `ws:agent:token` wypisuje gotowe
 `claude mcp add`, a **jedenaście** narzędzi `ws_*` czyta i zapisuje wspólną bazę
 z twardym filtrem przestrzeni — łącznie z wiki, która ma pełną historię rewizji
-i cofanie. Brakuje **frontendu**: na razie wszystko dzieje się przez API
-i wiersz poleceń. Kolejne zadania w `TODO/`.
+i cofanie.
+
+**Aplikacja dla ludzi też już stoi**: logowanie, przestrzenie i zarządzanie
+tokenami agentów pod `http://127.0.0.1:8080`. Brakuje w niej wyszukiwania
+(`TODO-007`) oraz przeglądania i edytora dokumentów (`TODO-008`) — do tego czasu
+wiki jest dostępna przez API i przez agentów. Kolejne zadania w `TODO/`.
 
 ## Co to daje
 
@@ -63,6 +67,14 @@ Sprawdzenie, czy fundament działa:
 make test-semantyka   # polskie zapytanie musi znaleźć polską treść
 make test             # testy backendu
 curl http://127.0.0.1:8080/api/health
+```
+
+Aplikacja: <http://127.0.0.1:8080>. Pierwsze konto zakłada się z wiersza poleceń,
+bo rejestracji nie ma:
+
+```bash
+docker compose exec backend php bin/console ws:user:invite ty@firma.pl --admin
+docker compose exec backend php bin/console ws:agent:token ty@firma.pl "laptop"
 ```
 
 Pełny opis: [README.docker.md](README.docker.md).

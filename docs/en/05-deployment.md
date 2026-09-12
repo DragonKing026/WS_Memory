@@ -75,6 +75,8 @@ The administrator account arrives together with user management (TODO-002).
 | `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — entity detection; defaults to `en`, see D-011 |
 | `MEMPALACE_TIMEOUT` | timeout for one palace tool call, in seconds (15 by default, set in `backend/.env`) |
 | `MCP_CALLS_PER_MINUTE` | calls per minute one agent token may make (120 by default, `backend/.env`) |
+| `FRONTEND_TARGET` | `dev` (Vite with hot reload) or `prod` (static `dist/` served by nginx) |
+| `WS_DEV_PORT` | the port the browser reaches the application on; the HMR websocket must be advertised there, not on Vite's port |
 
 > **The `worker` service is required from `TODO-005` on, not optional.** Publishing
 > documents to the palace goes through the queue; a stopped worker does not break
