@@ -48,7 +48,7 @@ final class SpaceAccessTest extends WebTestCase
         $this->member = ($accept)(($issue)('czlonek@web-systems.pl')->plainToken, 'Członek', self::PASSWORD);
         $this->stranger = ($accept)(($issue)('obcy@web-systems.pl')->plainToken, 'Obcy', self::PASSWORD);
 
-        $this->teamSpace = new Space('alfa', 'główna aplikacja Symfony zespołu');
+        $this->teamSpace = new Space('alfa', 'Alfa');
         $this->em->persist($this->teamSpace);
         $this->em->persist(new SpaceMember($this->teamSpace, $this->member, SpaceRole::Writer));
         $this->em->flush();

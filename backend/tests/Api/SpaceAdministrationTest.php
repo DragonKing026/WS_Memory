@@ -53,7 +53,7 @@ final class SpaceAdministrationTest extends WebTestCase
             self::PASSWORD,
         );
 
-        $space = new Space('alfa', 'główna aplikacja Symfony zespołu');
+        $space = new Space('alfa', 'Alfa');
         $this->em->persist($space);
         $this->em->persist(new SpaceMember($space, $this->spaceAdmin, SpaceRole::Admin));
         $this->em->persist(new SpaceMember($space, $this->writer, SpaceRole::Writer));
