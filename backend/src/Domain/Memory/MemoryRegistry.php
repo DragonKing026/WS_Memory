@@ -38,6 +38,20 @@ interface MemoryRegistry
     public function spaceFor(DrawerId $id): ?SpaceId;
 
     /**
+     * How many entries each of these spaces holds.
+     *
+     * Answered from our own table rather than from the palace, which is the whole
+     * reason the table exists: an agent asking what it can see must not cost a
+     * semantic query, and a space with no entries has to appear with a zero
+     * rather than vanish from the answer.
+     *
+     * @param list<SpaceId> $spaces
+     *
+     * @return array<string, int> keyed by space slug, one key per requested space
+     */
+    public function countsFor(array $spaces): array;
+
+    /**
      * Runs the given work inside one database transaction.
      *
      * The palace itself takes no part in it — it speaks HTTP and cannot be

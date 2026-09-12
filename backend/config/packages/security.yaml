@@ -27,8 +27,22 @@ security:
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
 
+        # Agents authenticate with their own credential, not a JWT: it has to
+        # live for months, die the moment somebody says so, and carry a scope
+        # that narrows its owner's permissions. A JWT does none of those
+        # (docs/03). Declared before `api` so the JWT listener never sees /mcp.
+        mcp:
+            pattern: ^/mcp
+            stateless: true
+            provider: app_users
+            # Runs on every request here too: a deactivated owner's agents must
+            # stop working without anybody revoking their tokens one by one.
+            user_checker: App\Infrastructure\Security\ActiveAccountChecker
+            custom_authenticators:
+                - App\Infrastructure\Security\AgentTokenAuthenticator
+
         api:
-            pattern: ^/(api|mcp)
+            pattern: ^/api
             stateless: true
             provider: app_users
             # Runs on every authenticated request, not only at sign-in: a JWT
@@ -43,6 +57,7 @@ security:
         - { path: ^/api/invitations/accept, roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/mcp, roles: IS_AUTHENTICATED_FULLY }
 
 when@test:
     security:

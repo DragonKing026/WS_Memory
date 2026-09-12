@@ -17,6 +17,9 @@ parameters:
     # waits for this call, so a generous timeout would mean a long-held row lock
     # rather than a more reliable write.
     mempalace.timeout: '%env(float:MEMPALACE_TIMEOUT)%'
+    # Calls one agent token may make per minute. Counted in the database next to
+    # `last_used_at`, so the limit holds across several backend containers (D-022).
+    mcp.calls_per_minute: '%env(int:MCP_CALLS_PER_MINUTE)%'
     # Public address used in invitation links. In development it is the local
     # nginx; in production the real domain.
     app.public_base_url: '%env(default:app_default_base_url:WS_PUBLIC_URL)%'
@@ -32,12 +35,18 @@ services:
         exclude:
             - '../src/Domain/**/{Entity,ValueObject}'
             - '../src/Kernel.php'
+            # The audit decorator implements McpTool, so registering it as a
+            # service would get it tagged as a tool and injected into the registry
+            # as one — a tool wrapping nothing. It is built by AuditedToolFactory.
+            - '../src/Presentation/Mcp/AuditedTool.php'
 
-    # Health probes are collected by tag: monitoring another dependency means
-    # adding a class, not editing the controller.
+    # Collected by tag, both of them: monitoring another dependency and offering
+    # another MCP tool are each "add a class", never "edit five places".
     _instanceof:
         App\Domain\Health\HealthProbe:
             tags: ['app.health_probe']
+        App\Presentation\Mcp\McpTool:
+            tags: ['app.mcp_tool']
 
     App\Domain\Health\HealthChecker:
         arguments:
@@ -55,6 +64,7 @@ services:
     App\Domain\Memory\MemoryRegistry: '@App\Infrastructure\Doctrine\DoctrineMemoryRegistry'
     App\Domain\Space\SpaceCatalog: '@App\Infrastructure\Doctrine\DoctrineSpaceCatalog'
     App\Domain\Space\SpaceMembershipRepository: '@App\Infrastructure\Doctrine\DoctrineSpaceMembershipRepository'
+    App\Domain\Identity\AgentTokenDirectory: '@App\Infrastructure\Doctrine\DoctrineAgentTokenDirectory'
     App\Domain\Audit\AuditTrail: '@App\Infrastructure\Doctrine\DoctrineAuditTrail'
 
     App\Infrastructure\MemPalace\MemPalaceClient:
@@ -63,7 +73,26 @@ services:
             $token: '%mempalace.token%'
             $timeoutSeconds: '%mempalace.timeout%'
 
+    # The registry wraps every tool in the audit decorator on the way in, so the
+    # whole chain around a tool call is visible in one class rather than scattered
+    # across container decorators.
+    App\Presentation\Mcp\McpToolRegistry:
+        arguments:
+            $registered: !tagged_iterator app.mcp_tool
+
+    App\Presentation\Mcp\McpController:
+        arguments:
+            $callsPerMinute: '%mcp.calls_per_minute%'
+
     App\Presentation\Console\InviteUserCommand:
+        arguments:
+            $publicBaseUrl: '%app.public_base_url%'
+
+    App\Presentation\Console\IssueAgentTokenCommand:
+        arguments:
+            $publicBaseUrl: '%app.public_base_url%'
+
+    App\Presentation\Api\AgentTokenController:
         arguments:
             $publicBaseUrl: '%app.public_base_url%'
 
@@ -88,5 +117,13 @@ when@test:
             public: true
         App\Application\Memory\MemoryService:
             public: true
+        App\Application\AgentToken\IssueAgentToken:
+            public: true
+        App\Application\AgentToken\RevokeAgentToken:
+            public: true
+        App\Presentation\Mcp\McpToolRegistry:
+            public: true
+            arguments:
+                $registered: !tagged_iterator app.mcp_tool
         App\Domain\Memory\MemoryRegistry: '@App\Infrastructure\Doctrine\DoctrineMemoryRegistry'
         App\Domain\Space\SpaceCatalog: '@App\Infrastructure\Doctrine\DoctrineSpaceCatalog'

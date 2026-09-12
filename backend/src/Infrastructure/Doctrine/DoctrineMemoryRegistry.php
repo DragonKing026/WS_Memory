@@ -123,6 +123,37 @@ final readonly class DoctrineMemoryRegistry implements MemoryRegistry
         return \is_string($slug) ? new SpaceId($slug) : null;
     }
 
+    public function countsFor(array $spaces): array
+    {
+        if ([] === $spaces) {
+            return [];
+        }
+
+        $slugs = array_map(static fn (SpaceId $space): string => $space->value, $spaces);
+
+        $rows = $this->connection->fetchAllAssociative(
+            <<<'SQL'
+                SELECT s.slug, count(e.id) AS liczba
+                FROM ws.spaces s
+                LEFT JOIN ws.memory_entries e ON e.space_id = s.id
+                WHERE s.slug IN (:slugs)
+                GROUP BY s.slug
+                SQL,
+            ['slugs' => array_values($slugs)],
+            ['slugs' => ArrayParameterType::STRING],
+        );
+
+        // Every requested space gets a key, including ones the join found nothing
+        // for and ones that no longer exist: a missing key would read as "no
+        // answer" where the answer is zero.
+        $counts = array_fill_keys($slugs, 0);
+        foreach ($rows as $row) {
+            $counts[(string) $row['slug']] = (int) $row['liczba'];
+        }
+
+        return $counts;
+    }
+
     public function transactional(\Closure $work): mixed
     {
         $this->connection->beginTransaction();

@@ -52,6 +52,19 @@ final class InMemoryMemoryRegistry implements MemoryRegistry
         return $this->rows[$id->value]->space ?? null;
     }
 
+    public function countsFor(array $spaces): array
+    {
+        $counts = [];
+        foreach ($spaces as $space) {
+            $counts[$space->value] = \count(array_filter(
+                $this->rows,
+                static fn (MemoryWrite $row): bool => $row->space->value === $space->value,
+            ));
+        }
+
+        return $counts;
+    }
+
     public function transactional(\Closure $work): mixed
     {
         ++$this->transactions;
