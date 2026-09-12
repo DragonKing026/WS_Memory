@@ -81,6 +81,7 @@ Pełny opis: [README.docker.md](README.docker.md).
 | [docs/09-ci.md](docs/09-ci.md) | Ciągła integracja: co kiedy chodzi, co robić przy czerwonym przebiegu |
 | [README.docker.md](README.docker.md) | Uruchomienie stosu, co gdzie jest, sprzątanie |
 | [docs/en/](docs/en/) | Angielskie odpowiedniki (polski jest wersją wiodącą) |
+| [SECURITY.md](SECURITY.md) | Jak zgłosić podatność i co w tym projekcie nią jest |
 | [CHANGELOG.md](CHANGELOG.md) | Historia zmian z datami i godzinami |
 | [TODO/](TODO/) | Zadania; ukończone w `TODO/DONE/` |
 

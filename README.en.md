@@ -88,6 +88,7 @@ Full description: [README.docker.md](README.docker.md).
 | [docs/en/07-frontend.md](docs/en/07-frontend.md) | Vue frontend conventions, screens, rules |
 | [docs/en/08-backend.md](docs/en/08-backend.md) | **The backend: what each part is for** — file map, flows, how to add things |
 | [docs/en/09-ci.md](docs/en/09-ci.md) | Continuous integration: what runs when, what to do when it is red |
+| [SECURITY.md](SECURITY.md) | How to report a vulnerability, and what counts as one here |
 | [CHANGELOG.md](CHANGELOG.md) | Change history with dates and times (Polish only) |
 | [TODO/](TODO/) | Tasks; completed ones in `TODO/DONE/` (Polish only) |
 
