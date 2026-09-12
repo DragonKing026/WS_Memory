@@ -848,3 +848,105 @@ separate pgvector namespace remains (`docs/en/02-data-model.md`).
 wing parameter, this decision should be superseded — a filter on the palace's
 side is cleaner than qualifying names. Migrating would require rewriting the
 facts that already exist.
+
+---
+
+## D-022 — The rate limit lives in the database, in the same row as "last used"
+
+**Date:** 2026-09-12 22:05 · **Status:** Accepted
+
+The rate limit for agent tokens is counted in two columns of `ws.agent_tokens`
+(`calls_in_window`, `window_started_at`), updated by the **same statement** that
+records `last_used_at` and `last_used_ip`. A fixed one-minute window.
+
+**Why not `symfony/rate-limiter`:** it would mean a new dependency (a decision in
+itself — see AGENTS.md) and a storage backend. A filesystem cache is local to one
+container, so with two backend containers the limit stops applying — which is the
+only situation where it is needed at all. Redis would mean another service in the
+stack for one counter.
+
+**Why it costs nothing:** the row has to be written anyway. "When was this token
+last used" is the field without which nobody dares retire any token, so the write
+happens on every call regardless of the limit. Adding the counter to the same
+`UPDATE ... RETURNING` is free, and the result comes straight back.
+
+**Why a fixed window rather than a sliding one:** at one minute, the difference is
+an edge case — an agent can make twice the limit across a window boundary. A
+sliding window would need a list of timestamps instead of a counter. The limit
+exists so a runaway loop cannot swamp the palace, not to bill anybody; double
+speed for one second does not defeat that.
+
+**Consequence:** the limit is **per token**, not per account. A runaway loop in one
+agent does not stop everything else that person has running — covered by
+`testTheLimitIsPerTokenAndNotPerAccount`.
+
+**Rejected:** *a limit in nginx* (`limit_req`) — it works on IP addresses, and a
+team's agents may all sit behind one. It would punish the innocent and could not
+tell tokens apart. It stays as a second line of defence against a flood of
+requests, not as a per-token limit.
+
+---
+
+## D-023 — A failing MCP tool is a JSON-RPC error, not a successful result with an error inside
+
+**Date:** 2026-09-12 22:10 · **Status:** Accepted
+
+When a tool fails, the gateway answers with a **JSON-RPC error** carrying a code
+(`-32003`, `-32010`, …). It does not answer with a success whose payload contains
+the failure.
+
+**This deliberately departs from the MCP specification**, which recommends
+`isError: true` inside the result. The reason is empirical rather than aesthetic:
+MemPalace does exactly what the specification recommends, and **it cost us hours**
+(TODO-000). With the embedding service stopped, its answer was indistinguishable
+from "I found nothing": HTTP 200, no error in the envelope, an empty result list
+and the cause tucked in beside it. A client that has to inspect a payload to learn
+whether a call worked will eventually not bother.
+
+The difference between "there is nothing" and "I could not look" is decisive for
+an agent: the first leads to writing the knowledge down, the second to retrying.
+Confusing them produces duplicates next to content the agent never saw.
+
+**The exception that proves the rule:** lacking permission to read is **not an
+error** — it is an empty result (inviolable rule 7). There the cost runs the other
+way: the message "you have no access to the space HR" itself reveals that such a
+space exists.
+
+**Consequence for clients:** an MCP client that assumes a result is always a
+success will see a protocol error. That is intended — it is meant to see one.
+
+---
+
+## D-024 — An audit entry is written immediately, not when somebody else flushes
+
+**Date:** 2026-09-12 22:15 · **Status:** Accepted
+
+`DoctrineAuditTrail` performs an `INSERT` through DBAL as it is called. It used to
+`persist()` an entity and leave the flush to its caller.
+
+**Why it changed:** that worked for as long as every caller happened to flush. An
+MCP tool call changes no entities, so **nothing flushed and every agent action went
+unrecorded** — with no error to say so. A test in TODO-004 found it by asking for
+the entry and getting none. "The audit will be saved if somebody else flushes
+later" is exactly the kind of silent dependency a code review does not show.
+
+**The trade-off, named:** an entry written inside a transaction that later rolls
+back is rolled back with it; and an entry written just before an unrelated failure
+can report an attempt that never completed. The direction is chosen deliberately: an
+append-only log that occasionally records an attempt is useful, whereas a log whose
+entries silently disappear is **worse than no log**, because it reads as proof that
+nothing happened.
+
+For a failing MCP call the trace survives regardless of the transaction: the
+`AuditedTool` decorator records the exception class **after** the rollback.
+
+**Rejected:** *`flush()` inside `record()`* — a Doctrine flush is global, so
+auditing in the middle of a use case would also commit half-built entities. That is
+a worse bug than the one being fixed.
+
+**Rejected:** *a second connection for auditing only* — an entry would then survive
+a rolled-back transaction, which is more correct. Rejected for now: a second
+connection means its own configuration, its own connection limit and its own
+failure mode, and the gain applies to a case where the decorator already leaves a
+second entry. Worth revisiting when the audit trail is used for accountability
+rather than diagnosis.

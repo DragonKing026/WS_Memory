@@ -834,3 +834,106 @@ wrażliwych zostaje osobny namespace pgvector (`docs/02-model-danych.md`).
 dostały parametr skrzydła, ta decyzja powinna zostać zastąpiona — filtr po
 stronie pałaca jest czystszy niż kwalifikowanie nazw. Migracja wymagałaby
 przepisania istniejących faktów.
+
+---
+
+## D-022 — Limit tempa w bazie, w tym samym wierszu co „ostatnio użyty"
+
+**Data:** 2026-09-12 22:05 · **Stan:** Przyjęta
+
+Ograniczenie tempa dla tokenów agentów liczymy w dwóch kolumnach tabeli
+`ws.agent_tokens` (`calls_in_window`, `window_started_at`), aktualizowanych
+**tym samym zapytaniem**, które zapisuje `last_used_at` i `last_used_ip`.
+Okno stałe, minutowe.
+
+**Dlaczego nie `symfony/rate-limiter`:** wymagałby nowej zależności (a to
+decyzja — patrz AGENTS.md) i magazynu. Magazyn w cache plikowym jest lokalny
+dla kontenera, więc przy dwóch kontenerach backendu limit przestaje
+obowiązywać — a to jedyny scenariusz, w którym w ogóle jest potrzebny. Redis
+oznaczałby kolejną usługę w stosie dla jednego licznika.
+
+**Dlaczego to nic nie kosztuje:** wiersz i tak trzeba zapisać. „Kiedy ten token
+był ostatnio użyty" to pole, bez którego nikt nie odważy się wycofać żadnego
+tokena — więc zapis następuje przy każdym wywołaniu niezależnie od limitu.
+Doliczenie licznika w tym samym `UPDATE ... RETURNING` jest darmowe, a wynik
+wraca od razu.
+
+**Dlaczego okno stałe, nie przesuwane:** przy minutowym oknie różnica dotyczy
+skrajnego przypadku — agent może wykonać dwa razy limit na przełomie okien.
+Przesuwane okno wymagałoby listy znaczników czasu zamiast licznika. Limit
+istnieje, żeby pętla w agencie nie zajechała pałaca, a nie żeby rozliczać
+kwoty; podwójna szybkość w jednej sekundzie tego celu nie psuje.
+
+**Konsekwencja:** limit jest **per token**, nie per konto. Rozbiegana pętla
+w jednym agencie nie zatrzymuje wszystkiego, co dana osoba ma uruchomione —
+pokryte testem `testTheLimitIsPerTokenAndNotPerAccount`.
+
+**Odrzucono:** *limit w nginxie* (`limit_req`) — działa na adresie IP, a wszyscy
+agenci jednego zespołu mogą siedzieć za jednym adresem. Karałby wtedy niewinnych
+i nie odróżniał tokenów. Zostaje jako druga linia obrony przed zalewem żądań,
+nie jako limit dla tokena.
+
+---
+
+## D-023 — Błąd narzędzia MCP jest błędem JSON-RPC, nie treścią udanej odpowiedzi
+
+**Data:** 2026-09-12 22:10 · **Stan:** Przyjęta
+
+Gdy narzędzie zawiedzie, gateway odpowiada **błędem JSON-RPC** z kodem
+(`-32003`, `-32010`, …). Nie odpowiada sukcesem, w którym błąd siedzi w treści.
+
+**To świadome odstępstwo od specyfikacji MCP**, która zaleca `isError: true`
+w wyniku. Powód jest empiryczny, nie estetyczny: MemPalace robi dokładnie to,
+co zaleca specyfikacja, i **kosztowało nas to godziny** (TODO-000). Przy
+zatrzymanym serwerze embeddingów odpowiedź była nie do odróżnienia od „nic nie
+znalazłem": HTTP 200, koperta bez błędu, pusta lista wyników i przyczyna
+schowana obok niej. Klient, który musi zajrzeć w treść, żeby dowiedzieć się,
+czy wywołanie się udało, kiedyś tego nie zrobi.
+
+Różnica między „nic nie ma" i „nie udało się sprawdzić" jest dla agenta
+kluczowa: pierwsze prowadzi do zapisania wiedzy, drugie do ponowienia. Pomylenie
+ich produkuje duplikaty obok treści, której agent nie zobaczył.
+
+**Wyjątek, który potwierdza regułę:** brak uprawnień do odczytu **nie jest
+błędem** — jest pustym wynikiem (reguła nienaruszalna 7). Bo tam koszt jest
+odwrotny: komunikat „nie masz dostępu do przestrzeni Kadry" sam ujawnia, że taka
+przestrzeń istnieje.
+
+**Konsekwencja dla klientów:** klient MCP, który zakłada, że wynik zawsze jest
+sukcesem, zobaczy błąd protokołu. To jest zamierzone — ma zobaczyć.
+
+---
+
+## D-024 — Wpis audytu zapisuje się od razu, nie czeka na cudzy `flush`
+
+**Data:** 2026-09-12 22:15 · **Stan:** Przyjęta
+
+`DoctrineAuditTrail` wykonuje `INSERT` przez DBAL w chwili wywołania. Wcześniej
+robił `persist()` encji i zostawiał `flush` wołającemu.
+
+**Dlaczego zmiana:** to działało, dopóki każdy wołający akurat flushował.
+Wywołanie narzędzia MCP nie zmienia żadnej encji, więc **nic nie flushowało
+i cała aktywność agentów przechodziła bez śladu** — bez żadnego błędu. Wykrył
+to test w TODO-004, który poprosił o wpis i nie znalazł żadnego. Sprzężenie
+„audyt zapisze się, jeśli ktoś inny później flushnie" jest dokładnie tym
+rodzajem cichej zależności, której nie widać w przeglądzie kodu.
+
+**Nazwany kompromis:** wpis wykonany wewnątrz transakcji, która się cofnie,
+cofnie się razem z nią; a wpis zapisany chwilę przed niezwiązaną awarią może
+zgłosić próbę, która się nie dokończyła. Kierunek jest wybrany świadomie:
+dziennik tylko dopisywany, który czasem zapisze próbę, jest użyteczny;
+dziennik, z którego wpisy po cichu znikają, jest **gorszy niż brak dziennika**,
+bo czyta się jako dowód, że nic się nie stało.
+
+Przy nieudanym wywołaniu MCP ślad zostaje niezależnie od transakcji: dekorator
+`AuditedTool` zapisuje wpis z klasą wyjątku **po** wycofaniu transakcji.
+
+**Odrzucono:** *`flush()` w `record()`* — `flush` w Doctrine jest globalny, więc
+audyt w środku przypadku użycia zatwierdzałby też encje w połowie zbudowane.
+To gorszy błąd niż ten, który naprawiamy.
+
+**Odrzucono:** *druga połączenie tylko do audytu* — wpis przetrwałby wycofanie
+transakcji, co jest poprawniejsze. Odrzucone na teraz: drugie połączenie to
+własna konfiguracja, własny limit połączeń i własny tryb awarii, a zysk dotyczy
+przypadku, w którym i tak mamy drugi wpis od dekoratora. Do rozważenia, gdy
+audyt zacznie być używany do rozliczeń, nie do diagnozy.
