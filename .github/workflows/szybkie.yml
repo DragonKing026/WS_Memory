@@ -1,0 +1,153 @@
+# Szybki przebieg — chodzi przy każdym pushu i pull requeście.
+#
+# Celowo NIE stawia serwera embeddingów: pobranie modelu bge-m3 to ~2 GB i
+# 6-8 minut, a sprawdza założenie zmieniające się raz na kwartał. Robi to
+# przebieg nocny (nocne.yml). Tutaj liczy się czas odpowiedzi — poniżej pięciu
+# minut, żeby wynik przyszedł, zanim autor zdąży przełączyć kontekst.
+
+name: Szybkie sprawdzenie
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Pull request z forka nie dostaje żadnych uprawnień poza odczytem.
+permissions:
+  contents: read
+
+concurrency:
+  # Nowszy push na tę samą gałąź unieważnia poprzedni przebieg — nikt nie
+  # czeka na wynik dla kodu, którego już nie ma.
+  group: szybkie-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Testy backendu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ws_memory
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_ENV: test
+      APP_SECRET: ci-nie-jest-sekretem
+      JWT_PASSPHRASE: ci-nie-jest-sekretem
+      # Celowo nieosiągalny: endpoint zdrowia ma wtedy zgłosić pamięć jako
+      # niedostępną, a test sprawdza kontrakt, nie stan świata.
+      MEMPALACE_URL: http://127.0.0.1:9
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, intl, sodium, zip
+          coverage: none
+
+      - name: Cache zależności Composera
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Instalacja zależności
+        working-directory: backend
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Schematy i role w bazie
+        # Odwzorowanie docker/postgres/init: dwa schematy, dwie role z
+        # rozdzielonym search_path. Rola ws_app celowo nie może pisać do
+        # palace — testy mają działać na tych samych ograniczeniach co produkcja.
+        env:
+          PGPASSWORD: ci
+        run: |
+          psql -h 127.0.0.1 -U postgres -d ws_memory -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE EXTENSION IF NOT EXISTS vector;
+          CREATE SCHEMA IF NOT EXISTS palace;
+          CREATE SCHEMA IF NOT EXISTS ws;
+          CREATE ROLE ws_app LOGIN PASSWORD 'ci';
+          GRANT USAGE, CREATE ON SCHEMA ws TO ws_app;
+          GRANT USAGE ON SCHEMA public, palace TO ws_app;
+          ALTER ROLE ws_app SET search_path = ws, public;
+          SQL
+          createdb -h 127.0.0.1 -U postgres ws_memory_test
+          psql -h 127.0.0.1 -U postgres -d ws_memory_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE EXTENSION IF NOT EXISTS vector;
+          CREATE SCHEMA IF NOT EXISTS ws AUTHORIZATION ws_app;
+          GRANT USAGE ON SCHEMA public TO ws_app;
+          SQL
+
+      - name: Klucze JWT
+        working-directory: backend
+        run: php bin/console lexik:jwt:generate-keypair --skip-if-exists
+        env:
+          DATABASE_URL: postgresql://ws_app:ci@127.0.0.1:5432/ws_memory?serverVersion=18&charset=utf8
+
+      - name: Migracje
+        working-directory: backend
+        run: php bin/console doctrine:migrations:migrate --no-interaction --env=test
+        env:
+          DATABASE_URL: postgresql://ws_app:ci@127.0.0.1:5432/ws_memory?serverVersion=18&charset=utf8
+
+      - name: PHPUnit
+        working-directory: backend
+        run: php vendor/bin/phpunit
+        env:
+          DATABASE_URL: postgresql://ws_app:ci@127.0.0.1:5432/ws_memory?serverVersion=18&charset=utf8
+
+  porzadek:
+    name: Dokumentacja i zadania
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Spójność wersji polskiej i angielskiej
+        run: ./scripts/sprawdz-dokumentacje.py
+
+      - name: Rozliczenia ukończonych zadań
+        run: ./scripts/sprawdz-zadania.py
+
+      - name: Składnia PHP
+        run: |
+          # Tanie sito przed PHPStanem: literówka składniowa nie powinna
+          # zajmować minuty na analizę statyczną.
+          find backend/src backend/tests backend/migrations -name '*.php' -print0 \
+            | xargs -0 -n1 -P4 php -l > /dev/null
+
+      - name: Składnia YAML w konfiguracji
+        run: |
+          python3 - <<'PY'
+          import sys, pathlib
+          try:
+              import yaml
+          except ImportError:
+              sys.exit(0)  # brak pyyaml na runnerze nie ma blokować przebiegu
+          bledy = 0
+          for plik in pathlib.Path('.').rglob('*.y*ml'):
+              if 'vendor' in plik.parts or 'node_modules' in plik.parts:
+                  continue
+              try:
+                  list(yaml.safe_load_all(plik.read_text(encoding='utf-8')))
+              except Exception as e:
+                  print(f'{plik}: {e}')
+                  bledy += 1
+          sys.exit(1 if bledy else 0)
+          PY

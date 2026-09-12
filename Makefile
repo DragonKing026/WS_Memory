@@ -7,7 +7,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BAZA_TESTOWA := ws_memory_test
 
-.PHONY: pomoc start stop test test-semantyka sprawdz-dokumentacje migracje konsola logi
+.PHONY: pomoc start stop test test-semantyka sprawdz-dokumentacje sprawdz-zadania sprawdz-wszystko migracje konsola logi
 
 pomoc:  ## Lista poleceń
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/ —/' | sort
@@ -29,6 +29,12 @@ test-semantyka:  ## Dowód, że polskie zapytanie znajduje polską treść
 
 sprawdz-dokumentacje:  ## Spójność wersji polskiej i angielskiej dokumentacji
 	@./scripts/sprawdz-dokumentacje.py
+
+sprawdz-zadania:  ## Czy ukończone zadania mają rozliczenie
+	@./scripts/sprawdz-zadania.py
+
+sprawdz-wszystko: sprawdz-dokumentacje sprawdz-zadania  ## To, co sprawdza CI przed commitem
+	@echo "Wszystko na miejscu." 
 
 # Baza testowa powstaje rolą nadrzędną, bo ws_app celowo nie ma prawa
 # tworzyć baz ani schematów — to samo ograniczenie, które chroni schemat
