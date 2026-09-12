@@ -72,10 +72,16 @@ Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
 | `MEMPALACE_EMBEDDING_API_URL` | `http://embeddings/v1/embeddings` |
 | `MEMPALACE_EMBEDDING_API_MODEL` | `BAAI/bge-m3` |
 | `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — wykrywanie encji; domyślnie `en`, patrz D-011 |
+| `MEMPALACE_TIMEOUT` | limit czasu na jedno wywołanie narzędzia pałaca, w sekundach (domyślnie 15, ustawiany w `backend/.env`) |
 | `MAILER_DSN` | zaproszenia i powiadomienia |
 
-Trzy ostatnie zmienne MemPalace są **nierozdzielne** — patrz D-003. Zmiana
-modelu unieważnia wszystkie wektory w bazie.
+Trzy zmienne embeddingów (`MEMPALACE_EMBEDDING_*`) są **nierozdzielne** — patrz
+D-003. Zmiana modelu unieważnia wszystkie wektory w bazie.
+
+`MEMPALACE_TIMEOUT` trzymamy **krótki celowo**. Przez czas oczekiwania na pałac
+otwarta jest transakcja bazy (D-020), więc hojny limit nie daje pewniejszego
+zapisu, tylko dłużej trzymany wiersz. Jeśli zapisy zaczynają przekraczać limit,
+problemem jest serwer embeddingów, nie ta liczba.
 
 ## Sekrety a publiczne repozytorium
 

@@ -73,10 +73,17 @@ The administrator account arrives together with user management (TODO-002).
 | `MEMPALACE_EMBEDDING_API_URL` | `http://embeddings/v1/embeddings` |
 | `MEMPALACE_EMBEDDING_API_MODEL` | `BAAI/bge-m3` |
 | `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — entity detection; defaults to `en`, see D-011 |
+| `MEMPALACE_TIMEOUT` | timeout for one palace tool call, in seconds (15 by default, set in `backend/.env`) |
 | `MAILER_DSN` | invitations and notifications |
 
-The three MemPalace embedding variables are **inseparable** — see D-003.
-Changing the model invalidates every vector in the database.
+The three MemPalace embedding variables (`MEMPALACE_EMBEDDING_*`) are
+**inseparable** — see D-003. Changing the model invalidates every vector in the
+database.
+
+`MEMPALACE_TIMEOUT` is kept **short on purpose**. A database transaction stays
+open for the duration of a palace call (D-020), so a generous timeout buys no
+extra reliability — only a longer-held row. If writes start exceeding it, the
+problem is the embedding service, not this number.
 
 ## Secrets and a public repository
 
