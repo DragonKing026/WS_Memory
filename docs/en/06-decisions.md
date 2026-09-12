@@ -824,7 +824,7 @@ not an entity, and nobody queries by it. The separator is `::`, because entity
 names come from prose and a single colon occurs in them ("Note: deadline").
 
 **A side effect, named plainly:** MemPalace will not connect
-`wing_alfa::Tenanto` to `wing_beta::Tenanto`. Graph traversal and entity
+`wing_alfa::Symfony` to `wing_beta::Symfony`. Graph traversal and entity
 detection work within a space, not across spaces. **This is intended** — a
 relationship crossing a space boundary would be a leak, not a feature.
 

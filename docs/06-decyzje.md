@@ -809,8 +809,8 @@ osiągalne z każdej przestrzeni. Orzeczenie zostaje nagie: to typ relacji, nie
 encja, i nikt po nim nie pyta. Separatorem jest `::`, bo nazwy encji pochodzą
 z prozy, a jeden dwukropek w nich występuje („Uwaga: termin").
 
-**Skutek uboczny, nazwany wprost:** MemPalace nie połączy `wing_alfa::Tenanto`
-z `wing_beta::Tenanto`. Przechodzenie grafu i wykrywanie encji działa w obrębie
+**Skutek uboczny, nazwany wprost:** MemPalace nie połączy `wing_alfa::Symfony`
+z `wing_beta::Symfony`. Przechodzenie grafu i wykrywanie encji działa w obrębie
 przestrzeni, nie między nimi. **To jest zamierzone** — relacja przez granicę
 przestrzeni byłaby wyciekiem, nie funkcją.
 

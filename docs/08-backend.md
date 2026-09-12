@@ -5,8 +5,9 @@ tags: [ws-memory, dokumentacja, backend, symfony, warstwy, api]
 # Backend — co do czego służy
 
 Stan: **działa** (2026-09-12). Zaimplementowane: zdrowie, zaproszenia, konta,
-logowanie, przestrzenie i role, audyt. Brakuje: gateway MCP (TODO-004), wiki
-(TODO-005), publikacja z lokalnych pałaców (TODO-012).
+logowanie, przestrzenie i role, audyt, **dostęp do pamięci** (szukanie, zapis,
+graf wiedzy, dziennik). Brakuje: gateway MCP (TODO-004), wiki (TODO-005),
+publikacja z lokalnych pałaców (TODO-012).
 
 Ten dokument opisuje **każdy element backendu i powód jego istnienia**. Jeśli
 nie wiesz, gdzie dopisać nową rzecz — zacznij tutaj.
@@ -46,6 +47,18 @@ mieszkają w `Domain/`.
 | `Space/SpaceRole.php` | Rola w przestrzeni: `reader` / `writer` / `admin`. Uporządkowana siłą, więc „co najmniej piszący" to porównanie, a nie lista przypadków, którą ktoś zapomni rozszerzyć przy czwartej roli. |
 | `Space/SpaceMembershipRepository.php` | **Port**: skąd biorą się członkostwa. Zadeklarowany w domenie, zaimplementowany w infrastrukturze. |
 | `Space/SpaceAccessResolver.php` | **Jedyne miejsce liczące uprawnienia.** Każdy odczyt i zapis przechodzi tędy. Nie ma cache — odebrana rola przestaje działać natychmiast, nie po wygaśnięciu czegokolwiek. |
+| `Space/SpaceCatalog.php` | **Port**: czym jest przestrzeń (skrzydło w pałacu, która jest prywatna) — w odróżnieniu od tego, kto ma do niej prawo. Osobno od członkostw, bo jedno czyta się na ścieżce uprawnień każdego żądania, a drugie dopiero wtedy, gdy przestrzeń już jest dozwolona. |
+| `Memory/PalaceWing.php` | Nazwa skrzydła — **jedyna oś, po której da się filtrować pamięć**. Typ nie przyjmuje wartości pustej, więc zapytanie bez filtra przestrzeni (reguła 3) jest niewyrażalne, a nie tylko zabronione. Zna też zasadę kwalifikowania nazw encji w grafie (D-021). |
+| `Memory/DrawerId.php` | Identyfikator treści w pałacu. `forFact()` wylicza stabilny odcisk dla faktu grafu, bo pałac nie zwraca dla faktów żadnego identyfikatora — wyliczany w jednym miejscu, bo zapis i odczyt muszą się na nim zgadzać co do znaku. |
+| `Memory/MemoryKind.php` | Klasa wiedzy (`note` / `document` / `diary` / `kg_fact` / `transcript`) i **jedyne miejsce mapujące ją na pokój pałaca**. Rozjazd między zapisem a odczytem nie dałby błędu, tylko treść zapisaną tam, gdzie nikt jej nie szuka. |
+| `Memory/MemoryQuery.php` | Czego szukamy — i celowo **nie** gdzie. Obiekt, który mógłby nieść skrzydło, pozwoliłby podać je z ciała żądania. |
+| `Memory/MemoryFragment.php` | Jedna treść wracająca z pamięci. `space` puste znaczy „jeszcze nieuwierzytelnione" — serwis nie wydaje fragmentu w tym stanie. |
+| `Memory/KnowledgeFact.php` | Trójka grafu wiedzy z okresem ważności. Odcisk nie zależy od okresu: przedłużenie ważności nie może zmieniać tożsamości faktu. |
+| `Memory/MemoryStore.php` | **Port**: silnik pamięci. `search()` przyjmuje `PalaceWing` jako pierwszy, nieopcjonalny argument — stąd gwarancja filtra. Jedno skrzydło na wywołanie, bo pałac filtruje po jednym. |
+| `Memory/MemoryRegistry.php` | **Port**: nasz rejestr treści w pałacu. Wyznacza też granicę transakcji — zapis jest realny, gdy jest zaksięgowany (D-020). |
+| `Memory/MemoryWrite.php` | Wiersz do zaksięgowania. Obiekt parametrów, bo lista będzie rosła przy publikacji z lokalnych pałaców (TODO-012). Tytuł i skrót treści wylicza w jednym miejscu. |
+| `Memory/MemoryUnavailable.php` | „Nie mogłem sprawdzić" — odrębne od „nic nie znalazłem". Agent, któremu powiemy „nic nie ma", zapisze tę wiedzę drugi raz obok kopii, której nie zobaczył. |
+| `Memory/MemoryAccessDenied.php` | Odmowa **zapisu**. Odczyt poza uprawnieniami odpowiada pusto, bo komunikat „nie masz dostępu do Kadr" sam jest wyciekiem. |
 | `Audit/AuditTrail.php` | **Port**: zapis, kto co zrobił. W domenie, bo audyt jest regułą tego systemu, nie wygodą infrastruktury (D-016). |
 | `Health/*` | Port `HealthProbe` + `HealthChecker` składający raport. Monitorowanie kolejnej zależności to dodanie klasy, nie edycja kontrolera. |
 
@@ -56,6 +69,7 @@ mieszkają w `Domain/`.
 | `Invitation/IssueInvitation.php` | Wystawia zaproszenie. Token losowy, w bazie **wyłącznie skrót**; jawna wartość wraca raz i nigdzie nie jest zapisywana. |
 | `Invitation/AcceptInvitation.php` | Zamienia zaproszenie w konto **razem z prywatną przestrzenią, w jednej transakcji**. Zapis bez wskazanej przestrzeni ląduje właśnie tam (reguła 6), więc konto bez niej wywracałoby pierwszy zapis agenta. |
 | `Invitation/IssuedInvitation.php` | Obiekt wyniku z jawnym tokenem. **Nie jest usługą** — wykluczony z kontenera. |
+| `Memory/MemoryService.php` | **Jedyne wejście do pamięci.** REST i MCP wołają tę klasę i nic pod nią, więc wybór drzwi nie zmienia odpowiedzi (D-008). Tu mieszka rozsyłanie zapytania po skrzydłach, przerankowanie wyników, druga warstwa filtrowania (D-019), domyślna przestrzeń prywatna (reguła 6) i etykieta autora. Nic powyżej tej warstwy nie ma prawa trzymać `MemoryStore`. |
 
 ### `Infrastructure/` — adaptery portów
 
@@ -64,6 +78,12 @@ mieszkają w `Domain/`.
 | `Doctrine/DoctrineSpaceMembershipRepository.php` | Czyta członkostwa **przez DBAL, nie przez ORM**. To zapytanie leży na ścieżce uprawnień każdego żądania, a hydracja encji wstawiłaby identity map między odebranie roli a jego skutek — czyli dokładnie ten cache, którego resolver obiecuje nie mieć. |
 | `Doctrine/DoctrineAuditTrail.php` | Zapisuje wpisy audytu. IP i przeglądarkę bierze z bieżącego żądania, nie z parametrów — gdyby były parametrem, część wywołań by o nich zapomniała, a wpis bez pochodzenia odpowiada na połowę pytania, po co istnieje. |
 | `Doctrine/DatabaseHealthProbe.php` | Sonda: czy baza odpowiada. |
+| `Doctrine/DoctrineMemoryRegistry.php` | Rejestr na DBAL. Przestrzeń rozwiązuje **wewnątrz INSERT-a** po slugu — osobny SELECT otwierałby okno, w którym przestrzeń znika między sprawdzeniem a zapisem. Trzyma też granicę transakcji. |
+| `Doctrine/DoctrineSpaceCatalog.php` | Skrzydło przestrzeni i przestrzeń prywatna użytkownika. Prywatną sprawdza **po konwencji slugu ORAZ po fladze** — przestrzeń nazwana ręcznie `priv_<uuid>` bez flagi nie może stać się miejscem, gdzie lądują cudze zapisy. |
+| `MemPalace/MemPalaceClient.php` | Cienki klient JSON-RPC. Dwie rzeczy nieoczywiste: **ponawia wyłącznie odczyty** (powtórzony zapis zakłada drugą szufladę) i **nigdy nie wpuszcza tokena do komunikatu błędu** — tak sekrety najczęściej wyciekają. |
+| `MemPalace/CallOutcome.php` | Wynik jednego wywołania narzędzia. Istnieje, bo MemPalace zgłasza awarię **wewnątrz** payloadu: HTTP 200, koperta bez błędu, a przyczyna obok pustej listy wyników. Rozróżnia też „nie ma takiej szuflady" od awarii. |
+| `MemPalace/McpMemoryStore.php` | Adapter portu pamięci — **jedyne miejsce znające nazwy narzędzi MemPalace** i kształt ich odpowiedzi. Aktualizacja pałaca (D-001) dotyka tego pliku i żadnego innego. |
+| `MemPalace/MemPalaceUnavailable.php` | Jedna awaria na wiele przyczyn: odmowa połączenia, limit czasu, HTTP 500, niezrozumiała koperta, błąd narzędzia. Wołający ma w każdym z tych przypadków te same możliwości. |
 | `MemPalace/MemPalaceHealthProbe.php` | Sonda: czy pamięć odpowiada. Pyta `/healthz` z krótkim limitem czasu — zawieszony healthcheck jest gorszy od negatywnego. |
 | `Security/ActiveAccountChecker.php` | Odrzuca konta nieaktywne — przy logowaniu **i przy każdym kolejnym żądaniu**. JWT jest ważny kryptograficznie aż do wygaśnięcia, więc bez tego zwolniona osoba czytałaby bazę jeszcze przez cały czas życia ostatniego tokena. |
 | `Security/LoginAuditSubscriber.php` | Audyt logowań. Wisi na zdarzeniach bezpieczeństwa, bo kontroler logowania **nigdy się nie wykonuje** — firewall odpowiada pierwszy. |
@@ -85,7 +105,7 @@ mieszkają w `Domain/`.
 | Encja | Uwagi konstrukcyjne |
 |---|---|
 | `User` | Konta się **dezaktywuje, nie usuwa** — rewizje i wpisy audytu wskazują autora, a historia bez autora przestaje być dowodem. `ROLE_USER` jest domyślna i nieprzechowywana. |
-| `Space` | `Space::privateFor()` tworzy przestrzeń prywatną `priv_<uuid>`. `palace_namespace` niepuste = osobne tabele pgvector dla przestrzeni wrażliwych. |
+| `Space` | `Space::privateFor()` tworzy przestrzeń prywatną `priv_<uuid>` — konwencję slugu trzyma `SpaceId::privateFor()`, żeby zapis i wyszukanie nie mogły się rozjechać. `palace_namespace` niepuste = osobne tabele pgvector dla przestrzeni wrażliwych. |
 | `SpaceMember` | **Klucz złożony** `(space, user)`: dwie role jednej osoby w jednej przestrzeni są niereprezentowalne, więc pytanie „która wygrywa" nie może paść. |
 | `Invitation` | Tylko skrót tokena. `isUsable()` łączy „niewykorzystane" i „nieprzeterminowane" w jednym miejscu, żeby drugie wejście nie zapomniało o jednym z warunków. |
 | `AuditLog` | Dopisywany, nigdy nie zmieniany. Aktor zapisany **zwykłym identyfikatorem, nie kluczem obcym** — dezaktywacja konta nie rusza zapisu tego, co zrobiło. |
@@ -122,9 +142,41 @@ bazie, jawny token raz na wyjściu) → osoba otwiera link →
 konto, prywatną przestrzeń i członkostwo w jednej transakcji → wpis
 `invitation.accepted`.
 
+### Szukanie w pamięci
+
+1. Wołający (REST albo MCP) buduje `Actor` i `MemoryQuery`. **Zapytanie nie ma
+   pola „przestrzeń" po stronie pałaca** — może jedynie zawęzić listę, którą i
+   tak przecinamy z uprawnieniami.
+2. `MemoryService` liczy dozwolone przestrzenie przez `SpaceAccessResolver`.
+   Puste przecięcie → **pusta odpowiedź i zero wywołań pałaca**. To nie jest
+   optymalizacja: właśnie tutaj skrót „nie ma przestrzeni, więc bez filtra"
+   zamieniłby się w zapytanie po całej bazie.
+3. Dla każdej dozwolonej przestrzeni `SpaceCatalog` podaje skrzydło, a
+   `McpMemoryStore` wykonuje **jedno `mempalace_search` na skrzydło**. Pałac
+   filtruje po jednym skrzydle, nie po liście — stąd rozsyłanie.
+4. Wyniki są **przerankowane** i ucięte do limitu. Sklejenie odpowiedzi bez
+   przerankowania dałoby najlepsze N z przestrzeni, która trafiła pierwsza.
+5. **Druga warstwa:** rejestr mówi, w której przestrzeni siedzi każda szuflada.
+   Czego nie zna albo co umieszcza gdzie indziej — wypada (D-019).
+6. Wpis w audycie: zapytanie, przestrzenie, liczba wyników.
+
+### Zapis do pamięci
+
+1. Przestrzeń docelowa: wskazana albo **prywatna właściciela** (reguła 6).
+   Brak prywatnej przestrzeni to zepsute konto, nie brakujący argument —
+   `AcceptInvitation` tworzy ją w tej samej transakcji co konto.
+2. `SpaceAccessResolver` sprawdza prawo **zapisu**. Odmowa jest wyjątkiem, nie
+   pustą odpowiedzią: agent sam wskazał przestrzeń, więc i tak wie, że istnieje.
+3. Otwiera się transakcja rejestru. W niej: `mempalace_add_drawer` → wiersz w
+   `ws.memory_entries` → wpis audytu → zatwierdzenie.
+4. Błąd pałaca cofa transakcję, w której nic jeszcze nie było. Błąd księgowania
+   cofa wiersz i **zostawia szufladę w pałacu** — kierunek awarii wybrany
+   świadomie (D-020), bo szuflada bez wiersza jest niewidoczna, a wiersz bez
+   szuflady byłby wynikiem, którego nie da się otworzyć.
+
 ## Uprawnienia od końca do końca
 
-Cztery warstwy, każda pokryta testem negatywnym:
+Pięć warstw, każda pokryta testem negatywnym:
 
 1. **Firewall** — bez ważnego JWT nie ma dostępu do `/api` poza zdrowiem,
    logowaniem, akceptacją zaproszenia i dokumentacją kontraktu.
@@ -133,6 +185,9 @@ Cztery warstwy, każda pokryta testem negatywnym:
 3. **Kontroler** — sprawdza uprawnienie przed istnieniem i zwraca `404` tam,
    gdzie `403` zdradzałoby istnienie zasobu.
 4. **Audyt** — każda zmiana stanu zostawia wpis z aktorem, IP i przeglądarką.
+5. **Pamięć — dwa filtry, nie jeden.** Skrzydło zawęża pytanie do pałaca,
+   rejestr sprawdza odpowiedź (D-019). Pierwszy chroni przed naszym błędem w
+   zapytaniu, drugi przed rozjazdem między dwoma magazynami.
 
 Administrator globalny **nie czyta cudzych przestrzeni po cichu** (D-016).
 Może nadać sobie rolę — i to zostaje w dzienniku.
@@ -147,6 +202,7 @@ różnic wymaga DBAL `^4.5`, a stabilne jest 4.4.4. Mapowanie sprawdzamy przez
 |---|---|
 | `Version20260912000001` | Kolejka Messengera w `ws`, z wyzwalaczem `LISTEN/NOTIFY`. |
 | `Version20260912000002` | Konta, zaproszenia, przestrzenie, role, dziennik audytu. |
+| `Version20260912000003` | Rejestr treści w pałacu (`ws.memory_entries`). |
 
 **Pułapka `schema_filter`** — opisana w `docs/05-deployment.md`. W skrócie: filtr
 `~^ws\.~` odrzuca własne tabele, bo przy `search_path = ws` DBAL zwraca je bez
@@ -161,6 +217,12 @@ kwalifikacji schematem. Poprawny wzorzec **wyklucza** `palace`.
 | `Api/AuthenticationTest.php` | Logowanie, `/api/me`, identyczna odmowa dla złego hasła i nieznanego konta, audyt. |
 | `Api/SpaceAccessTest.php` | `404` zamiast `403`, identyczność odpowiedzi, lista tylko własnych przestrzeni, natychmiastowy skutek odebrania roli. |
 | `Api/SpaceAdministrationTest.php` | Kto **nie może**: piszący nie awansuje siebie, obcy dostaje `404`, przestrzeni prywatnej nie da się udostępnić. |
+| `Application/Memory/MemoryServiceTest.php` | Pamięć **bez pałaca i bez bazy**: puste przecięcie przestrzeni nie odpytuje pałaca wcale, szuflada z obcej przestrzeni odpada, nieznana szuflada odpowiada identycznie jak zabroniona, nieudane zaksięgowanie cofa zapis. Podwójki pisane ręcznie, żeby test czytał ruch do pałaca, a nie sprawdzał, że wywołaliśmy metodę. |
+| `Infrastructure/MemPalace/MemPalaceClientTest.php` | Przewód: błąd w payloadzie zamiast w kopercie, HTTP 5xx, niezrozumiała treść, ponowienie odczytu, **brak ponowienia zapisu**, brak tokena w komunikacie błędu. |
+| `Infrastructure/MemPalace/McpMemoryStoreTest.php` | Tłumaczenie na dialekt MemPalace, sprawdzone wobec pól, które **realnie** zwraca żywy pałac 3.7.0. |
+| `Infrastructure/Doctrine/DoctrineMemoryRegistryTest.php` | To, czego podwójka sprawdzić nie może: indeks unikalny, klucz obcy, wycofanie transakcji, `tags` w obie strony. |
+| `Infrastructure/Doctrine/DoctrineSpaceCatalogTest.php` | Skrzydło różne od slugu, przestrzeń prywatna po akceptacji zaproszenia, podróbka `priv_*` bez flagi. |
+| `Integration/MemoryOnLivePalaceTest.php` | **Cały łańcuch na żywym pałacu**: polskie zapytanie innymi słowami, odmowa dla obcego, szuflada wstawiona poza rejestrem, filtr pokoju, obieg faktu w grafie. Pomijany, gdy pałac nie odpowiada — więc szybkie CI zostaje szybkie, a przebieg nocny to wykonuje. |
 
 Uruchomienie: `make test` (przygotowuje bazę testową i uruchamia PHPUnit).
 
@@ -183,13 +245,19 @@ negatywnym. Druga metoda liczenia uprawnień to druga metoda pomylenia się.
 **Nową migrację:** ręcznie w `migrations/`, nazwa `VersionRRRRMMDDNNNNNN`.
 Tylko schemat `ws` — do `palace` nie piszemy nigdy (D-004).
 
+**Nową operację na pamięci:** metoda w `MemoryService`, nigdy nowy wołający
+`MemoryStore`. Serwis jest granicą uprawnień; obejście go omija oba filtry
+(D-019) i księgowanie (D-020). Jeśli potrzebujesz nowego narzędzia MemPalace,
+dodaj je do portu `MemoryStore` i do `McpMemoryStore` — nazwy narzędzi nie
+wolno wypuszczać wyżej.
+
 **Nową zależność:** wpierw decyzja `D-0xx` w `docs/06-decyzje.md`.
 
 ## Konfiguracja
 
 | Plik | Co ustawia |
 |---|---|
-| `config/services.yaml` | Autowiring, tag sond zdrowia, adres MemPalace, publiczny adres. Blok `when@test` udostępnia trzy usługi testom. |
+| `config/services.yaml` | Autowiring, tag sond zdrowia, adres MemPalace, **token i limit czasu pałaca**, jawne powiązania portów z adapterami, publiczny adres. Blok `when@test` udostępnia testom kilka usług po nazwie. |
 | `config/packages/doctrine.yaml` | Połączenie, `schema_filter` ukrywający `palace`, mapowanie encji. |
 | `config/packages/security.yaml` | Firewalle: zdrowie bez zabezpieczeń, `json_login`, JWT dla `/api` i `/mcp`. W testach obniżony koszt hashowania. |
 | `config/packages/messenger.yaml` | Kolejka w bazie, `auto_setup: false` — tabelę tworzy migracja. |
@@ -201,3 +269,11 @@ Tylko schemat `ws` — do `palace` nie piszemy nigdy (D-004).
   obsługuje jeszcze Symfony 8 (wymaga `symfony/console ^7`). Do czasu wydania
   zgodnej wersji token wygasa i trzeba zalogować się ponownie.
 - **Brak wysyłki maili z zaproszeniami** — link trzeba przekazać ręcznie.
+- **Graf wiedzy nie łączy encji między przestrzeniami.** `wing_alfa::Symfony`
+  i `wing_beta::Symfony` są dla MemPalace dwiema encjami, bo zakres wchodzi do
+  klucza (D-021). Zamierzone: relacja przez granicę przestrzeni byłaby wyciekiem.
+- **Znacznik `tags` nie trafia do pałaca** — MemPalace 3.7 nie ma pola na
+  znaczniki w `add_drawer`. Trzymamy je w `ws.memory_entries`, czyli są
+  przeszukiwalne w SQL, ale nie wpływają na wyszukiwanie semantyczne.
+- **Nie ma rekompensaty dla sierot w pałacu** — szufladę bez wiersza w rejestrze
+  raportuje zadanie cykliczne, nikt jej automatycznie nie usuwa (D-020).

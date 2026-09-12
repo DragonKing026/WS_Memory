@@ -71,7 +71,7 @@ final readonly class KnowledgeFact
      * A stable digest of the triple, ignoring its validity window.
      *
      * Case- and whitespace-insensitive: the palace is queried with whatever an
-     * agent typed, and "Tenanto" written twice with different capitalisation is
+     * agent typed, and "PostgreSQL" written twice with different capitalisation is
      * one fact, not two. The window is left out on purpose — extending a fact's
      * validity must not change its identity, or the extension would register as
      * a new fact and the old row would linger unreachable.
