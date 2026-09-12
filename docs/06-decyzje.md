@@ -702,3 +702,135 @@ i tak byśmy ich nie pisali.
 Potrafi zgłosić rzeczy, których nie ma, i przeoczyć te, które są. Traktujemy
 jego wyniki jako podpowiedź do przejrzenia, nie jako bramkę blokującą scalenie.
 Bramką jest PHPStan i testy — one dają ten sam wynik przy każdym uruchomieniu.
+
+---
+
+## D-019 — Dwie warstwy filtrowania: skrzydło przed pytaniem, rejestr po odpowiedzi
+
+**Data:** 2026-09-12 21:10 · **Stan:** Przyjęta
+
+Odczyt pamięci przechodzi przez **dwa** niezależne filtry. Pierwszy zawęża
+pytanie: każde wywołanie `mempalace_search` niesie skrzydło jednej dozwolonej
+przestrzeni. Drugi sprawdza odpowiedź: szuflada, której `ws.memory_entries`
+nie umieszcza w dozwolonej przestrzeni, **nie wychodzi na zewnątrz** — również
+wtedy, gdy przyszła ze skrzydła, o które sami zapytaliśmy.
+
+**Dlaczego dwa, skoro pierwszy wystarcza:** pałac jest osobnym procesem z
+własną historią. Można go zaktualizować, przywrócić z kopii starszej niż nasza
+tabela, można w nim ręcznie coś poprawić. Jego odpowiedź nie jest dowodem
+przynależności treści — jest tylko odpowiedzią. Pierwsza warstwa chroni przed
+naszym błędem w zapytaniu, druga przed rozjazdem między dwoma magazynami.
+
+Filtr drugi **nie zastępuje** pierwszego i nie wolno ich zamienić kolejnością.
+Samo filtrowanie odpowiedzi to dokładnie to, czego zabrania reguła
+nienaruszalna nr 3: treść zostałaby pobrana z niedozwolonej przestrzeni, a o
+tym, czy wyjdzie dalej, decydowałby kod aplikacji.
+
+**Co się dzieje z treścią nieznaną rejestrowi:** jest **pomijana**, nie
+zgłaszana jako błąd. Szuflada bez wiersza w rejestrze to sygnał rozjazdu
+(reguła integralności nr 5 w `docs/02-model-danych.md`) i raportuje go zadanie
+cykliczne. Na ścieżce odczytu pominięcie jest bezpiecznym kierunkiem awarii:
+nieznana treść jest niewidoczna, zamiast być widoczna bez sprawdzenia.
+
+**Konsekwencja w kodzie:** `MemoryService::keepOnlyRegistered()`. Pokryte
+testami `testDrawerThePalaceReturnsFromAnUnregisteredWingIsDropped`,
+`testDrawerUnknownToTheRegistryIsDropped` oraz — na żywym pałacu —
+`testDrawerFiledStraightIntoOurWingIsNotReturned`, który wstawia szufladę
+wprost do naszego skrzydła, obchodząc rejestr.
+
+**Odrzucono:** *zaufać skrzydłu i nie sprawdzać wyników* — o jedno zapytanie SQL
+mniej na odczyt. Odrzucone, bo cena błędu jest niesymetryczna: oszczędzamy
+milisekundy, a ryzykujemy pokazanie komuś treści z przestrzeni, do której nie
+ma prawa. Tego rodzaju awaria nie zgłasza się sama.
+
+---
+
+## D-020 — Sierota w pałacu jest dopuszczalna, sierota w rejestrze nie
+
+**Data:** 2026-09-12 21:15 · **Stan:** Przyjęta
+
+Zapis do pamięci to dwa magazyny: pałac (HTTP, nie ma transakcji) i nasza baza
+(transakcja jest). Rozproszonej transakcji między nimi nie ma i nie będzie,
+więc trzeba **wybrać kierunek awarii**. Wybieramy ten: pałac może zostać z
+szufladą, na którą nie wskazuje żaden wiersz; **odwrotnie nigdy**.
+
+Kolejność jest więc taka: otwórz transakcję → zapisz do pałaca → zaksięguj
+wiersz → zatwierdź. Błąd pałaca cofa transakcję, w której nic jeszcze nie
+było. Błąd księgowania cofa wiersz i zostawia szufladę w pałacu.
+
+**Dlaczego tak, a nie odwrotnie:** szuflada bez wiersza jest **niewidoczna** —
+druga warstwa filtrowania (D-019) odrzuca wszystko, czego rejestr nie zna.
+Wiersz bez szuflady byłby wynikiem wyszukiwania, którego nie da się otworzyć:
+widać tytuł, klik daje błąd. Pierwsze jest stratą miejsca, drugie jest błędem,
+który zgłasza użytkownik.
+
+**Konsekwencje:** `MemoryRegistry::transactional()` wyznacza granicę, a limit
+czasu na wywołanie pałaca (`MEMPALACE_TIMEOUT`, domyślnie 15 s) jest krótki
+właśnie dlatego, że przez ten czas transakcja jest otwarta. Hojny limit nie
+dawałby pewniejszego zapisu, tylko dłużej trzymany wiersz.
+
+Zapisów **nie ponawiamy**. Powtórzony `mempalace_add_drawer` zakłada drugą
+szufladę i nic później nie odróżni jej od treści zapisanej dwa razy celowo —
+kontrola duplikatów w MemPalace porównuje treść, nie intencję. Przy błędzie
+zapisu nie wiemy, czy dotarł, więc zgłaszamy awarię. Odczyty ponawiamy, bo
+powtórzone szukanie kosztuje jedno zapytanie.
+
+**Odrzucono:** *zapis do pałaca przed transakcją, rejestr po* — prostsze w
+kodzie, bo transakcja nie obejmuje wywołania HTTP. Odrzucone, bo wtedy „w tej
+samej transakcji" przestaje cokolwiek znaczyć, a błąd księgowania nadal
+zostawia szufladę — zyskujemy krótszą transakcję i tracimy jedyną gwarancję,
+jaką mamy.
+
+**Odrzucono:** *rekompensata — przy błędzie księgowania usuń szufladę z pałaca* —
+poprawne w teorii. Odrzucone na teraz, bo usuwanie też może zawieść i wtedy
+trzeba kolejki rekompensat; a skoro sierota w pałacu jest niewidoczna,
+rozwiązujemy problem, który nie boli. Zadanie cykliczne je raportuje.
+
+---
+
+## D-021 — Graf wiedzy zakresujemy kwalifikowaną nazwą encji, nie filtrem
+
+**Data:** 2026-09-12 21:20 · **Stan:** Przyjęta
+
+`mempalace_kg_query` przyjmuje **wyłącznie** encję — nie ma parametru skrzydła,
+pokoju ani żadnej innej osi. Graf wiedzy w MemPalace 3.7.0 jest jeden i wspólny
+dla całego pałaca. Reguła nienaruszalna nr 3 zabrania zaś pytać bez filtra
+przestrzeni i filtrować wyniki po pobraniu.
+
+Rozwiązanie: **zakres wchodzi do klucza**. Fakt zapisujemy pod nazwą
+kwalifikowaną skrzydłem — `wing_alfa::WS_Memory` — i pod taką samą pytamy.
+Zapytanie o cudzą przestrzeń nie zwraca faktów do odfiltrowania; ono ich **nie
+dopasowuje**. Przedrostek zdejmujemy przed zwróceniem wyniku, więc dla agenta
+encja nazywa się tak, jak ją napisał.
+
+Kwalifikujemy **podmiot i dopełnienie**, bo `kg_query` dopasowuje encję w obu
+pozycjach — kwalifikowanie samego podmiotu zostawiłoby fakty przychodzące
+osiągalne z każdej przestrzeni. Orzeczenie zostaje nagie: to typ relacji, nie
+encja, i nikt po nim nie pyta. Separatorem jest `::`, bo nazwy encji pochodzą
+z prozy, a jeden dwukropek w nich występuje („Uwaga: termin").
+
+**Skutek uboczny, nazwany wprost:** MemPalace nie połączy `wing_alfa::Tenanto`
+z `wing_beta::Tenanto`. Przechodzenie grafu i wykrywanie encji działa w obrębie
+przestrzeni, nie między nimi. **To jest zamierzone** — relacja przez granicę
+przestrzeni byłaby wyciekiem, nie funkcją.
+
+**Konsekwencja w kodzie:** `PalaceWing::qualify()` / `unqualify()` oraz
+`KnowledgeFact::scopedTo()` / `unscopedFrom()`. Rejestr księguje fakt pod
+odciskiem **niekwalifikowanym** plus przestrzenią — wing zakodowany dwa razy
+uczyniłby wiersz nieosiągalnym z zapytania znającego samą nazwę encji.
+
+**Odrzucono:** *pobrać fakty i odfiltrować po rejestrze* — działa i jest
+prostsze. Odrzucone, bo to wprost reguła nr 3: fakt z cudzej przestrzeni
+trafiałby do pamięci procesu, a o jego losie decydowałby `if`. Przy grafie jest
+to groźniejsze niż przy szufladach, bo fakt jest krótki i mówi wprost („X
+zarabia Y") — pomyłka nie wycieka akapitu, wycieka zdanie, które się pamięta.
+
+**Odrzucono:** *osobny pałac na przestrzeń* — pełna izolacja grafu. Odrzucone:
+kilkanaście pałaców to kilkanaście procesów i kilkanaście kopii modelu w
+pamięci, a mamy jedną maszynę i jeden model (D-003). Dla przestrzeni naprawdę
+wrażliwych zostaje osobny namespace pgvector (`docs/02-model-danych.md`).
+
+**Do zweryfikowania przy aktualizacji MemPalace:** gdyby `kg_add` i `kg_query`
+dostały parametr skrzydła, ta decyzja powinna zostać zastąpiona — filtr po
+stronie pałaca jest czystszy niż kwalifikowanie nazw. Migracja wymagałaby
+przepisania istniejących faktów.

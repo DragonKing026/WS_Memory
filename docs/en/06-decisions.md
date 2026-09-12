@@ -718,3 +718,133 @@ have written for this project anyway.
 report things that are not there and miss things that are. We treat its output
 as a prompt to review, not as a gate blocking a merge. The gate is PHPStan and
 the tests — they give the same answer every time they run.
+
+---
+
+## D-019 — Two filtering layers: the wing before the question, the registry after the answer
+
+**Date:** 2026-09-12 21:10 · **Status:** Accepted
+
+A read of memory passes through **two** independent filters. The first narrows
+the question: every `mempalace_search` call carries the wing of one permitted
+space. The second checks the answer: a drawer that `ws.memory_entries` does not
+place in a permitted space **does not leave the building** — not even when it
+came back from a wing we asked about ourselves.
+
+**Why two, when the first is enough:** the palace is a separate process with a
+history of its own. It can be upgraded, restored from a backup older than our
+table, edited by hand. Its answer is not evidence that content belongs
+somewhere — it is only an answer. The first layer guards against a mistake in
+our query, the second against drift between two stores.
+
+The second layer does **not** replace the first, and the two must never be
+swapped. Filtering the answer alone is exactly what inviolable rule 3 forbids:
+content would be fetched out of a forbidden space, and application code would
+decide whether it travels further.
+
+**What happens to content the registry does not know:** it is **dropped**, not
+reported as an error. A drawer with no registry row signals drift (integrity
+rule 5 in `docs/en/02-data-model.md`) and a periodic task reports it. On the
+read path, dropping is the safe direction to fail in: unknown content becomes
+invisible instead of visible-but-unchecked.
+
+**In the code:** `MemoryService::keepOnlyRegistered()`. Covered by
+`testDrawerThePalaceReturnsFromAnUnregisteredWingIsDropped`,
+`testDrawerUnknownToTheRegistryIsDropped` and — against a live palace —
+`testDrawerFiledStraightIntoOurWingIsNotReturned`, which files a drawer directly
+into our own wing, bypassing the registry.
+
+**Rejected:** *trust the wing and skip checking results* — one SQL query less
+per read. Rejected because the cost of being wrong is asymmetric: we would save
+milliseconds and risk showing somebody content from a space they have no right
+to. That kind of failure does not report itself.
+
+---
+
+## D-020 — An orphan in the palace is acceptable, an orphan in the registry is not
+
+**Date:** 2026-09-12 21:15 · **Status:** Accepted
+
+A write touches two stores: the palace (HTTP, no transactions) and our database
+(transactions, yes). There is no distributed transaction between them and there
+will not be, so a **direction of failure has to be chosen**. We choose this one:
+the palace may end up holding a drawer no row points at; **never the reverse**.
+
+The order is therefore: open the transaction → write to the palace → book the
+row → commit. A failing palace rolls back a transaction that held nothing yet.
+A failing booking rolls back the row and leaves the drawer in the palace.
+
+**Why this way round:** a drawer with no row is **invisible** — the second
+filtering layer (D-019) drops everything the registry does not know. A row with
+no drawer would be a search result that cannot be opened: the title shows, the
+click fails. The first is wasted space; the second is a bug a user reports.
+
+**Consequences:** `MemoryRegistry::transactional()` draws the boundary, and the
+timeout on a palace call (`MEMPALACE_TIMEOUT`, 15 s by default) is short
+precisely because a transaction stays open for its duration. A generous timeout
+would not buy a more reliable write, only a longer-held row.
+
+Writes are **never retried**. A repeated `mempalace_add_drawer` files a second
+drawer, and nothing afterwards can distinguish it from content saved twice on
+purpose — MemPalace's duplicate check compares content, not intent. When a write
+fails we do not know whether it landed, so we report a failure. Reads are
+retried, because a repeated search costs one query.
+
+**Rejected:** *write to the palace before the transaction, book after* — simpler,
+since the transaction would not span an HTTP call. Rejected because "in the same
+transaction" then means nothing, and a failed booking still leaves a drawer: we
+would gain a shorter transaction and lose the only guarantee we have.
+
+**Rejected:** *compensation — delete the drawer when booking fails* — correct in
+theory. Rejected for now, because deleting can fail too and then a compensation
+queue is needed; and since an orphan in the palace is invisible, we would be
+solving a problem that does not hurt. A periodic task reports them.
+
+---
+
+## D-021 — The knowledge graph is scoped by qualified entity names, not by a filter
+
+**Date:** 2026-09-12 21:20 · **Status:** Accepted
+
+`mempalace_kg_query` takes **only** an entity — there is no wing parameter, no
+room, no other axis. The knowledge graph in MemPalace 3.7.0 is single and shared
+across the whole palace. Inviolable rule 3, meanwhile, forbids asking without a
+space filter and forbids filtering results after fetching them.
+
+The answer: **the scope goes into the key**. A fact is written under a
+wing-qualified name — `wing_alfa::WS_Memory` — and asked for under the same one.
+A query about another space's facts does not return them to be filtered; it does
+not **match** them. The prefix is stripped before the result leaves us, so to an
+agent the entity is named the way it wrote it.
+
+Both **subject and object** are qualified, because `kg_query` matches an entity
+in either position — qualifying only the subject would leave incoming facts
+reachable from every space. The predicate stays bare: it is a relationship type,
+not an entity, and nobody queries by it. The separator is `::`, because entity
+names come from prose and a single colon occurs in them ("Note: deadline").
+
+**A side effect, named plainly:** MemPalace will not connect
+`wing_alfa::Tenanto` to `wing_beta::Tenanto`. Graph traversal and entity
+detection work within a space, not across spaces. **This is intended** — a
+relationship crossing a space boundary would be a leak, not a feature.
+
+**In the code:** `PalaceWing::qualify()` / `unqualify()` and
+`KnowledgeFact::scopedTo()` / `unscopedFrom()`. The registry books a fact under
+its **unqualified** fingerprint plus the space — encoding the wing twice would
+make the row unreachable from a query that only knows the bare entity name.
+
+**Rejected:** *fetch the facts and filter them against the registry* — it works
+and it is simpler. Rejected because it is rule 3 verbatim: a fact from somebody
+else's space would reach process memory and an `if` would decide its fate. With
+the graph this is worse than with drawers, because a fact is short and explicit
+("X earns Y") — a mistake leaks not a paragraph but a sentence people remember.
+
+**Rejected:** *one palace per space* — full graph isolation. Rejected: a dozen
+palaces means a dozen processes and a dozen copies of the model in memory, and
+we have one machine and one model (D-003). For genuinely sensitive spaces a
+separate pgvector namespace remains (`docs/en/02-data-model.md`).
+
+**To revisit when MemPalace is upgraded:** if `kg_add` and `kg_query` ever gain a
+wing parameter, this decision should be superseded — a filter on the palace's
+side is cleaner than qualifying names. Migrating would require rewriting the
+facts that already exist.
