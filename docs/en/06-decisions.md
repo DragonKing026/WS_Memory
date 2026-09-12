@@ -1025,3 +1025,75 @@ it.
 
 **Rejected:** *automatic acceptance after a delay* — a queue that empties itself is
 not a review, only a delay.
+
+---
+
+## D-027 — Routes written out explicitly, no file-based routing
+
+**Date:** 2026-09-12 23:20 · **Status:** Accepted
+· **Amends** D-008 and `docs/en/07-frontend.md` in this respect
+
+The frontend's routes are written out in one file (`src/router/index.ts`) rather than
+derived from a directory tree. `unplugin-vue-router` is **not** a dependency.
+
+**Why:** `unplugin-vue-router` 0.19.2 — the only release there is — requires
+`vue-router ^4.6`, while the project's stack says **vue-router 5**, which is the
+current major. That left three options:
+
+1. take the router back a major to keep a build-time convention,
+2. wait for the plugin to catch up,
+3. write the routes out.
+
+The first is a migration debt taken on day one: a new application would start on a
+version it has to leave, and leaving will require changing the router and the plugin
+together. The second blocks the task on somebody else's release.
+
+**What we lose:** adding a page means adding an entry to the table. For an application
+of a dozen screens (`docs/en/07-frontend.md`) that is one line per screen. **What we
+gain:** every address in the application is visible in one readable file, together with
+which ones are public and what they are named — information a directory tree does not
+carry, and which matters here because the route guard keys on `meta.public`.
+
+**To revisit:** once `unplugin-vue-router` supports vue-router 5 this decision can be
+superseded. Migrating means moving files into a structure matching the addresses, with
+no change in logic.
+
+**Rejected:** *our own plugin scanning `pages/`* — writing a build tool to avoid
+writing twelve lines of configuration is a poor trade.
+
+---
+
+## D-028 — The JWT lives in `localStorage`, with the risk named
+
+**Date:** 2026-09-12 23:25 · **Status:** Accepted
+
+The frontend's access token lives in `localStorage`. Not in an `httpOnly` cookie, not
+in `sessionStorage`, and not in memory alone.
+
+**The risk, stated plainly:** given a successful XSS, an attacker reads the token and
+has access for the rest of its lifetime (8 hours, D-017). An `httpOnly` cookie would be
+immune to that.
+
+**Why we do it anyway:**
+
+- **`httpOnly` is a backend change**, not a frontend one: the server would have to set
+  the cookie and defend against CSRF, while the API is deliberately stateless (D-008)
+  and serves two surfaces, one of which — `/mcp` — does not use cookies at all. That is
+  a separate task, not a frontend decision.
+- **`sessionStorage` breaks when a link is opened in a new tab** — the user is signed
+  out mid-work, for a reason nobody can explain to them.
+- **Memory only** means signing out on every page refresh, including an `F5` in the
+  middle of reading a document.
+
+**What reduces the exposure:** the token lives 8 hours rather than indefinitely;
+deactivating an account cuts access at the next request (`ActiveAccountChecker`); and
+every access to storage is wrapped in `try/catch`, so a private window or cleared site
+data does not break the application.
+
+**Where this is written down besides here:** `SECURITY.md`, under risks accepted
+deliberately. A risk only the author of the code knows about is not accepted — it is
+overlooked.
+
+**Rejected:** *a token in memory plus refresh through a cookie* — that is the correct
+architecture and it needs a refresh endpoint, which does not exist (D-017). To be
+considered together with it.

@@ -132,6 +132,11 @@ Nazywamy je wprost, bo niewypowiedziane ryzyko wygląda jak przeoczenie:
 - **Zmielony tekst kodu trafia na serwer** jako szuflady, choć samo mielenie jest
   lokalne (D-012). Serwer nie ma dostępu do repozytoriów ani kluczy do gita, ale
   treść plików może się w nim znaleźć.
+- **Token frontendu mieszka w `localStorage`** (D-028). Przy udanym XSS napastnik
+  odczyta go i ma dostęp na cały czas życia tokena — 8 godzin. Ciasteczko
+  `httpOnly` byłoby na to odporne, ale wymaga zmiany w backendzie (ustawianie
+  ciasteczka i ochrona CSRF) wraz z endpointem odświeżania, którego nie ma (D-017).
+  Do rozwiązania razem z nim, nie osobno.
 
 ---
 
@@ -256,3 +261,8 @@ Named plainly, because an unspoken risk looks like an oversight:
 - **Mined source text reaches the server** as drawers, even though mining itself is
   local (D-012). The server has no access to repositories or git keys, but the
   contents of files can end up in it.
+- **The frontend's token lives in `localStorage`** (D-028). Given a successful XSS an
+  attacker reads it and has access for the token's remaining lifetime — 8 hours. An
+  `httpOnly` cookie would be immune, but it needs a backend change (setting the cookie
+  and CSRF defence) together with the refresh endpoint that does not exist (D-017). To
+  be solved with it, not separately.

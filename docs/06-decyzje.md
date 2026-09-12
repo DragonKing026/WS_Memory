@@ -1015,3 +1015,79 @@ kolejkę ozdobą.
 
 **Odrzucono:** *automatyczne przyjmowanie po czasie* — kolejka, która sama się
 opróżnia, nie jest przeglądem, tylko opóźnieniem.
+
+---
+
+## D-027 — Trasy wypisane jawnie, bez routingu plikowego
+
+**Data:** 2026-09-12 23:20 · **Stan:** Przyjęta
+· **Zmienia w tym zakresie** D-008 i `docs/07-frontend.md`
+
+Trasy frontendu są wypisane w jednym pliku (`src/router/index.ts`), a nie
+wyprowadzane ze struktury katalogów. `unplugin-vue-router` **nie wchodzi** do
+zależności.
+
+**Dlaczego:** `unplugin-vue-router` w wersji 0.19.2 — jedynej wydanej — wymaga
+`vue-router ^4.6`, a stack projektu mówi **vue-router 5** i to jest wersja
+bieżąca. Do wyboru były trzy rzeczy:
+
+1. cofnąć router o major, żeby utrzymać konwencję budowania,
+2. czekać, aż wtyczka nadrobi,
+3. wypisać trasy.
+
+Pierwsza opcja to dług migracyjny wzięty pierwszego dnia: nowa aplikacja
+startowałaby na wersji, z której trzeba będzie wyjść, a wyjście będzie
+wymagało jednoczesnej zmiany routera i wtyczki. Druga blokuje zadanie na
+cudzym wydaniu.
+
+**Co tracimy:** przy dodaniu strony trzeba dopisać wpis w tablicy tras. Przy
+projekcie rzędu dwunastu ekranów (`docs/07-frontend.md`) to jedna linia na
+ekran. **Co zyskujemy:** wszystkie adresy aplikacji widać w jednym czytelnym
+pliku, razem z tym, które są publiczne i jak się nazywają — informacji, której
+w drzewie katalogów nie ma, a która jest tu istotna, bo strażnik trasy opiera
+się właśnie na `meta.public`.
+
+**Do zweryfikowania:** gdy `unplugin-vue-router` zacznie wspierać vue-router 5,
+tę decyzję można zastąpić. Migracja to przeniesienie plików do struktury
+odpowiadającej adresom — bez zmian w logice.
+
+**Odrzucono:** *własna wtyczka skanująca katalog `pages/`* — pisanie narzędzia
+budowania, żeby nie pisać dwunastu linii konfiguracji, to zła wymiana.
+
+---
+
+## D-028 — Token JWT w `localStorage`, z nazwanym ryzykiem
+
+**Data:** 2026-09-12 23:25 · **Stan:** Przyjęta
+
+Token dostępowy frontendu mieszka w `localStorage`. Nie w ciasteczku `httpOnly`,
+nie w `sessionStorage`, nie tylko w pamięci.
+
+**Ryzyko wypowiedziane wprost:** przy udanym XSS napastnik odczyta token i ma
+dostęp na cały jego czas życia (8 godzin, D-017). Ciasteczko `httpOnly` byłoby
+na to odporne.
+
+**Dlaczego mimo to:**
+
+- **`httpOnly` wymaga zmiany backendu**, nie frontendu: serwer musiałby
+  ustawiać ciasteczko i pilnować CSRF-a, a API jest świadomie bezstanowe
+  (D-008) i obsługuje dwie powierzchnie, z których jedna — `/mcp` — ciasteczek
+  nie używa w ogóle. To osobne zadanie, nie decyzja frontendu.
+- **`sessionStorage` zawodzi przy otwarciu odsyłacza w nowej karcie** —
+  użytkownik zostaje wylogowany w środku pracy, bez powodu, który da się
+  wyjaśnić.
+- **Tylko pamięć** oznacza wylogowanie przy każdym odświeżeniu strony, czyli
+  przy `F5` w trakcie czytania dokumentu.
+
+**Co to zmniejsza ryzyko:** token żyje 8 godzin, nie bezterminowo; unieważnienie
+konta odcina dostęp przy następnym żądaniu (`ActiveAccountChecker`); a każdy
+dostęp do magazynu jest owinięty w `try/catch`, więc prywatne okno i wyczyszczone
+dane witryny nie wywracają aplikacji.
+
+**Gdzie to jest zapisane poza tą decyzją:** `SECURITY.md`, w sekcji ryzyk
+przyjętych świadomie. Ryzyko, o którym wie tylko autor kodu, nie jest przyjęte —
+jest przeoczone.
+
+**Odrzucono:** *token w pamięci plus „odświeżanie" przez ciasteczko* — to jest
+poprawna architektura i wymaga endpointu odświeżania, którego nie ma (D-017).
+Do rozważenia razem z nim.
