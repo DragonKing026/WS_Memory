@@ -29,7 +29,6 @@ final class SpaceAccessTest extends WebTestCase
     private KernelBrowser $client;
     private EntityManagerInterface $em;
     private User $member;
-    private User $stranger;
     private Space $teamSpace;
 
     protected function setUp(): void
@@ -46,7 +45,7 @@ final class SpaceAccessTest extends WebTestCase
         $accept = $container->get(AcceptInvitation::class);
 
         $this->member = ($accept)(($issue)('czlonek@web-systems.pl')->plainToken, 'Członek', self::PASSWORD);
-        $this->stranger = ($accept)(($issue)('obcy@web-systems.pl')->plainToken, 'Obcy', self::PASSWORD);
+        ($accept)(($issue)('obcy@web-systems.pl')->plainToken, 'Obcy', self::PASSWORD);
 
         $this->teamSpace = new Space('alfa', 'Alfa');
         $this->em->persist($this->teamSpace);

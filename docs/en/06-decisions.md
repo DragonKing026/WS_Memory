@@ -676,3 +676,45 @@ is active **on every request**, not only at sign-in, and permissions are
 computed from the database every time anyway (no cache in
 `SpaceAccessResolver`). Deactivating an account and revoking a role both take
 effect immediately, however long the token would otherwise live.
+
+---
+
+## D-018 — CodeQL with AI findings plus PHPStan, because they look for different things
+
+**Date:** 2026-09-12 23:10 · **Status:** Accepted
+
+Code scanning rests on three legs:
+
+1. **CodeQL in default setup** — configured in the repository settings rather
+   than by a workflow file. It covers Python (our scripts) and the Actions
+   workflows.
+2. **AI findings** — GitHub's preview feature generating security findings for
+   languages CodeQL does not support. This is what covers our PHP backend.
+3. **PHPStan at level 8** — in the fast CI run.
+
+**Why three rather than one:** CodeQL **does not support PHP** — it covers
+C/C++, C#, Go, Java, JS/TS, Python, Ruby, Swift, Rust and Actions. Without AI
+findings the Symfony backend would be invisible to scanning.
+
+**Why PHPStan despite AI findings:** they look for different things. CodeQL and
+AI findings hunt **vulnerabilities** — injections, leaks, misused
+cryptography. PHPStan catches **correctness bugs**: a method that does not
+exist, a wrong type, a condition that never holds. In permission code the
+latter is often the more dangerous: a rule that mistakenly always returns true
+is not a vulnerability — it is a quietly opened door, and no vulnerability
+scanner will report it.
+
+Running PHPStan over the existing code confirmed this immediately: at level 8
+it found **four real defects**, among them a space description accepting any
+type from JSON instead of text, and a user identifier that could be an empty
+string — the very value the entire security layer keys on.
+
+**Why CodeQL's default setup rather than our own `codeql.yml`:** AI findings
+**requires the default setup**, and the default setup and a custom workflow are
+mutually exclusive. So we give up custom CodeQL queries — which we would not
+have written for this project anyway.
+
+**Caveat:** AI findings is a preview feature and non-deterministic. It can
+report things that are not there and miss things that are. We treat its output
+as a prompt to review, not as a gate blocking a merge. The gate is PHPStan and
+the tests — they give the same answer every time they run.

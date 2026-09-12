@@ -52,8 +52,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function __construct(string $email, string $displayName)
     {
+        $normalised = strtolower(trim($email));
+        if ('' === $normalised) {
+            // The identifier the whole security layer keys on cannot be empty.
+            // Guaranteeing it here means every consumer downstream may rely on
+            // it, instead of each one re-checking.
+            throw new \InvalidArgumentException('Adres e-mail konta nie może być pusty.');
+        }
+
         $this->id = Uuid::v7();
-        $this->email = strtolower(trim($email));
+        $this->email = $normalised;
         $this->displayName = $displayName;
         $this->createdAt = new \DateTimeImmutable();
     }
@@ -63,8 +71,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->id;
     }
 
+    /** @return non-empty-string */
     public function getEmail(): string
     {
+        \assert('' !== $this->email);
+
         return $this->email;
     }
 
@@ -73,9 +84,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->displayName;
     }
 
+    /** @return non-empty-string */
     public function getUserIdentifier(): string
     {
-        return $this->email;
+        return $this->getEmail();
     }
 
     /** @return list<string> */

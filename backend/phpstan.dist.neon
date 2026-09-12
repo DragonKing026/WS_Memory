@@ -1,0 +1,24 @@
+# Analiza statyczna backendu.
+#
+# CodeQL nie obsługuje PHP, a AI findings jest w wersji zapoznawczej i szuka
+# podatności, nie błędów poprawności (D-018). PHPStan zamyka tę drugą lukę:
+# nieistniejąca metoda, zły typ, warunek, który nigdy nie zachodzi. W kodzie
+# uprawnień to szczególnie istotne — reguła, która przez pomyłkę zawsze zwraca
+# prawdę, nie jest podatnością, tylko cicho otwartymi drzwiami.
+
+includes:
+    - vendor/phpstan/phpstan-symfony/extension.neon
+    - vendor/phpstan/phpstan-doctrine/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+        - migrations
+
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
+
+    # Encje Doctrine mają pola inicjalizowane przez ORM, nie przez konstruktor.
+    checkUninitializedProperties: false

@@ -79,7 +79,11 @@ final readonly class SpaceAdministrationController
         }
 
         $space = new Space($slug, $name);
-        $space->setDescription($payload->get('description'));
+        // The payload carries whatever the client sent — a number, a boolean.
+        // Coercing here rather than trusting the shape keeps the entity's
+        // contract honest.
+        $description = $payload->get('description');
+        $space->setDescription(null === $description ? null : (string) $description);
 
         // The creator becomes its administrator immediately. Otherwise the
         // first action after creating a space would be granting yourself

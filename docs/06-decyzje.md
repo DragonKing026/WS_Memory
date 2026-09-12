@@ -659,3 +659,46 @@ sprawdza aktywność konta **przy każdym żądaniu**, nie tylko przy logowaniu,
 a uprawnienia i tak są liczone z bazy za każdym razem (brak cache w
 `SpaceAccessResolver`). Dezaktywacja konta i odebranie roli działają
 natychmiast, niezależnie od tego, ile jeszcze token by żył.
+
+---
+
+## D-018 — CodeQL z AI findings plus PHPStan, bo szukają czego innego
+
+**Data:** 2026-09-12 23:10 · **Stan:** Przyjęta
+
+Skanowanie kodu stoi na trzech nogach:
+
+1. **CodeQL w trybie domyślnym** — konfigurowany w ustawieniach repozytorium,
+   nie plikiem workflow. Obejmuje Pythona (nasze skrypty) oraz workflowy
+   Actions.
+2. **AI findings** — funkcja zapoznawcza GitHuba, generująca zgłoszenia
+   bezpieczeństwa dla języków, których CodeQL nie obsługuje. To ona pokrywa
+   nasz backend w PHP.
+3. **PHPStan na poziomie 8** — w szybkim przebiegu CI.
+
+**Dlaczego trzy, a nie jedna:** CodeQL **nie obsługuje PHP** — wspiera C/C++,
+C#, Go, Javę, JS/TS, Pythona, Ruby, Swift, Rust i Actions. Bez AI findings
+backend Symfony byłby dla skanowania niewidoczny.
+
+**Dlaczego PHPStan mimo AI findings:** szukają różnych rzeczy. CodeQL i AI
+findings polują na **podatności** — wstrzyknięcia, wycieki, złe użycie
+kryptografii. PHPStan łapie **błędy poprawności**: nieistniejącą metodę, zły
+typ, warunek, który nigdy nie zachodzi. W kodzie uprawnień to drugie bywa
+groźniejsze: reguła, która przez pomyłkę zawsze zwraca prawdę, nie jest
+podatnością — jest cicho otwartymi drzwiami, których żaden skaner podatności
+nie zgłosi.
+
+Uruchomienie PHPStana na istniejącym kodzie potwierdziło to od razu: na
+poziomie 8 znalazł **cztery realne usterki**, w tym opis przestrzeni przyjmujący
+z JSON-a dowolny typ zamiast tekstu oraz identyfikator użytkownika mogący być
+pustym łańcuchem — a to na nim opiera się cała warstwa bezpieczeństwa.
+
+**Dlaczego tryb domyślny CodeQL, a nie własny `codeql.yml`:** AI findings
+**wymaga trybu domyślnego**, a tryb domyślny i własny workflow wykluczają się
+wzajemnie. Rezygnujemy więc z własnych zapytań CodeQL — przy tym projekcie
+i tak byśmy ich nie pisali.
+
+**Zastrzeżenie:** AI findings jest w wersji zapoznawczej i niedeterministyczny.
+Potrafi zgłosić rzeczy, których nie ma, i przeoczyć te, które są. Traktujemy
+jego wyniki jako podpowiedź do przejrzenia, nie jako bramkę blokującą scalenie.
+Bramką jest PHPStan i testy — one dają ten sam wynik przy każdym uruchomieniu.
