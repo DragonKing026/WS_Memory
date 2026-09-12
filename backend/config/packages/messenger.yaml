@@ -27,4 +27,9 @@ framework:
                     queue_name: failed
                     auto_setup: false
 
-        routing: {}
+        routing:
+            # Publikacja dokumentu do pałaca idzie w tło, bo policzenie wektora dla
+            # całego dokumentu trwa sekundy, a człowiek naciskający „zapisz" nie ma
+            # na co czekać. Zadanie jest idempotentne i odrzuca zlecenia dla
+            # nieaktualnej rewizji, więc kolejność dostarczenia nie ma znaczenia.
+            App\Application\Document\PublishDocument: async

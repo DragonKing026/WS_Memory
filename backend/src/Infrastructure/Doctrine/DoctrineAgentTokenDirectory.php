@@ -9,6 +9,7 @@ use App\Domain\Identity\AgentIdentity;
 use App\Domain\Identity\AgentTokenDirectory;
 use App\Domain\Space\SpaceId;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Adapter: agent tokens read and updated through plain DBAL.
@@ -102,6 +103,22 @@ final readonly class DoctrineAgentTokenDirectory implements AgentTokenDirectory
         // write. Counting it as the first call of a window is harmless; the next
         // request will fail to resolve at all.
         return \is_int($calls) || \is_numeric($calls) ? (int) $calls : 1;
+    }
+
+    public function ownerOf(string $tokenId): ?string
+    {
+        if (!Uuid::isValid($tokenId)) {
+            return null;
+        }
+
+        // No conditions on revocation or expiry: this answers "who wrote it", and
+        // that does not change when a credential is retired.
+        $owner = $this->connection->fetchOne(
+            'SELECT user_id FROM ws.agent_tokens WHERE id = :id',
+            ['id' => $tokenId],
+        );
+
+        return \is_string($owner) ? $owner : null;
     }
 
     /**

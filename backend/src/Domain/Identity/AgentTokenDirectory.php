@@ -32,4 +32,15 @@ interface AgentTokenDirectory
      * returned number is what the caller compares against the limit.
      */
     public function noteUsage(string $tokenId, ?string $ip): int;
+
+    /**
+     * Who owns a token, whether or not it is still usable.
+     *
+     * Needed when reconstructing authorship after the fact: a revision written by an
+     * agent records the token and, because exactly one author column may be set, not
+     * the person behind it. Publishing that revision has to name a person, so the
+     * owner is looked up here — and a revoked or expired token must still answer,
+     * since who wrote something does not change when their credential is retired.
+     */
+    public function ownerOf(string $tokenId): ?string;
 }
