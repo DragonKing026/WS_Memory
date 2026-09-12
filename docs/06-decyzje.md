@@ -1,6 +1,6 @@
 ---
 noteId: "57b9d670aeb011f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, decyzje, adr, architektura, uzasadnienia]
 
 ---
 
@@ -103,6 +103,11 @@ korzysta z niego przez `MEMPALACE_EMBEDDING_MODEL=openai-compat` +
 w bazie i wymaga przeliczenia jej od zera. Dlatego decyzja podjęta przed
 pierwszym zapisem, a nie po.
 
+> **Uzupełnienie po D-010:** ta decyzja dotyczy **wyłącznie serwera**. Lokalne
+> pałace deweloperów mogą mieć dowolny model, bo hybryda współdzieli **tekst,
+> nie wektory** — serwer przelicza każdą publikowaną szufladę swoim modelem.
+> Wymóg jednego modelu w całym zespole zniknął.
+
 **Odrzucono:**
 - *`embeddinggemma` lokalnie na każdej maszynie* — 300 MB modelu na laptop i
   ryzyko rozjazdu wersji.
@@ -175,6 +180,11 @@ z całą wiedzą firmy na publicznym porcie to zła wymiana za wygodę.
 
 **Korzyść uboczna, znacząca:** deweloper nie musi mieć zainstalowanego
 MemPalace, Pythona ani modelu embeddingów. Wystarczy plugin i token.
+
+> **Uzupełnienie po D-010:** to pozostaje drogą domyślną, ale nie jedyną.
+> Deweloper z lokalnym pałacem mieli transkrypty u siebie i publikuje wybrane
+> — wtedy hook nie wysyła surowej rozmowy nigdzie. Plugin rozpoznaje, który
+> tryb zachodzi.
 
 **Odrzucono:** *dostęp do Postgresa przez VPN/WireGuard* — możliwy do dodania
 później, jeśli pojawi się potrzeba lokalnego minowania repozytoriów bez
@@ -258,3 +268,88 @@ co agent zapisał, jest dokładnie tym, co człowiek widzi i edytuje.
 **Odrzucono:** *TipTap* — używany w nowszy projekt z frontendem Vue i dobry w swojej
 roli (treści redakcyjne pisane wyłącznie przez ludzi), ale tutaj jego model
 dokumentu stałby się drugą reprezentacją prawdy.
+
+---
+
+## D-010 — Hybryda: lokalny pałac plus publikacja do wspólnej bazy
+
+**Data:** 2026-09-12 16:38 · **Stan:** Przyjęta
+
+Deweloper może mieć **własny lokalny MemPalace** (własny `init`, własne `mine`,
+własne hooki) i jednocześnie publikować wybraną wiedzę do wspólnej bazy przez
+API WS_Memory. Agent ma **dwa serwery MCP**: `mempalace` (lokalny, prywatny)
+i `ws_memory` (wspólny). Publikacja działa w dwóch trybach: **selektywnym**
+(`/ws-publish` z filtrem i podglądem) oraz **lustrzenia** — wskazane skrzydło
+lokalnego pałaca jest cyklicznie publikowane do odpowiadającej przestrzeni.
+
+**Co ustalono w kodzie MemPalace 3.7.0, zanim podjęto decyzję:**
+
+- **Replikacji pałac↔pałac nie ma.** `logstream sync` synchronizuje zdarzenia
+  koordynacyjne i artefakty (RFC 004) — w `logsync.py` nie ma ani jednego
+  odwołania do szuflad. `mempalace sync` to sprzątanie po usuniętych plikach,
+  nie replikacja. `replica.json` i `patch_submit` to fundament pod przyszły
+  mesh i przekazywanie patchy kodu.
+- **Mostek da się zbudować z tego, co jest**: `mempalace_list_drawers`
+  (paginacja, filtr skrzydła/pokoju, zakres daty) plus `mempalace_get_drawer`
+  (pełna treść) na lokalnym serwerze stdio.
+- **`replica.json` daje stabilny identyfikator maszyny** — w kodzie opisany
+  jako „nazwa siedziska, czyli tej kopii pałaca". Dokładnie to, czego potrzeba
+  do rozpoznawania, skąd przyszła szuflada.
+
+**Dlaczego tak, a nie „wszystko na serwerze":**
+
+1. **Kod nie opuszcza laptopa.** Mielenie dzieje się lokalnie; na serwer idzie
+   tylko tekst wybranych szuflad.
+2. **Uprawnienia, atrybucja i audyt zostają nietknięte**, bo publikacja idzie
+   przez API — nie wystawiamy Postgresa i nikt nie dostaje DSN-u. Reguły 1–3
+   obowiązują bez wyjątku.
+3. **Prywatność jest domyślna.** Rozmowy i notatki robocze zostają lokalnie,
+   dopóki ktoś ich świadomie nie skieruje do wspólnej bazy.
+4. **Znika wymóg jednego modelu embeddingów na laptopach** (uzupełnienie D-003).
+5. **Użytkownik sam uruchamia `init` i `mine`** — u siebie, bez pośrednictwa
+   aplikacji i bez czekania na administratora.
+
+**Czego ta hybryda nie daje:** jednego zapytania obejmującego oba indeksy.
+Lokalny pałac i wspólna baza to dwa magazyny, więc agent pyta dwa razy — skill
+`ws-memory-recall` narzuca kolejność: najpierw wspólna, potem lokalna.
+Scalanie po stronie serwera wymagałoby wysyłania tam wszystkiego, czyli
+rezygnacji z prywatności, która jest tu główną zaletą.
+
+**Zabezpieczenia lustrzenia** — lustro raz ustawione działa bez nadzoru, więc
+ryzyko wysłania czegoś nieprzewidzianego obsługujemy wprost:
+
+- **Pierwszy przebieg każdego lustra jest podglądem**: pokazuje, co poleci, i
+  wymaga potwierdzenia. Lustro nie zaczyna działać samo.
+- **Wykluczenia pokoi** w definicji lustra (np. skrzydło projektu bez pokoju
+  `diary`).
+- **Filtr sekretów po obu stronach** — szuflada zawierająca wzorce sekretów
+  (`.env`, klucze prywatne, hasła w URL-ach) jest odrzucana z raportem.
+- **Dziennik partii publikacji** z możliwością wycofania całej partii jednym
+  działaniem.
+- **Wyłącznik globalny i per lustro**, plus pauza.
+- **Przyrostowość** — lustro wysyła tylko szuflady nowsze niż ostatni znacznik.
+
+**Odrzucono:** *lokalny mempalace z `MEMPALACE_PGVECTOR_DSN` wskazującym
+centralną bazę*. Byłoby najprostsze w konfiguracji i dawało jeden indeks, ale
+zapis wprost do bazy **omija całą warstwę uprawnień** — token agenta, role w
+przestrzeniach i audyt przestałyby cokolwiek znaczyć. To unieważniłoby powód,
+dla którego WS_Memory istnieje.
+
+---
+
+## D-011 — Wykrywanie encji po polsku, `init` bez LLM-a
+
+**Data:** 2026-09-12 16:38 · **Stan:** Przyjęta
+
+Ustawiamy `MEMPALACE_ENTITY_LANGUAGES=pl,en`. `mempalace init` po stronie
+serwera uruchamiamy z `--no-llm`.
+
+**Dlaczego:** wykrywanie encji domyślnie działa **po angielsku** (`--lang`,
+domyślnie `en`). To ten sam rodzaj cichej wady co domyślny `minilm` z D-003,
+tylko dotyczy grafu wiedzy i powiązań między szufladami — nazwy, role i relacje
+w polskich tekstach byłyby rozpoznawane słabiej, bez żadnego komunikatu o błędzie.
+
+`init` domyślnie chce LLM-a (ollama) do dopracowania encji. Nie mamy ollamy w
+stosie, a dodanie jej to kolejny kontener i kilka GB RAM dla funkcji, która
+tylko **dopracowuje** heurystyki. Startujemy bez niej; jeśli jakość wykrywania
+okaże się za słaba, to osobna decyzja z własnym numerem.

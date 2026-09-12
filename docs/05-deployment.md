@@ -1,6 +1,6 @@
 ---
 noteId: "be5f5841aeb111f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, dokumentacja, deployment, docker, backup, operacje]
 
 ---
 
@@ -45,6 +45,7 @@ docker compose exec backend bin/console ws:user:invite twoj@email.pl --admin
 | `MEMPALACE_EMBEDDING_MODEL` | `openai-compat` |
 | `MEMPALACE_EMBEDDING_API_URL` | `http://embeddings/v1/embeddings` |
 | `MEMPALACE_EMBEDDING_API_MODEL` | `BAAI/bge-m3` |
+| `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — wykrywanie encji; domyślnie `en`, patrz D-011 |
 | `MAILER_DSN` | zaproszenia i powiadomienia |
 
 Trzy ostatnie zmienne MemPalace są **nierozdzielne** — patrz D-003. Zmiana

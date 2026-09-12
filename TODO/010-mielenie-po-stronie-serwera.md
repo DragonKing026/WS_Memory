@@ -1,10 +1,10 @@
 ---
 noteId: "ac1d9e70aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, mielenie, mempalace, worker, dokumenty]
 
 ---
 
-# 010 — Mielenie po stronie serwera: transkrypty, repozytoria, dokumenty
+# TODO-010 — Mielenie po stronie serwera: transkrypty, repozytoria, dokumenty
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 009
 

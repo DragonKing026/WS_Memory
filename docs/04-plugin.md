@@ -1,6 +1,6 @@
 ---
 noteId: "be5f5840aeb111f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, dokumentacja, plugin, claude-code, hooki, agenci-ai, hybryda]
 
 ---
 
@@ -8,9 +8,13 @@ tags: []
 
 Stan: **projekt**, nieimplementowany (2026-09-12).
 
-Plugin jest jedyną rzeczą, którą deweloper instaluje na swojej maszynie.
-**Nie wymaga MemPalace, Pythona ani modelu embeddingów** — cała praca dzieje
-się po stronie serwera (D-006).
+Plugin jest jedyną rzeczą, którą deweloper **musi** zainstalować.
+**Nie wymaga MemPalace, Pythona ani modelu embeddingów** — cała praca może
+dziać się po stronie serwera (D-006).
+
+Kto chce, może dodatkowo postawić **własny lokalny MemPalace** i publikować z
+niego wybraną wiedzę do wspólnej bazy (D-010). Plugin obsługuje oba tryby i
+sam rozpoznaje, który zachodzi.
 
 ## Struktura
 
@@ -31,6 +35,7 @@ plugin/
     ws-search.md
     ws-doc.md
     ws-status.md
+    ws-publish.md        ← publikacja z lokalnego pałaca (tryb hybrydowy)
   agents/
     ws-dokumentalista.md
     ws-archiwista.md
@@ -112,6 +117,41 @@ i ustawienie zmiennych środowiskowych. Uruchamiany raz na maszynę.
 ogólnej.** Jeśli baza nie zawiera odpowiedzi, ma to powiedzieć i zgłosić lukę
 w dokumentacji — inaczej nowa osoba nie wiedziałaby, czy dostała firmową
 praktykę, czy domysł modelu.
+
+## Tryb hybrydowy: lokalny pałac obok wspólnej bazy
+
+Dla dewelopera, który chce mielić własne projekty u siebie (D-010).
+
+**Konfiguracja:** dwa serwery MCP naraz — `mempalace` (lokalny, stdio) i
+`ws_memory` (wspólny, HTTP). Agent czyta z obu. Skill `ws-memory-recall`
+narzuca kolejność: **najpierw wspólna baza, potem lokalna** — wiedza zespołu
+ma pierwszeństwo przed prywatnymi notatkami.
+
+**Mielenie** robisz sam, u siebie, jak dotąd:
+
+```bash
+mempalace init ~/projekty/nowy-projekt
+mempalace mine ~/projekty/nowy-projekt
+```
+
+Kod nie opuszcza laptopa. Nikogo nie musisz o nic prosić.
+
+**Publikacja selektywna** — `/ws-publish`: wybierasz skrzydło, pokój albo
+zakres daty, widzisz podgląd (ile szuflad, co zostanie pominięte i dlaczego),
+potwierdzasz. Serwer przelicza embeddingi swoim modelem i zapisuje z Twoim
+autorstwem.
+
+**Lustro** — mapowanie „skrzydło lokalnego pałaca → przestrzeń", działające
+cyklicznie w tle. Cztery zabezpieczenia, bo lustro pracuje bez nadzoru:
+
+- **pierwszy przebieg jest podglądem** i wymaga potwierdzenia — lustro nie
+  zaczyna działać samo;
+- **wykluczenia pokoi** (np. skrzydło projektu bez pokoju `diary`);
+- **filtr sekretów po obu stronach** — klient nie wysyła, serwer i tak sprawdza;
+- **partie do wycofania** jednym działaniem, z raportem pominięć.
+
+Czego tryb hybrydowy nie daje: jednego zapytania obejmującego oba magazyny.
+To dwa indeksy, więc agent pyta dwa razy.
 
 ## Instalacja u dewelopera
 

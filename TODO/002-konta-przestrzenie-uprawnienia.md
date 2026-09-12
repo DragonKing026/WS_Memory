@@ -1,10 +1,10 @@
 ---
 noteId: "29bab672aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, backend, uprawnienia, konta, audyt]
 
 ---
 
-# 002 — Backend: konta, zaproszenia, przestrzenie, role, audyt
+# TODO-002 — Backend: konta, zaproszenia, przestrzenie, role, audyt
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 001
 

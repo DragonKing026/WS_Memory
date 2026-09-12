@@ -1,3 +1,7 @@
+---
+tags: [ws-memory, przeglad, onboarding]
+---
+
 # WS_Memory
 
 Wspólna baza wiedzy i dokumentacja Web Systems — **jedna dla ludzi i dla
@@ -25,6 +29,10 @@ Projekt zatwierdzony 2026-09-12. Zadania czekają w `TODO/`.
 - **Dla agentów AI** — serwer MCP z firmowymi narzędziami: szukanie w bazie,
   zapisywanie ustaleń, pisanie dokumentacji, graf wiedzy. Plus plugin do
   Claude Code z hookami, skillami i podagentami.
+- **Dla dewelopera, który woli u siebie** — własny lokalny MemPalace: sam
+  mielisz swoje projekty (`mempalace init`, `mempalace mine`), kod nie opuszcza
+  laptopa, a do wspólnej bazy publikujesz tylko to, co wybierzesz — ręcznie
+  albo lustrem wskazanego skrzydła.
 - **Dla administratora** — jeden `docker compose up`, jeden `pg_dump` jako
   pełny backup, audyt każdego zapisu i odczytu.
 

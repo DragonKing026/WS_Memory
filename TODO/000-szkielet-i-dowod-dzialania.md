@@ -1,10 +1,10 @@
 ---
 noteId: "29bab670aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, docker, mempalace, embeddingi, postgres, faza-0]
 
 ---
 
-# 000 — Szkielet Dockera i dowód, że polska semantyka działa
+# TODO-000 — Szkielet Dockera i dowód, że polska semantyka działa
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** brak
 

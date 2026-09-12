@@ -1,10 +1,10 @@
 ---
 noteId: "7a6c5dd0aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, frontend, vue, vite, docker]
 
 ---
 
-# 006 — Frontend: fundament i logowanie
+# TODO-006 — Frontend: fundament i logowanie
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 002
 

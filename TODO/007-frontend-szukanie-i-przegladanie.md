@@ -1,10 +1,10 @@
 ---
 noteId: "7a6c84e1aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, frontend, wyszukiwanie, ui]
 
 ---
 
-# 007 — Frontend: wyszukiwanie i przeglądanie bazy
+# TODO-007 — Frontend: wyszukiwanie i przeglądanie bazy
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 006, 003
 

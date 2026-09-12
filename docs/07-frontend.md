@@ -1,6 +1,6 @@
 ---
 noteId: "986e0eb1aeb111f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, dokumentacja, frontend, vue, vite, ui]
 
 ---
 

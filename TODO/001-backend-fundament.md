@@ -1,10 +1,10 @@
 ---
 noteId: "29bab671aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, backend, symfony, doctrine, api-platform]
 
 ---
 
-# 001 — Backend: fundament Symfony
+# TODO-001 — Backend: fundament Symfony
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 000
 

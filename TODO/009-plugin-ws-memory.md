@@ -1,10 +1,10 @@
 ---
 noteId: "ac1d7760aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, plugin, claude-code, hooki, agenci-ai]
 
 ---
 
-# 009 — Plugin WS_Memory do Claude Code
+# TODO-009 — Plugin WS_Memory do Claude Code
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 004, 005
 

@@ -1,3 +1,7 @@
+---
+tags: [ws-memory, spec, projektowanie, decyzje, architektura]
+---
+
 # WS_Memory — spec projektowy
 
 **Data:** 2026-09-12 · **Stan:** zatwierdzony · **Autor ustaleń:** Artur Ograbek

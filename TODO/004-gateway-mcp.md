@@ -1,10 +1,10 @@
 ---
 noteId: "50cd7590aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, backend, mcp, tokeny, uprawnienia, agenci-ai]
 
 ---
 
-# 004 — Backend: gateway MCP i tokeny agentów
+# TODO-004 — Backend: gateway MCP i tokeny agentów
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 003
 

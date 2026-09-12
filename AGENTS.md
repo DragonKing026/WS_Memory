@@ -1,6 +1,6 @@
 ---
 noteId: "14240ca0aeb011f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, kontrakt-projektu, architektura, konwencje, agenci-ai]
 
 ---
 
@@ -58,6 +58,9 @@ ma, a czego potrzebuje zespół:
 9. **Backend nie renderuje interfejsu, frontend nie zna bazy.** Jedyny
    kontrakt to OpenAPI. Każde obejście tej granicy (szablon w backendzie,
    zapytanie SQL z frontendu) to błąd architektoniczny.
+10. **Lokalny pałac nigdy nie pisze wprost do centralnej bazy.** Publikacja
+    idzie przez API, bo tylko tam działają token, role i audyt. Dawanie
+    `MEMPALACE_PGVECTOR_DSN` na zewnątrz unieważniłoby całą warstwę uprawnień.
 
 ## 3. Architektura w jednym akapicie
 
@@ -80,6 +83,22 @@ i minować. `embeddings` wystawia `/v1/embeddings` z modelem wielojęzycznym.
 systemu.
 
 Pełny opis: `docs/01-architektura.md`.
+
+### Dwa tryby pracy dewelopera (D-010)
+
+**Tryb serwerowy** (domyślny) — deweloper instaluje tylko plugin. Transkrypty
+sesji lecą na serwer, mielenie dzieje się tam. Nie potrzebuje MemPalace,
+Pythona ani modelu embeddingów.
+
+**Tryb hybrydowy** — deweloper ma **własny lokalny MemPalace**: sam robi
+`mempalace init` i `mempalace mine` na swoich projektach, **kod nie opuszcza
+laptopa**. Agent ma wtedy dwa serwery MCP (`mempalace` lokalny + `ws_memory`
+wspólny), a wybraną wiedzę publikuje do wspólnej bazy **przez API** — nigdy
+wprost do bazy danych, bo to ominęłoby uprawnienia i audyt.
+
+Publikacja działa selektywnie (`/ws-publish`) albo przez **lustro**: mapowanie
+skrzydła lokalnego pałaca na przestrzeń, działające cyklicznie. Lustro nie
+startuje bez potwierdzenia pierwszego podglądu przez człowieka.
 
 ## 4. Trzy klasy wiedzy
 
@@ -240,3 +259,9 @@ a frontend podmienić bez dotykania backendu.
 - **Token agenta** — poświadczenie maszyny, dziedziczy uprawnienia właściciela.
 - **Weryfikacja** — potwierdzenie przez człowieka, że treść napisana przez AI
   jest prawdziwa. Znacznik zaufania, nie warunek publikacji.
+- **Replika** — kopia pałaca na konkretnej maszynie, z własnym stabilnym
+  identyfikatorem z `replica.json`. Nazywa maszynę, nie użytkownika ani modelu.
+- **Lustro** (`mirror`) — mapowanie skrzydła lokalnego pałaca na przestrzeń we
+  wspólnej bazie, publikujące przyrostowo i cyklicznie.
+- **Partia publikacji** (`publish_batch`) — jednostka wycofania: wszystko, co
+  poszło do wspólnej bazy jednym przebiegiem, da się cofnąć jednym działaniem.

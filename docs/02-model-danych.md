@@ -1,6 +1,6 @@
 ---
 noteId: "8b915270aeb011f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, dokumentacja, model-danych, postgres, doctrine, pgvector]
 
 ---
 
@@ -81,12 +81,38 @@ przy akceptacji zaproszenia.
 `id`, `drawer_id` (identyfikator w MemPalace), `space_id`, `kind`
 (`note` / `document` / `diary` / `kg_fact` / `transcript`), `author_user_id`,
 `author_agent_token_id`, `document_id` (gdy `kind = document`), `title`,
-`created_at`.
+`created_at`, `source_replica` (identyfikator lokalnego pałaca, skąd przyszła
+treść — `null` dla zapisów powstałych na serwerze), `source_drawer_id`
+(identyfikator szuflady w tamtym pałacu), `publish_batch_id`.
+
+> Para `(source_replica, source_drawer_id)` jest **unikalna**. To ona sprawia,
+> że powtórna publikacja tej samej lokalnej szuflady aktualizuje wpis, zamiast
+> tworzyć drugi (D-010). Identyfikator repliki bierzemy z `replica.json`
+> lokalnego pałaca — MemPalace utrzymuje go stabilnie właśnie po to.
 
 > Po co ta tabela, skoro dane są w pałacu: **żeby uprawnienia i audyt działały
 > w SQL, a nie na wynikach z pałaca.** Filtrujemy przed zapytaniem
 > semantycznym, nie po nim. Dodatkowo daje listowanie i statystyki bez
 > obciążania MemPalace.
+
+### Hybryda: lokalne pałace i publikacja
+
+**`mirrors`** — definicja lustra: skrzydło lokalnego pałaca → przestrzeń.
+`id`, `user_id`, `source_replica`, `source_wing`, `space_id`,
+`excluded_rooms` (`JSONB`), `is_active`, `is_confirmed` (pierwszy przebieg to
+podgląd — lustro nie działa, dopóki człowiek nie potwierdzi), `paused_at`,
+`last_synced_at`, `last_drawer_filed_at` (znacznik przyrostowości),
+`created_at`.
+
+**`publish_batches`** — jedna partia publikacji, żeby dało się ją wycofać.
+`id`, `user_id`, `mirror_id` (`null` przy publikacji selektywnej), `space_id`,
+`mode` (`selective` / `mirror`), `drawer_count`, `skipped_count`,
+`skipped_reasons` (`JSONB` — co odrzucił filtr sekretów i dlaczego),
+`status` (`preview` / `applied` / `reverted`), `created_at`, `reverted_at`.
+
+> Partia jest jednostką wycofania: „wypchnąłem nie to skrzydło" rozwiązuje się
+> jednym działaniem, a nie ręcznym szukaniem szuflad. Raport pominięć jest
+> częścią partii, nie osobnym dziennikiem — inaczej nikt by go nie czytał.
 
 ### Operacje
 
@@ -129,3 +155,8 @@ gdzie błąd w filtrze byłby nieakceptowalny).
    dostęp na przyszłość.
 5. `memory_entries` bez odpowiadającej szuflady w pałacu to sygnał rozjazdu
    — zadanie cykliczne to raportuje (nie naprawia po cichu).
+6. Lustro bez `is_confirmed` **nie wykonuje publikacji** — może tylko
+   wygenerować podgląd. Warunek sprawdzany w kodzie i pokryty testem.
+7. Wycofanie partii usuwa szuflady z pałaca i wiersze `memory_entries`, ale
+   **zostawia samą partię** ze statusem `reverted` — historia publikacji się
+   nie kurczy.

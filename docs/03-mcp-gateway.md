@@ -1,6 +1,6 @@
 ---
 noteId: "986e0eb0aeb111f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, dokumentacja, mcp, uprawnienia, agenci-ai, bezpieczenstwo]
 
 ---
 

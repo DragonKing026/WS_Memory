@@ -1,12 +1,15 @@
 ---
 noteId: "29ba8f60aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, proces, konwencje]
 
 ---
 
 # TODO — zasady prowadzenia zadań
 
-Jeden plik = jedno zadanie. Numeracja rosnąca, `NNN-krotki-opis.md`.
+Jeden plik = jedno zadanie. Nazwa pliku: `NNN-krotki-opis.md`.
+Nagłówek w środku pliku: **`# TODO-NNN — Tytuł zadania`** — numeracja z
+prefiksem, żeby zadanie dało się jednoznacznie przywołać w rozmowie, commicie
+i dokumentacji („zrób TODO-004"), bez mylenia z numerem decyzji (`D-004`).
 
 ## Struktura pliku zadania
 
@@ -50,3 +53,5 @@ Zadanie bez sekcji **Co zostało zrobione** nie trafia do `DONE/`.
 
 Zadania 000-002 są ściśle sekwencyjne. Dalej backend (003-005) i frontend
 (006-008) mogą iść równolegle, bo stykają się tylko przez kontrakt OpenAPI.
+`TODO-010` (mielenie serwerowe) i `TODO-012` (mostek z lokalnego pałaca) to
+dwie niezależne drogi wnoszenia wiedzy — kolejność między nimi jest dowolna.

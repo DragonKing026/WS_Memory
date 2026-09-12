@@ -1,10 +1,10 @@
 ---
 noteId: "50cd9ca0aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, backend, mempalace, uprawnienia]
 
 ---
 
-# 003 — Backend: klient MemPalace i serwisy domenowe pamięci
+# TODO-003 — Backend: klient MemPalace i serwisy domenowe pamięci
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 002
 

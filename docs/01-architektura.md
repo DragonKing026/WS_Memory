@@ -1,6 +1,6 @@
 ---
 noteId: "72bca9c0aeb011f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, dokumentacja, architektura, docker, bezpieczenstwo, mempalace]
 
 ---
 
@@ -147,6 +147,29 @@ backup systemu: wiki, rewizje, konta, uprawnienia, audyt **i pałac**.
 
 Deweloper nie potrzebuje ani MemPalace, ani Pythona, ani modelu embeddingów
 — tylko pluginu i tokena.
+
+### E. Deweloper z własnym lokalnym pałacem (hybryda, D-010)
+
+Droga alternatywna do A–D, dla kogoś, kto chce mielić u siebie:
+
+1. Deweloper ma lokalny MemPalace: własne `mempalace init` i `mempalace mine`
+   na swoich projektach. **Kod nie opuszcza laptopa.**
+2. Agent ma **dwa serwery MCP**: `mempalace` (lokalny, prywatny) i `ws_memory`
+   (wspólny). Skill narzuca kolejność szukania: najpierw wspólna baza, potem
+   lokalna.
+3. Publikacja do wspólnej bazy idzie **przez API**, nie przez bazę danych:
+   plugin czyta lokalne szuflady (`mempalace_list_drawers` +
+   `mempalace_get_drawer`) i wysyła ich treść na `POST /api/publish`.
+4. `backend` sprawdza uprawnienia, przepuszcza treść przez filtr sekretów,
+   przelicza embeddingi **swoim** modelem i zapisuje z autorem oraz parą
+   `(source_replica, source_drawer_id)` — powtórna publikacja aktualizuje,
+   nie duplikuje.
+5. Lustro (`ws.mirrors`) robi to samo cyklicznie dla wskazanego skrzydła, ale
+   **dopiero po potwierdzeniu pierwszego podglądu przez człowieka**.
+
+Dlaczego przez API, a nie wprost do bazy: zapis do Postgresa ominąłby token,
+role i audyt — czyli całą warstwę, dla której WS_Memory istnieje. Ten wariant
+został świadomie odrzucony w D-010.
 
 ## Granica bezpieczeństwa
 

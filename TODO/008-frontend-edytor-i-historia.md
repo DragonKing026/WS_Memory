@@ -1,10 +1,10 @@
 ---
 noteId: "7a6c84e0aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, frontend, edytor, codemirror, wersjonowanie]
 
 ---
 
-# 008 — Frontend: edytor Markdown, historia, tokeny agentów
+# TODO-008 — Frontend: edytor Markdown, historia, tokeny agentów
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 007, 005
 

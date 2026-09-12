@@ -1,10 +1,10 @@
 ---
 noteId: "50cd9ca1aeb211f1997d030a3cd38ca7"
-tags: []
+tags: [ws-memory, todo, backend, wiki, wersjonowanie, rewizje]
 
 ---
 
-# 005 — Backend: wiki, rewizje, publikacja do pałaca
+# TODO-005 — Backend: wiki, rewizje, publikacja do pałaca
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 002, 003
 
