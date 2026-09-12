@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+@import '@nuxt/ui';
+
+/*
+ * The application's own tokens, on top of Nuxt UI's.
+ *
+ * Deliberately few. Nuxt UI ships a coherent set of colours and spacing, and a second
+ * palette next to it is how two buttons end up almost the same shade of blue.
+ */
+@theme {
+  /* The one thing this application needs a colour for that a UI kit does not have:
+     telling apart what a person wrote from what an agent wrote. */
+  --color-ai: var(--color-violet-500);
+  --color-verified: var(--color-emerald-600);
+}
+
+:root {
+  --ui-radius: 0.5rem;
+}
+
+/* Content written in Markdown is rendered into this, so the defaults have to be
+   sensible for prose rather than for an application chrome. */
+.ws-prose {
+  @apply leading-relaxed;
+}
+
+.ws-prose :where(h1, h2, h3) {
+  @apply font-semibold mt-6 mb-2;
+}
+
+.ws-prose :where(p, ul, ol, pre, blockquote) {
+  @apply my-3;
+}
+
+.ws-prose :where(ul) {
+  @apply list-disc pl-6;
+}
+
+.ws-prose :where(ol) {
+  @apply list-decimal pl-6;
+}
+
+.ws-prose :where(code) {
+  @apply text-sm px-1 py-0.5 rounded bg-elevated;
+}
+
+.ws-prose :where(pre) {
+  @apply p-3 rounded overflow-x-auto bg-elevated;
+}
