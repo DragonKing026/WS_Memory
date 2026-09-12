@@ -78,6 +78,26 @@ The administrator account arrives together with user management (TODO-002).
 The three MemPalace embedding variables are **inseparable** — see D-003.
 Changing the model invalidates every vector in the database.
 
+## Secrets and a public repository
+
+The repository is **public**. Two rules follow, both hard:
+
+1. **No committed file contains a real secret.** `backend/.env` holds
+   placeholders only; the real values come from `docker-compose.yml` via the
+   root `.env`, which is not in the repository.
+2. **Repository defaults never reach production.**
+   `./docker/wygeneruj-sekrety.sh` generates a fresh set on first run.
+
+Two values from before the repository went public remain in its history:
+`JWT_PASSPHRASE` and `APP_SECRET` from the Symfony Flex recipe. Both have been
+replaced, and the JWT private key was never committed, so neither protects
+anything now. **We do not rewrite history** — rewriting pushed commits breaks
+everyone's copies, and the benefit is nil once the values are dead.
+
+Should a secret that is **still in use** ever leak: rotate it in the running
+system first, and only then consider the history. The other order leaves a
+working key in the hands of whoever already has it.
+
 ## TLS
 
 `nginx` with Let's Encrypt (`certbot` in webroot mode). The only exposed ports

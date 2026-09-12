@@ -77,6 +77,26 @@ Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
 Trzy ostatnie zmienne MemPalace są **nierozdzielne** — patrz D-003. Zmiana
 modelu unieważnia wszystkie wektory w bazie.
 
+## Sekrety a publiczne repozytorium
+
+Repozytorium jest **publiczne**. Wynikają z tego dwie zasady, obie twarde:
+
+1. **Żaden plik commitowany nie zawiera prawdziwego sekretu.** `backend/.env`
+   trzyma wyłącznie wartości zastępcze; realne podaje `docker-compose.yml`
+   z głównego `.env`, którego nie ma w repozytorium.
+2. **Wartości domyślne z repozytorium nigdy nie idą na produkcję.**
+   `./docker/wygeneruj-sekrety.sh` losuje komplet przy pierwszym uruchomieniu.
+
+W historii repozytorium znajdują się dwie wartości sprzed przejścia na
+publiczne: `JWT_PASSPHRASE` i `APP_SECRET` z przepisu Symfony Flex. Obie zostały
+wymienione, a klucz prywatny JWT nigdy nie był commitowany, więc nie chronią już
+niczego. **Historii nie przepisujemy** — zmiana wypchniętych commitów rozjeżdża
+kopie u wszystkich, a korzyść jest zerowa, skoro wartości są martwe.
+
+Gdyby kiedyś wyciekł sekret **nadal używany**: najpierw go wymień w działającym
+systemie, dopiero potem rozważaj historię. Kolejność odwrotna zostawia działający
+klucz w rękach osoby, która już go ma.
+
 ## TLS
 
 `nginx` z Let's Encrypt (`certbot` w trybie webroot). Jedyne wystawione porty
