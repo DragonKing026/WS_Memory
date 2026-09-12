@@ -7,7 +7,8 @@ cd "$(dirname "$0")/.."
 
 losowy() { openssl rand -base64 24 | tr -d '/+=' | cut -c1-32; }
 
-for klucz in POSTGRES_PASSWORD MEMPALACE_DB_PASSWORD WS_DB_PASSWORD MEMPALACE_MCP_HTTP_TOKEN; do
+for klucz in POSTGRES_PASSWORD MEMPALACE_DB_PASSWORD WS_DB_PASSWORD \
+             MEMPALACE_MCP_HTTP_TOKEN APP_SECRET JWT_PASSPHRASE; do
   wartosc="$(losowy)"
   if grep -q "^${klucz}=" .env; then
     sed -i "s|^${klucz}=.*|${klucz}=${wartosc}|" .env

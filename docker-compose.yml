@@ -129,6 +129,7 @@ services:
       # Token do MemPalace zna WYŁĄCZNIE backend. Agenci dostają własne
       # tokeny wystawiane w aplikacji (reguła nienaruszalna nr 1).
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?ustaw JWT_PASSPHRASE w .env}
     volumes:
       - ./backend:/app
     mem_limit: ${BACKEND_MEM_LIMIT:-1g}
@@ -158,6 +159,7 @@ services:
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
       MEMPALACE_URL: http://mempalace:8765
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?ustaw JWT_PASSPHRASE w .env}
     volumes:
       - ./backend:/app
     mem_limit: ${WORKER_MEM_LIMIT:-512m}
