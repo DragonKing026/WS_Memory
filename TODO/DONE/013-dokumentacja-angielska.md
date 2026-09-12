@@ -4,7 +4,7 @@ tags: [ws-memory, todo, dokumentacja, i18n]
 
 # TODO-013 — Angielskie odpowiedniki dokumentacji
 
-**Utworzono:** 2026-09-12 19:40 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 20:40** · **Zależności:** brak
+**Utworzono:** 2026-09-12 18:29 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 18:48** · **Zależności:** brak
 
 ## Powód
 
@@ -61,7 +61,7 @@ Tłumaczenie ich kosztowałoby stale, a nie służy nikomu poza archiwum.
 
 ## Co zostało zrobione
 
-**Ukończono:** 2026-09-12 20:40
+**Ukończono:** 2026-09-12 18:48
 
 ### Kryteria ukończenia — weryfikacja
 

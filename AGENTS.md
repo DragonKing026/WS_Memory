@@ -9,7 +9,7 @@ tags: [ws-memory, kontrakt-projektu, architektura, konwencje, agenci-ai]
 Ten plik jest kontraktem dla każdego agenta AI i każdej osoby, która pracuje
 nad **WS_Memory**. Czytasz go przed pierwszą zmianą w repozytorium.
 
-Ostatnia aktualizacja: 2026-09-12 20:15 CEST
+Ostatnia aktualizacja: 2026-09-12 19:59 CEST (commit `ebbaffc`)
 
 ---
 

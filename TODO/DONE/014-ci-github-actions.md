@@ -4,7 +4,7 @@ tags: [ws-memory, todo, ci, github-actions, testy]
 
 # TODO-014 — CI na GitHub Actions w dwóch prędkościach
 
-**Utworzono:** 2026-09-12 22:10 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 23:30** · **Zależności:** 002
+**Utworzono:** 2026-09-12 19:29 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 19:51** · **Zależności:** 002
 
 ## Powód
 
@@ -76,7 +76,7 @@ zanim w ogóle mamy co wdrażać.
 
 ## Co zostało zrobione
 
-**Ukończono:** 2026-09-12 23:30
+**Ukończono:** 2026-09-12 19:51
 
 ### Zmiana założeń w trakcie
 

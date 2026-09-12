@@ -6,7 +6,7 @@ tags: [ws-memory, todo, backend, wiki, wersjonowanie, rewizje]
 
 # TODO-005 — Backend: wiki, rewizje, publikacja do pałaca
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 002, 003
+**Utworzono:** 2026-09-12 16:03 · **Stan:** do zrobienia · **Zależności:** 002, 003
 
 ## Powód
 

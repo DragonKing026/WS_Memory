@@ -6,7 +6,7 @@ tags: [ws-memory, todo, backend, mcp, tokeny, uprawnienia, agenci-ai]
 
 # TODO-004 — Backend: gateway MCP i tokeny agentów
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 003
+**Utworzono:** 2026-09-12 16:03 · **Stan:** do zrobienia · **Zależności:** 003
 
 ## Powód
 

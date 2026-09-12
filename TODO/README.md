@@ -25,6 +25,9 @@ Każde zadanie ma cztery sekcje:
 
 1. Dopisz sekcję **Co zostało zrobione** z datą i godziną: co powstało, co
    przetestowano, co odłożono i dlaczego. Fakty, nie deklaracje.
+   **Godzinę bierzesz z zegara, nie z pamięci** — po commicie da się ją
+   sprawdzić przez `git log`. Daty pisane na wyczucie rozjechały już raz
+   `CHANGELOG.md` o kilka godzin i umieściły dwa wpisy w przyszłości.
 2. `git mv TODO/NNN-....md TODO/DONE/` — historia pliku zostaje zachowana.
 3. Zaktualizuj dokumentację w `docs/`, jeśli zmieniło się zachowanie systemu.
 4. Dopisz wpis do `CHANGELOG.md` z datą i godziną.

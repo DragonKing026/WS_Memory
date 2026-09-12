@@ -6,7 +6,7 @@ tags: [ws-memory, todo, mielenie, mempalace, worker, dokumenty]
 
 # TODO-010 — Mielenie po stronie serwera: transkrypty, repozytoria, dokumenty
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** ❌ **ANULOWANE 2026-09-12 17:08**
+**Utworzono:** 2026-09-12 16:03 · **Stan:** ❌ **ANULOWANE 2026-09-12 16:52**
 · **Powód:** decyzja D-012
 
 > ## Dlaczego anulowane

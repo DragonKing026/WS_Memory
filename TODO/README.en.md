@@ -27,7 +27,9 @@ Every task has four sections:
 ## When finished
 
 1. Add a **Co zostało zrobione** (What was done) section with the date and
-   time: what was built, what was tested, what was deferred and why. Facts, not
+   time — **taken from the clock, not from memory**, so that `git log` can verify
+   it afterwards. Times written by feel have already put `CHANGELOG.md` hours out
+   and placed two entries in the future: what was built, what was tested, what was deferred and why. Facts, not
    declarations.
 2. `git mv TODO/NNN-....md TODO/DONE/` — the file's history is preserved.
 3. Update the documentation in `docs/` **and** `docs/en/` if system behaviour

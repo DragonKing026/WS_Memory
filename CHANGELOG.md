@@ -9,9 +9,13 @@ tags: [ws-memory, changelog, historia-zmian]
 Wszystkie istotne zmiany w projekcie, z datą i godziną. Najnowsze na górze.
 Format: `## RRRR-MM-DD GG:MM — tytuł`.
 
----
+**Czas wpisu to czas commita, który go wprowadził** — do sprawdzenia przez
+`git log -S"<tytuł wpisu>" -- CHANGELOG.md`. Nie szacujemy go i nie zapisujemy
+„z pamięci": daty pisane na wyczucie już raz rozjechały ten plik o kilka godzin
+i umieściły dwa wpisy w przyszłości.
 
-## 2026-09-12 21:30 — TODO-003 ukończone: backend czyta i zapisuje pamięć
+---
+## 2026-09-12 21:31 — TODO-003 ukończone: backend czyta i zapisuje pamięć
 
 Powstała jedyna droga między naszymi uprawnieniami a pałacem. Od teraz każde
 zapytanie do pamięci niesie filtr przestrzeni, a każdy zapis jest zaksięgowany
@@ -62,7 +66,206 @@ mapowanie, które obiecywało filtr niewyrażalny w protokole.
 
 ---
 
-## 2026-09-12 17:52 — TODO-000 ukończone: fundament działa, polska semantyka potwierdzona
+## 2026-09-12 20:45 — Wiki generowana z dokumentacji
+
+Wiki GitHuba jako **renderowane lustro** katalogu `docs/`: 23 strony plus pasek
+boczny, obie wersje językowe, publikowane po każdym scaleniu do `main`, które
+dotknęło dokumentacji.
+
+Świadomie **nie** jest drugim źródłem prawdy. Ręczna edycja zostaje nadpisana,
+o czym informuje nagłówek każdej strony. Powód jest ten sam, dla którego
+powstał `make sprawdz-dokumentacje`: dwa miejsca z tą samą treścią rozjeżdżają
+się zawsze, a nieaktualny opis bywa traktowany jako fakt — także przez modele
+AI, które go czytają.
+
+Generator przepisuje odnośniki ze ścieżek plików na nazwy stron wiki; bez tego
+nawigacja prowadziłaby donikąd. Podgląd lokalny przez `make wiki`.
+
+---
+
+## 2026-09-12 20:32 — Ochrona gałęzi, Dependabot i pierwsze zielone przebiegi
+
+- **Ruleset na `main`**: zakaz usunięcia i przepisania historii, wymagane
+  przejście dwóch sprawdzeń, wymagany pull request z zerem akceptacji.
+  Administrator omija — przy jednej osobie wymuszanie PR-ów na literówkę
+  byłoby ceremonią bez treści; wyjątek znika, gdy dojdą kolejne osoby.
+- **Dependabot** dla PHP, akcji i obrazów, z aktualizacjami grupowanymi.
+  Włączone alerty i automatyczne poprawki bezpieczeństwa.
+- **CodeQL w trybie domyślnym** z AI findings (D-018) — pierwszy przebieg
+  zielony w minutę.
+
+**Pięć własnych usterek w CI, wyłapanych przez samo CI:** kontrola YAML
+przewracała się na znacznikach Symfony; PHPStan wymagał skompilowanego
+kontenera; nocny startował workera przed migracjami; brakowało `composer
+install`, bo obraz deweloperski celowo nie zawiera zależności; brakowało
+kluczy JWT, bo są w `.gitignore`. Wszystkie poprawione, wszystkie przebiegi
+zielone.
+
+**Dependabot od razu udowodnił sens nocnego przebiegu:** zaproponował podbicie
+Pythona w obrazie pamięci z 3.12 na 3.14. Nocny uruchomił na tej gałęzi test
+polskiej semantyki i dopiero jego wynik uzasadnił scalenie — bez tej bramki
+byłby to skok w ciemno, a awaria objawiłaby się cicho, jako gorsze wyniki
+wyszukiwania.
+
+---
+
+## 2026-09-12 19:51 — TODO-014: ciągła integracja i skanowanie kodu
+
+- **Szybki przebieg** na każdym pushu i pull requeście: testy backendu
+  z Postgresem, spójność dokumentacji, rozliczenia zadań, składnia, PHPStan.
+  Celowo bez serwera embeddingów.
+- **Przebieg nocny** z pełnym stosem i testem polskiej semantyki, uruchamiany
+  też natychmiast przy zmianie konfiguracji embeddingów — to jedyne miejsce,
+  w którym da się po cichu zepsuć trafność wyszukiwania.
+- **CodeQL w trybie domyślnym + AI findings** (D-018). CodeQL nie obsługuje
+  PHP, więc bez AI findings backend byłby niewidoczny dla skanowania.
+- **PHPStan poziom 8** jako uzupełnienie, bo skanery podatności nie zgłaszają
+  błędów poprawności. Przy pierwszym uruchomieniu znalazł cztery realne
+  usterki, w tym identyfikator użytkownika mogący być pustym łańcuchem.
+- Nowy `scripts/sprawdz-zadania.py` egzekwuje regułę o rozliczeniach zadań.
+
+**Repozytorium stało się publiczne w trakcie tego zadania.** Skutki:
+zanonimizowano nazwy klientów w dokumentacji **i w historii gita** (przepisanie
+uzgodnione, kopia zapasowa zrobiona), usunięto wygenerowany `APP_SECRET`
+z commitowanego pliku, wycofano sugestię self-hosted runnera. Uzasadnienie
+podziału CI na dwie prędkości zmieniło się z kosztu minut na czas odpowiedzi —
+wniosek ten sam, powód inny.
+
+---
+
+## 2026-09-12 19:17 — TODO-002: konta, przestrzenie, role i audyt
+
+Pierwsze zadanie z prawdziwą logiką uprawnień, więc testy negatywne przed
+kodem: **44 testy, 84 asercje**, z tego 12 negatywnych.
+
+- `SpaceAccessResolver` jako **jedyne miejsce liczące uprawnienia**, z portem
+  repozytorium — reguły testowane bez bazy, więc chodzą przy każdym commicie.
+  Bez cache: odebranie roli działa natychmiast.
+- Zaproszenia z tokenem przechowywanym wyłącznie jako skrót; konto i jego
+  prywatna przestrzeń powstają w jednej transakcji.
+- Logowanie JWT, `/api/me`, przestrzenie, nadawanie ról, `ws:user:invite`.
+- Audyt: `invitation.issued`, `invitation.accepted`, `user.login`,
+  `user.login_failed` (bez aktora — mamy wtedy tożsamość deklarowaną, nie
+  potwierdzoną), `space.created`, `space.member_added`, `space.read`.
+- **Przestrzeń poza uprawnieniami odpowiada bajt w bajt jak nieistniejąca**,
+  a uprawnienie sprawdzane jest przed istnieniem, żeby nie różnicować czasu
+  odpowiedzi.
+- **D-016** — administrator globalny nie czyta cudzych przestrzeni po cichu.
+- **D-017** — odświeżania tokenów nie piszemy własnoręcznie; TTL 8 godzin.
+
+**Luka znaleziona przy pisaniu dokumentacji backendu:** dezaktywacja konta nie
+odcinała dostępu, bo JWT zostaje ważny do wygaśnięcia. Naprawione
+`ActiveAccountCheckerem` działającym przy każdym żądaniu.
+
+Nowy dokument `docs/08-backend.md` (+ angielski): mapa wszystkich plików z rolą
+każdego, przepływy żądań, uprawnienia od końca do końca, instrukcja dodawania
+nowych rzeczy.
+
+---
+
+## 2026-09-12 18:48 — TODO-013: dokumentacja dwujęzyczna
+
+Wykonane poza kolejnością, na wniosek: każde kolejne zadanie dokłada treści do
+przetłumaczenia, więc zwlekanie kosztuje liniowo.
+
+- `AGENTS.en.md`, `README.en.md`, `TODO/README.en.md` oraz `docs/en/` z sześcioma
+  dokumentami i specem — około 1700 wierszy. Polska wersja pozostaje wiodąca;
+  każdy plik angielski nosi w nagłówku wskazanie oryginału i datę synchronizacji.
+- **Definicja ukończenia** w `AGENTS.md`: siedmiopunktowa lista przechodzona
+  przed commitem. Reguła „aktualizuj dokumentację" była opisowa i przez to
+  niesprawdzalna.
+- `make sprawdz-dokumentacje` — wychwytuje brak odpowiednika, rozjazd numerów
+  decyzji, brak nagłówka i plik bez wpisu w mapie. Sprawdzony przeciwko obu
+  rodzajom usterki, bo skrypt zawsze przechodzący jest gorszy od jego braku.
+- Zasada commitowania **natychmiast po zamknięciu zmiany**, nie na koniec
+  zadania — historia gita ma pokazywać przebieg pracy, nie tylko wynik.
+
+**Tłumaczenie okazało się przeglądem dokumentacji** i ujawniło pięć rozjazdów,
+wszystkie poprawione: `README` twierdził, że implementacja jest nierozpoczęta;
+`docs/05` że nie ma `docker-compose.yml` i używał nieistniejącej roli `ws`
+w poleceniu backupu; `AGENTS.md` pisał, że mempalace mieli (wbrew D-012), miał
+nieaktualną datę i mówił o siedmiu działających usługach zamiast sześciu; graf
+zadań nie znał `TODO-012` ani `TODO-013`.
+
+Spec projektowy przetłumaczono, ale oznaczono jako **zapis historyczny** —
+zamyka się na D-009, a późniejsze decyzje zmieniły trzy opisane w nim rzeczy.
+
+---
+
+## 2026-09-12 18:29 — TODO-001: fundament backendu
+
+Symfony 8.0 na PHP 8.4 jako **czyste API** (D-008): API Platform 4.3, Doctrine
+ORM 3.6, Messenger z transportem w bazie, LexikJWT. Zero Twiga — Swagger UI
+wyłączone, kontrakt wystawiony maszynowo pod `/api/docs.json`. Doszły trzy
+usługi: `backend`, `worker` i `nginx`; wszystkie sześć jest `healthy`.
+
+**Warstwy i porty od pierwszej klasy**, nie „później, jak urośnie":
+`Domain/` → `Application/` → `Infrastructure/` → `Presentation/`. Endpoint
+zdrowia jest tego przykładem — `HealthProbe` to port, sondy bazy i pamięci to
+adaptery zbierane po tagu. Monitorowanie kolejnej zależności to dodanie klasy,
+nie edycja kontrolera.
+
+**Ustalenia językowe:** w kodzie wszystko po angielsku, łącznie z komentarzami
+(konwencja głównej aplikacji Symfony zespołu); dokumentacja dwujęzyczna z polskim jako wersją wiodącą.
+Pierwsza wersja kontrolera miała polskie nazwy — przepisana, zanim urosło.
+Angielskie odpowiedniki dokumentacji to nowe `TODO-013`.
+
+**Zasady struktury dopisane do AGENTS.md:** warstwy, kierunek zależności oraz
+tabela wzorców z uzasadnieniem — każdy wzorzec przypisany do konkretnej
+przyszłej zmiany, nie dodany „na wszelki wypadek".
+
+**Pięć rzeczy, które wyszły dopiero w działaniu** (szczegóły w
+`TODO/DONE/001-backend-fundament.md`):
+
+- `doctrine:schema:validate` i `migrations:diff` **nie działają** — wymagają
+  DBAL ^4.5, a stabilne jest 4.4.4. Sprawdzone, że to nie nasza konfiguracja:
+  błąd występuje także bez `schema_filter`. Migracje piszemy ręcznie,
+  walidujemy `--skip-sync`.
+- `monolog-bundle` nie wspiera jeszcze Symfony 8 przy jawnym pinowaniu.
+- `localhost` w kontenerze rozwiązuje się najpierw na IPv6 — healthcheck
+  nginxa dostawał odmowę, bo `listen 80` wiąże tylko IPv4.
+- Symfony cache'uje skompilowany kontener w zamontowanym wolumenie: poprawka
+  konfiguracji nie działa, dopóki nie usunie się `backend/var/cache`.
+- Healthcheck workera nie może używać `pgrep` (brak `procps` w obrazie PHP) —
+  pytamy `/proc/1/cmdline`.
+
+---
+
+## 2026-09-12 18:01 — Pomiary modeli embeddingów i limity zasobów
+
+Domknięcie incydentu z TODO-000: serwer embeddingów zajął 21 GB i zdławił
+maszynę deweloperską. Zamiast zgadywać lżejszy model, zmierzono cztery
+kandydaty na trzech polskich parach zdań (`test/porownaj-modele.py`, każdy z
+twardym limitem pamięci, sprzątanie po każdym).
+
+**Wynik obalił dwie pozorne oczywistości:**
+
+- **`bge-m3` po dostrojeniu zajmuje 2,2 GB, nie 21 GB.** Te 19 GB to była
+  wyłącznie rezerwacja buforów TEI (`--max-batch-tokens 16384` i tyle wątków
+  tokenizacji, ile rdzeni) przy modelu z oknem 8192 tokenów. Model zostaje.
+- **Najlepszy margines miał `paraphrase-multilingual-MiniLM` (0,281) — i to
+  pułapka.** Ma okno **128 tokenów**, więc ucinałby każdą szufladę po ~90
+  słowach, cicho i bez błędu. Odrzucony.
+- Rodzina **E5 wypadła najgorzej** (margines 0,034–0,055) i potwierdziła
+  pierwotny argument D-003: wymuszony wspólny prefiks `query: ` po obu
+  stronach ściska podobieństwa w paśmie wokół 0,8 — para kontrolna dostaje
+  0,804, dokładnie tyle co trafna.
+
+**Prawdziwą przyczyną awarii był brak `mem_limit` w compose**, nie wybór
+modelu. Kontener bez limitu bierze całą pamięć maszyny, więc pomyłka w
+konfiguracji zamieniła się w zdławienie komputera. Limity są teraz na
+wszystkich usługach i zostają także na produkcji jako druga linia obrony.
+
+- Zmierzony stan pod limitami: embeddingi 2,12 GB z 4 GB, mempalace 66 MB,
+  Postgres 31 MB — cały stos poniżej 2,3 GB.
+- D-003 uzupełniona o tabelę pomiarów i wymóg strojenia buforów.
+- `docs/05-deployment.md`: realne liczby zamiast szacunków, uzasadnienie limitów.
+- Nowe narzędzie `test/porownaj-modele.py` — stanowisko do porównywania modeli
+  na polskich parach zdań, przydatne przy każdej przyszłej zmianie modelu.
+
+---
+
+## 2026-09-12 17:46 — TODO-000 ukończone: fundament działa, polska semantyka potwierdzona
 
 **Pierwszy kod w projekcie.** Trzy usługi w Dockerze stoją, a założenie, na
 którym stoi cały projekt, jest potwierdzone w działaniu, nie na papierze:
@@ -107,206 +310,7 @@ Zadanie przeniesione do `TODO/DONE/` z pełnym zapisem weryfikacji.
 
 ---
 
-## 2026-09-13 00:50 — Wiki generowana z dokumentacji
-
-Wiki GitHuba jako **renderowane lustro** katalogu `docs/`: 23 strony plus pasek
-boczny, obie wersje językowe, publikowane po każdym scaleniu do `main`, które
-dotknęło dokumentacji.
-
-Świadomie **nie** jest drugim źródłem prawdy. Ręczna edycja zostaje nadpisana,
-o czym informuje nagłówek każdej strony. Powód jest ten sam, dla którego
-powstał `make sprawdz-dokumentacje`: dwa miejsca z tą samą treścią rozjeżdżają
-się zawsze, a nieaktualny opis bywa traktowany jako fakt — także przez modele
-AI, które go czytają.
-
-Generator przepisuje odnośniki ze ścieżek plików na nazwy stron wiki; bez tego
-nawigacja prowadziłaby donikąd. Podgląd lokalny przez `make wiki`.
-
----
-
-## 2026-09-13 00:20 — Ochrona gałęzi, Dependabot i pierwsze zielone przebiegi
-
-- **Ruleset na `main`**: zakaz usunięcia i przepisania historii, wymagane
-  przejście dwóch sprawdzeń, wymagany pull request z zerem akceptacji.
-  Administrator omija — przy jednej osobie wymuszanie PR-ów na literówkę
-  byłoby ceremonią bez treści; wyjątek znika, gdy dojdą kolejne osoby.
-- **Dependabot** dla PHP, akcji i obrazów, z aktualizacjami grupowanymi.
-  Włączone alerty i automatyczne poprawki bezpieczeństwa.
-- **CodeQL w trybie domyślnym** z AI findings (D-018) — pierwszy przebieg
-  zielony w minutę.
-
-**Pięć własnych usterek w CI, wyłapanych przez samo CI:** kontrola YAML
-przewracała się na znacznikach Symfony; PHPStan wymagał skompilowanego
-kontenera; nocny startował workera przed migracjami; brakowało `composer
-install`, bo obraz deweloperski celowo nie zawiera zależności; brakowało
-kluczy JWT, bo są w `.gitignore`. Wszystkie poprawione, wszystkie przebiegi
-zielone.
-
-**Dependabot od razu udowodnił sens nocnego przebiegu:** zaproponował podbicie
-Pythona w obrazie pamięci z 3.12 na 3.14. Nocny uruchomił na tej gałęzi test
-polskiej semantyki i dopiero jego wynik uzasadnił scalenie — bez tej bramki
-byłby to skok w ciemno, a awaria objawiłaby się cicho, jako gorsze wyniki
-wyszukiwania.
-
----
-
-## 2026-09-12 23:30 — TODO-014: ciągła integracja i skanowanie kodu
-
-- **Szybki przebieg** na każdym pushu i pull requeście: testy backendu
-  z Postgresem, spójność dokumentacji, rozliczenia zadań, składnia, PHPStan.
-  Celowo bez serwera embeddingów.
-- **Przebieg nocny** z pełnym stosem i testem polskiej semantyki, uruchamiany
-  też natychmiast przy zmianie konfiguracji embeddingów — to jedyne miejsce,
-  w którym da się po cichu zepsuć trafność wyszukiwania.
-- **CodeQL w trybie domyślnym + AI findings** (D-018). CodeQL nie obsługuje
-  PHP, więc bez AI findings backend byłby niewidoczny dla skanowania.
-- **PHPStan poziom 8** jako uzupełnienie, bo skanery podatności nie zgłaszają
-  błędów poprawności. Przy pierwszym uruchomieniu znalazł cztery realne
-  usterki, w tym identyfikator użytkownika mogący być pustym łańcuchem.
-- Nowy `scripts/sprawdz-zadania.py` egzekwuje regułę o rozliczeniach zadań.
-
-**Repozytorium stało się publiczne w trakcie tego zadania.** Skutki:
-zanonimizowano nazwy klientów w dokumentacji **i w historii gita** (przepisanie
-uzgodnione, kopia zapasowa zrobiona), usunięto wygenerowany `APP_SECRET`
-z commitowanego pliku, wycofano sugestię self-hosted runnera. Uzasadnienie
-podziału CI na dwie prędkości zmieniło się z kosztu minut na czas odpowiedzi —
-wniosek ten sam, powód inny.
-
----
-
-## 2026-09-12 21:55 — TODO-002: konta, przestrzenie, role i audyt
-
-Pierwsze zadanie z prawdziwą logiką uprawnień, więc testy negatywne przed
-kodem: **44 testy, 84 asercje**, z tego 12 negatywnych.
-
-- `SpaceAccessResolver` jako **jedyne miejsce liczące uprawnienia**, z portem
-  repozytorium — reguły testowane bez bazy, więc chodzą przy każdym commicie.
-  Bez cache: odebranie roli działa natychmiast.
-- Zaproszenia z tokenem przechowywanym wyłącznie jako skrót; konto i jego
-  prywatna przestrzeń powstają w jednej transakcji.
-- Logowanie JWT, `/api/me`, przestrzenie, nadawanie ról, `ws:user:invite`.
-- Audyt: `invitation.issued`, `invitation.accepted`, `user.login`,
-  `user.login_failed` (bez aktora — mamy wtedy tożsamość deklarowaną, nie
-  potwierdzoną), `space.created`, `space.member_added`, `space.read`.
-- **Przestrzeń poza uprawnieniami odpowiada bajt w bajt jak nieistniejąca**,
-  a uprawnienie sprawdzane jest przed istnieniem, żeby nie różnicować czasu
-  odpowiedzi.
-- **D-016** — administrator globalny nie czyta cudzych przestrzeni po cichu.
-- **D-017** — odświeżania tokenów nie piszemy własnoręcznie; TTL 8 godzin.
-
-**Luka znaleziona przy pisaniu dokumentacji backendu:** dezaktywacja konta nie
-odcinała dostępu, bo JWT zostaje ważny do wygaśnięcia. Naprawione
-`ActiveAccountCheckerem` działającym przy każdym żądaniu.
-
-Nowy dokument `docs/08-backend.md` (+ angielski): mapa wszystkich plików z rolą
-każdego, przepływy żądań, uprawnienia od końca do końca, instrukcja dodawania
-nowych rzeczy.
-
----
-
-## 2026-09-12 20:40 — TODO-013: dokumentacja dwujęzyczna
-
-Wykonane poza kolejnością, na wniosek: każde kolejne zadanie dokłada treści do
-przetłumaczenia, więc zwlekanie kosztuje liniowo.
-
-- `AGENTS.en.md`, `README.en.md`, `TODO/README.en.md` oraz `docs/en/` z sześcioma
-  dokumentami i specem — około 1700 wierszy. Polska wersja pozostaje wiodąca;
-  każdy plik angielski nosi w nagłówku wskazanie oryginału i datę synchronizacji.
-- **Definicja ukończenia** w `AGENTS.md`: siedmiopunktowa lista przechodzona
-  przed commitem. Reguła „aktualizuj dokumentację" była opisowa i przez to
-  niesprawdzalna.
-- `make sprawdz-dokumentacje` — wychwytuje brak odpowiednika, rozjazd numerów
-  decyzji, brak nagłówka i plik bez wpisu w mapie. Sprawdzony przeciwko obu
-  rodzajom usterki, bo skrypt zawsze przechodzący jest gorszy od jego braku.
-- Zasada commitowania **natychmiast po zamknięciu zmiany**, nie na koniec
-  zadania — historia gita ma pokazywać przebieg pracy, nie tylko wynik.
-
-**Tłumaczenie okazało się przeglądem dokumentacji** i ujawniło pięć rozjazdów,
-wszystkie poprawione: `README` twierdził, że implementacja jest nierozpoczęta;
-`docs/05` że nie ma `docker-compose.yml` i używał nieistniejącej roli `ws`
-w poleceniu backupu; `AGENTS.md` pisał, że mempalace mieli (wbrew D-012), miał
-nieaktualną datę i mówił o siedmiu działających usługach zamiast sześciu; graf
-zadań nie znał `TODO-012` ani `TODO-013`.
-
-Spec projektowy przetłumaczono, ale oznaczono jako **zapis historyczny** —
-zamyka się na D-009, a późniejsze decyzje zmieniły trzy opisane w nim rzeczy.
-
----
-
-## 2026-09-12 19:45 — TODO-001: fundament backendu
-
-Symfony 8.0 na PHP 8.4 jako **czyste API** (D-008): API Platform 4.3, Doctrine
-ORM 3.6, Messenger z transportem w bazie, LexikJWT. Zero Twiga — Swagger UI
-wyłączone, kontrakt wystawiony maszynowo pod `/api/docs.json`. Doszły trzy
-usługi: `backend`, `worker` i `nginx`; wszystkie sześć jest `healthy`.
-
-**Warstwy i porty od pierwszej klasy**, nie „później, jak urośnie":
-`Domain/` → `Application/` → `Infrastructure/` → `Presentation/`. Endpoint
-zdrowia jest tego przykładem — `HealthProbe` to port, sondy bazy i pamięci to
-adaptery zbierane po tagu. Monitorowanie kolejnej zależności to dodanie klasy,
-nie edycja kontrolera.
-
-**Ustalenia językowe:** w kodzie wszystko po angielsku, łącznie z komentarzami
-(konwencja głównej aplikacji Symfony zespołu); dokumentacja dwujęzyczna z polskim jako wersją wiodącą.
-Pierwsza wersja kontrolera miała polskie nazwy — przepisana, zanim urosło.
-Angielskie odpowiedniki dokumentacji to nowe `TODO-013`.
-
-**Zasady struktury dopisane do AGENTS.md:** warstwy, kierunek zależności oraz
-tabela wzorców z uzasadnieniem — każdy wzorzec przypisany do konkretnej
-przyszłej zmiany, nie dodany „na wszelki wypadek".
-
-**Pięć rzeczy, które wyszły dopiero w działaniu** (szczegóły w
-`TODO/DONE/001-backend-fundament.md`):
-
-- `doctrine:schema:validate` i `migrations:diff` **nie działają** — wymagają
-  DBAL ^4.5, a stabilne jest 4.4.4. Sprawdzone, że to nie nasza konfiguracja:
-  błąd występuje także bez `schema_filter`. Migracje piszemy ręcznie,
-  walidujemy `--skip-sync`.
-- `monolog-bundle` nie wspiera jeszcze Symfony 8 przy jawnym pinowaniu.
-- `localhost` w kontenerze rozwiązuje się najpierw na IPv6 — healthcheck
-  nginxa dostawał odmowę, bo `listen 80` wiąże tylko IPv4.
-- Symfony cache'uje skompilowany kontener w zamontowanym wolumenie: poprawka
-  konfiguracji nie działa, dopóki nie usunie się `backend/var/cache`.
-- Healthcheck workera nie może używać `pgrep` (brak `procps` w obrazie PHP) —
-  pytamy `/proc/1/cmdline`.
-
----
-
-## 2026-09-12 19:05 — Pomiary modeli embeddingów i limity zasobów
-
-Domknięcie incydentu z TODO-000: serwer embeddingów zajął 21 GB i zdławił
-maszynę deweloperską. Zamiast zgadywać lżejszy model, zmierzono cztery
-kandydaty na trzech polskich parach zdań (`test/porownaj-modele.py`, każdy z
-twardym limitem pamięci, sprzątanie po każdym).
-
-**Wynik obalił dwie pozorne oczywistości:**
-
-- **`bge-m3` po dostrojeniu zajmuje 2,2 GB, nie 21 GB.** Te 19 GB to była
-  wyłącznie rezerwacja buforów TEI (`--max-batch-tokens 16384` i tyle wątków
-  tokenizacji, ile rdzeni) przy modelu z oknem 8192 tokenów. Model zostaje.
-- **Najlepszy margines miał `paraphrase-multilingual-MiniLM` (0,281) — i to
-  pułapka.** Ma okno **128 tokenów**, więc ucinałby każdą szufladę po ~90
-  słowach, cicho i bez błędu. Odrzucony.
-- Rodzina **E5 wypadła najgorzej** (margines 0,034–0,055) i potwierdziła
-  pierwotny argument D-003: wymuszony wspólny prefiks `query: ` po obu
-  stronach ściska podobieństwa w paśmie wokół 0,8 — para kontrolna dostaje
-  0,804, dokładnie tyle co trafna.
-
-**Prawdziwą przyczyną awarii był brak `mem_limit` w compose**, nie wybór
-modelu. Kontener bez limitu bierze całą pamięć maszyny, więc pomyłka w
-konfiguracji zamieniła się w zdławienie komputera. Limity są teraz na
-wszystkich usługach i zostają także na produkcji jako druga linia obrony.
-
-- Zmierzony stan pod limitami: embeddingi 2,12 GB z 4 GB, mempalace 66 MB,
-  Postgres 31 MB — cały stos poniżej 2,3 GB.
-- D-003 uzupełniona o tabelę pomiarów i wymóg strojenia buforów.
-- `docs/05-deployment.md`: realne liczby zamiast szacunków, uzasadnienie limitów.
-- Nowe narzędzie `test/porownaj-modele.py` — stanowisko do porównywania modeli
-  na polskich parach zdań, przydatne przy każdej przyszłej zmianie modelu.
-
----
-
-## 2026-09-12 18:10 — Lokalny pałac pierwotny, serwer trzyma kopię
+## 2026-09-12 17:10 — Lokalny pałac pierwotny, serwer trzyma kopię
 
 Doprecyzowanie kierunku: praca dzieje się lokalnie, serwer dostaje **kopię**.
 Wtyczka WS_Memory istnieje właśnie po to, żeby ta kopia powstawała — kto chce
@@ -334,7 +338,7 @@ z tego ujęcia:
 
 ---
 
-## 2026-09-12 17:52 — Wysyłka na serwer domyślna, tryb ręczny jako wyłącznik
+## 2026-09-12 17:08 — Wysyłka na serwer domyślna, tryb ręczny jako wyłącznik
 
 Odwrócone domyślne zachowanie. Wcześniej publikacja była czynnością, którą
 trzeba pamiętać; teraz **wszystko, co trafia do lokalnego pałaca, jedzie na
@@ -365,7 +369,7 @@ się z publikacji na **mapowanie**, bo to ono decyduje o widoczności dla innych
 
 ---
 
-## 2026-09-12 17:30 — Przenośność na inne klienty AI
+## 2026-09-12 16:55 — Przenośność na inne klienty AI
 
 Pytanie z biura: skoro MemPalace działa nie tylko z Claude, czy struktura
 wtyczek nie zablokuje nas później przy Codeksie? Sprawdzono, jak zrobił to
@@ -396,7 +400,7 @@ przenośność tanim kosztem:
 
 ---
 
-## 2026-09-12 17:15 — Jedna droga: mielenie wyłącznie lokalne
+## 2026-09-12 16:52 — Jedna droga: mielenie wyłącznie lokalne
 
 Konsekwencja hybrydy, doprowadzona do końca. Skoro każdy może mielić u siebie,
 druga — serwerowa — droga wnoszenia wiedzy jest zbędna.
@@ -429,7 +433,7 @@ którą surowa rozmowa wychodzi na serwer**.
 
 ---
 
-## 2026-09-12 16:52 — Hybryda: lokalny pałac plus wspólna baza
+## 2026-09-12 16:39 — Hybryda: lokalny pałac plus wspólna baza
 
 Na pytanie „czy ktoś może mieć MemPalace lokalnie i zapisywać do wspólnego"
 przeprowadzono rozpoznanie podsystemu replikacji. **Ustalono, że replikacji
@@ -470,7 +474,7 @@ w pełni serwerowa:
 
 ---
 
-## 2026-09-12 16:12 — Spec projektowy i dwanaście zadań wdrożeniowych
+## 2026-09-12 16:03 — Spec projektowy i dwanaście zadań wdrożeniowych
 
 - `docs/superpowers/specs/2026-09-12-ws-memory-design.md` — spec utrwalający
   decyzje, kryteria ukończenia projektu i ryzyka wraz z ich obsługą.
@@ -487,7 +491,7 @@ fundamentem byłoby marnotrawstwem.
 
 ---
 
-## 2026-09-12 16:02 — Rozdzielenie backendu i frontendu
+## 2026-09-12 15:57 — Rozdzielenie backendu i frontendu
 
 Na wniosek zmieniono warstwę prezentacji: zamiast monolitu z Twigiem — czyste
 API Symfony plus osobna aplikacja Vue 3. Wzorzec przeniesiony z Precision
@@ -512,7 +516,7 @@ Telemed 2.0 (sprawdzony w zespole), potwierdzony wyszukiwaniem w pałacu.
 
 ---
 
-## 2026-09-12 15:43 — Projekt zatwierdzony, dokumentacja założycielska
+## 2026-09-12 15:57 — Projekt zatwierdzony, dokumentacja założycielska
 
 Etap projektowania zakończony. Kodu jeszcze nie ma.
 

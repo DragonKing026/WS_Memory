@@ -6,7 +6,7 @@ tags: [ws-memory, todo, backend, uprawnienia, konta, audyt]
 
 # TODO-002 — Backend: konta, zaproszenia, przestrzenie, role, audyt
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 21:55** · **Zależności:** 001
+**Utworzono:** 2026-09-12 16:03 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 19:17** · **Zależności:** 001
 
 ## Powód
 
@@ -66,7 +66,7 @@ nieobjęte ścieżki.
 
 ## Co zostało zrobione
 
-**Ukończono:** 2026-09-12 21:55
+**Ukończono:** 2026-09-12 19:17
 
 ### Kryteria ukończenia — weryfikacja
 

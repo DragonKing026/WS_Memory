@@ -6,7 +6,7 @@ tags: [ws-memory, todo, docker, mempalace, embeddingi, postgres, faza-0]
 
 # TODO-000 — Szkielet Dockera i dowód, że polska semantyka działa
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 17:52** · **Zależności:** brak
+**Utworzono:** 2026-09-12 16:03 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 17:46** · **Zależności:** brak
 
 ## Powód
 
@@ -77,7 +77,7 @@ Na co uważać:
 
 ## Co zostało zrobione
 
-**Ukończono:** 2026-09-12 17:52
+**Ukończono:** 2026-09-12 17:46
 
 ### Wynik: fundament działa, założenie potwierdzone
 

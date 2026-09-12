@@ -6,7 +6,7 @@ tags: [ws-memory, todo, backend, symfony, doctrine, api-platform]
 
 # TODO-001 — Backend: fundament Symfony
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 19:45** · **Zależności:** 000
+**Utworzono:** 2026-09-12 16:03 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 18:29** · **Zależności:** 000
 
 ## Powód
 
@@ -59,7 +59,7 @@ Doctrine **nie mogą dotykać** `palace` — konfigurujemy `schema_filter`.
 
 ## Co zostało zrobione
 
-**Ukończono:** 2026-09-12 19:45
+**Ukończono:** 2026-09-12 18:29
 
 ### Kryteria ukończenia — weryfikacja
 

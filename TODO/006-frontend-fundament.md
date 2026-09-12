@@ -6,7 +6,7 @@ tags: [ws-memory, todo, frontend, vue, vite, docker]
 
 # TODO-006 — Frontend: fundament i logowanie
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 002
+**Utworzono:** 2026-09-12 16:03 · **Stan:** do zrobienia · **Zależności:** 002
 
 ## Powód
 

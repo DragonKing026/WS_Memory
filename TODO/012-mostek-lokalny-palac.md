@@ -6,7 +6,7 @@ tags: [ws-memory, todo, hybryda, mempalace, publikacja, lustro]
 
 # TODO-012 — Mostek: lokalny pałac → wspólna baza (hybryda)
 
-**Utworzono:** 2026-09-12 16:45 · **Stan:** do zrobienia · **Zależności:** 004, 009 · **Przejmuje zakres anulowanego** TODO-010
+**Utworzono:** 2026-09-12 16:39 · **Stan:** do zrobienia · **Zależności:** 004, 009 · **Przejmuje zakres anulowanego** TODO-010
 
 ## Powód
 

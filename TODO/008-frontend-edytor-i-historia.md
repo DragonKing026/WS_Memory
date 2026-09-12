@@ -6,7 +6,7 @@ tags: [ws-memory, todo, frontend, edytor, codemirror, wersjonowanie]
 
 # TODO-008 — Frontend: edytor Markdown, historia, tokeny agentów
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 007, 005
+**Utworzono:** 2026-09-12 16:03 · **Stan:** do zrobienia · **Zależności:** 007, 005
 
 ## Powód
 
