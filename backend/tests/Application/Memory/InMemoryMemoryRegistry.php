@@ -1,0 +1,76 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Application\Memory;
+
+use App\Domain\Memory\DrawerId;
+use App\Domain\Memory\MemoryRegistry;
+use App\Domain\Memory\MemoryWrite;
+use App\Domain\Space\SpaceId;
+
+/**
+ * The registry without a database — including its transaction.
+ *
+ * The transaction is the interesting part to fake. `failOnRegister` lets a test
+ * make bookkeeping fail after the palace has already accepted a write, which is
+ * the one ordering where the two stores can disagree; without that lever the
+ * rollback rule would be asserted by reading the code rather than by running it.
+ */
+final class InMemoryMemoryRegistry implements MemoryRegistry
+{
+    /** @var array<string, MemoryWrite> */
+    public array $rows = [];
+
+    public bool $failOnRegister = false;
+
+    public int $transactions = 0;
+
+    public function register(MemoryWrite $write): void
+    {
+        if ($this->failOnRegister) {
+            throw new \RuntimeException('registry write failed (test)');
+        }
+
+        $this->rows[$write->drawer->value] = $write;
+    }
+
+    public function spacesFor(array $ids): array
+    {
+        $spaces = [];
+        foreach ($ids as $id) {
+            if (isset($this->rows[$id->value])) {
+                $spaces[$id->value] = $this->rows[$id->value]->space;
+            }
+        }
+
+        return $spaces;
+    }
+
+    public function spaceFor(DrawerId $id): ?SpaceId
+    {
+        return $this->rows[$id->value]->space ?? null;
+    }
+
+    public function transactional(\Closure $work): mixed
+    {
+        ++$this->transactions;
+        $before = $this->rows;
+
+        try {
+            return $work();
+        } catch (\Throwable $e) {
+            $this->rows = $before;
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Pretends a drawer was filed by someone else, into the given space.
+     */
+    public function givenRow(MemoryWrite $write): void
+    {
+        $this->rows[$write->drawer->value] = $write;
+    }
+}
