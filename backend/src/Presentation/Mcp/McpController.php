@@ -10,6 +10,7 @@ use App\Infrastructure\Security\AgentTokenAuthenticator;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -33,7 +34,7 @@ final readonly class McpController
     }
 
     #[Route('/mcp', name: 'mcp_endpoint', methods: ['POST'])]
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request): Response
     {
         $identity = $request->attributes->get(AgentTokenAuthenticator::IDENTITY_ATTRIBUTE);
         if (!$identity instanceof AgentIdentity) {
@@ -76,11 +77,11 @@ final readonly class McpController
         /** @var array<string, mixed> $decoded */
         $answer = $this->server->handle($decoded, $identity->actor);
 
-        // A notification has no answer. Returning an empty body with 202 is what
-        // tells the client it was accepted; a JSON body here makes clients that
-        // are waiting for nothing hang.
+        // A notification has no answer. An empty body with 202 is what tells the
+        // client it was accepted; any JSON here makes a client that is waiting for
+        // nothing hang on its next request.
         if (null === $answer) {
-            return new JsonResponse(null, Response::HTTP_ACCEPTED, [], true);
+            return new HttpResponse('', Response::HTTP_ACCEPTED);
         }
 
         return new JsonResponse($answer);

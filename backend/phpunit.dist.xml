@@ -14,6 +14,9 @@
         <ini name="display_errors" value="1" />
         <ini name="error_reporting" value="-1" />
         <server name="APP_ENV" value="test" force="true" />
+        <!-- Low on purpose: the rate limit test proves the mechanism, not the
+             number, and 120 requests to prove it would only be slower. -->
+        <server name="MCP_CALLS_PER_MINUTE" value="5" force="true" />
         <server name="SHELL_VERBOSITY" value="-1" />
     </php>
 

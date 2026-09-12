@@ -47,7 +47,11 @@ final class AgentTokenAuthenticator extends AbstractAuthenticator
     ) {
     }
 
-    public function supports(Request $request): ?bool
+    /**
+     * Narrowed from the interface's ?bool: null there means "decide lazily", and
+     * the path prefix is knowable at once.
+     */
+    public function supports(Request $request): bool
     {
         return str_starts_with($request->getPathInfo(), '/mcp');
     }
@@ -87,7 +91,7 @@ final class AgentTokenAuthenticator extends AbstractAuthenticator
         return null;
     }
 
-    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
+    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
         // WWW-Authenticate so a client can tell "your credential is wrong" from
         // "this endpoint is down". Whoever configured the agent needs to react

@@ -139,7 +139,7 @@ final readonly class DoctrineMemoryRegistry implements MemoryRegistry
                 WHERE s.slug IN (:slugs)
                 GROUP BY s.slug
                 SQL,
-            ['slugs' => array_values($slugs)],
+            ['slugs' => $slugs],
             ['slugs' => ArrayParameterType::STRING],
         );
 
