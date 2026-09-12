@@ -56,6 +56,30 @@ Zadanie przeniesione do `TODO/DONE/` z pełnym zapisem weryfikacji.
 
 ---
 
+## 2026-09-12 23:30 — TODO-014: ciągła integracja i skanowanie kodu
+
+- **Szybki przebieg** na każdym pushu i pull requeście: testy backendu
+  z Postgresem, spójność dokumentacji, rozliczenia zadań, składnia, PHPStan.
+  Celowo bez serwera embeddingów.
+- **Przebieg nocny** z pełnym stosem i testem polskiej semantyki, uruchamiany
+  też natychmiast przy zmianie konfiguracji embeddingów — to jedyne miejsce,
+  w którym da się po cichu zepsuć trafność wyszukiwania.
+- **CodeQL w trybie domyślnym + AI findings** (D-018). CodeQL nie obsługuje
+  PHP, więc bez AI findings backend byłby niewidoczny dla skanowania.
+- **PHPStan poziom 8** jako uzupełnienie, bo skanery podatności nie zgłaszają
+  błędów poprawności. Przy pierwszym uruchomieniu znalazł cztery realne
+  usterki, w tym identyfikator użytkownika mogący być pustym łańcuchem.
+- Nowy `scripts/sprawdz-zadania.py` egzekwuje regułę o rozliczeniach zadań.
+
+**Repozytorium stało się publiczne w trakcie tego zadania.** Skutki:
+zanonimizowano nazwy klientów w dokumentacji **i w historii gita** (przepisanie
+uzgodnione, kopia zapasowa zrobiona), usunięto wygenerowany `APP_SECRET`
+z commitowanego pliku, wycofano sugestię self-hosted runnera. Uzasadnienie
+podziału CI na dwie prędkości zmieniło się z kosztu minut na czas odpowiedzi —
+wniosek ten sam, powód inny.
+
+---
+
 ## 2026-09-12 21:55 — TODO-002: konta, przestrzenie, role i audyt
 
 Pierwsze zadanie z prawdziwą logiką uprawnień, więc testy negatywne przed
