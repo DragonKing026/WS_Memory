@@ -19,8 +19,10 @@ REST `/api` dla ludzi i MCP `/mcp` dla agentów.
 
 ## Status
 
-**Etap projektowania zakończony, implementacja nierozpoczęta.**
-Projekt zatwierdzony 2026-09-12. Zadania czekają w `TODO/`.
+**Fundament działa.** Projekt zatwierdzony 2026-09-12; ukończone `TODO-000`
+(baza, embeddingi, pamięć + dowód polskiej semantyki) i `TODO-001` (backend
+Symfony jako czyste API). Sześć usług wstaje i odpowiada; brakuje frontendu,
+kont użytkowników i gatewaya MCP. Kolejne zadania w `TODO/`.
 
 ## Co to daje
 
@@ -39,14 +41,22 @@ Projekt zatwierdzony 2026-09-12. Zadania czekają w `TODO/`.
 
 ## Szybki start
 
-> Dostępne po ukończeniu zadania `TODO/000-szkielet-i-dowod-dzialania.md`.
+```bash
+cp .env.example .env
+./docker/wygeneruj-sekrety.sh   # losowe hasła i tokeny
+make start                      # pierwszy start ~3 min: pobranie modelu embeddingów
+make migracje
+```
+
+Sprawdzenie, czy fundament działa:
 
 ```bash
-cp .env.example .env        # ustaw hasła, domenę, sekret JWT
-docker compose up -d
-docker compose exec backend bin/console doctrine:migrations:migrate
-docker compose exec backend bin/console ws:user:invite twoj@email.pl --admin
+make test-semantyka   # polskie zapytanie musi znaleźć polską treść
+make test             # testy backendu
+curl http://127.0.0.1:8080/api/health
 ```
+
+Pełny opis: [README.docker.md](README.docker.md).
 
 ## Dokumentacja
 
@@ -60,6 +70,8 @@ docker compose exec backend bin/console ws:user:invite twoj@email.pl --admin
 | [docs/05-deployment.md](docs/05-deployment.md) | Docker, TLS, backup, aktualizacje |
 | [docs/06-decyzje.md](docs/06-decyzje.md) | Decyzje techniczne z uzasadnieniem |
 | [docs/07-frontend.md](docs/07-frontend.md) | Konwencje frontendu Vue, ekrany, zasady |
+| [README.docker.md](README.docker.md) | Uruchomienie stosu, co gdzie jest, sprzątanie |
+| [docs/en/](docs/en/) | Angielskie odpowiedniki (polski jest wersją wiodącą) |
 | [CHANGELOG.md](CHANGELOG.md) | Historia zmian z datami i godzinami |
 | [TODO/](TODO/) | Zadania; ukończone w `TODO/DONE/` |
 

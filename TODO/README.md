@@ -35,20 +35,26 @@ Zadanie bez sekcji **Co zostało zrobione** nie trafia do `DONE/`.
 ## Kolejność i zależności
 
 ```
-000 szkielet ──► 001 backend fundament ──► 002 konta i przestrzenie
-                                              │
-                          ┌───────────────────┼───────────────────┐
-                          ▼                   ▼                   ▼
-                   003 klient pałaca    005 wiki backend    006 frontend fundament
-                          │                   │                   │
-                          ▼                   │                   ▼
-                   004 gateway MCP ◄──────────┘            007 szukanie (UI)
-                          │                                       │
-                          ▼                                       ▼
-                   009 plugin                              008 edytor i historia
-                          │
-                          ▼
-                   010 mielenie ──► 011 dopieszczenie
+✅ 000 szkielet ──► ✅ 001 backend fundament ──► 002 konta i przestrzenie
+                                                     │
+                                 ┌───────────────────┼───────────────────┐
+                                 ▼                   ▼                   ▼
+                          003 klient pałaca    005 wiki backend    006 frontend fundament
+                                 │                   │                   │
+                                 ▼                   │                   ▼
+                          004 gateway MCP ◄──────────┘            007 szukanie (UI)
+                                 │                                       │
+                                 ▼                                       ▼
+                          009 plugin                              008 edytor i historia
+                                 │
+                                 ▼
+                          012 mostek: lokalny pałac → serwer
+                                 │
+                                 ▼
+                          011 dopieszczenie
+
+  ❌ 010 mielenie serwerowe — ANULOWANE (D-012)
+  ⏸  013 dokumentacja angielska — niezależne, im wcześniej tym taniej
 ```
 
 Zadania 000-002 są ściśle sekwencyjne. Dalej backend (003-005) i frontend

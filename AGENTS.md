@@ -9,7 +9,7 @@ tags: [ws-memory, kontrakt-projektu, architektura, konwencje, agenci-ai]
 Ten plik jest kontraktem dla każdego agenta AI i każdej osoby, która pracuje
 nad **WS_Memory**. Czytasz go przed pierwszą zmianą w repozytorium.
 
-Ostatnia aktualizacja: 2026-09-12 15:43 CEST
+Ostatnia aktualizacja: 2026-09-12 20:15 CEST
 
 ---
 
@@ -76,15 +76,16 @@ Telemed 2.0. Backend to czyste API Symfony, które działa niezależnie od
 frontendu i ma własny kontrakt; frontend to aplikacja Vue 3 na Vite,
 budowana osobno. Żadna część nie renderuje HTML-a drugiej.
 
-Siedem usług w Dockerze. `nginx` terminuje TLS i jest jedynym wejściem; kieruje
+Siedem usług w Dockerze (sześć już działa, brakuje `frontend` — TODO-006).
+`nginx` terminuje TLS i jest jedynym wejściem; kieruje
 `/` na frontend, a `/api` i `/mcp` na backend — **ten sam origin, więc
 przeglądarka w ogóle nie dotyka CORS-a**. `backend` (Symfony 8 / PHP 8.4)
 wystawia dwie powierzchnie nad tą samą logiką domenową: REST `/api` dla
 frontendu i **gateway MCP** `/mcp` dla agentów. `frontend` (Vue 3 + Vite) to
 w produkcji statyczne pliki, w dev kontener z HMR. `worker` (Symfony Messenger)
-publikuje dokumenty do pałaca i mieli transkrypty. `mempalace`
+publikuje dokumenty do pałaca i przetwarza partie publikacji. `mempalace`
 (`mempalace serve`) jest jedynym komponentem, który umie szukać semantycznie
-i minować. `embeddings` wystawia `/v1/embeddings` z modelem wielojęzycznym.
+i zapisywać szuflady — **nie mieli** (D-012). `embeddings` wystawia `/v1/embeddings` z modelem wielojęzycznym.
 `postgres` (18 + pgvector) trzyma **wszystko** w dwóch schematach: `palace`
 (tabele MemPalace) i `ws` (dane aplikacji). Jeden `pg_dump` to pełny backup
 systemu.
@@ -158,6 +159,10 @@ tam, gdzie treść naprawdę tego wymaga.
 | Embeddingi | `BAAI/bge-m3` przez `/v1/embeddings` | 1024 wymiary, bez prefiksów — D-003 |
 | Testy | PHPUnit | |
 
+> Ograniczenie: `doctrine:schema:validate` i `migrations:diff` wymagają DBAL
+> `^4.5`, a stabilne jest 4.4.4. Migracje piszemy ręcznie, mapowanie
+> sprawdzamy `--skip-sync` (`docs/05-deployment.md`).
+
 ### Frontend — osobna aplikacja, wzorzec z nowszy projekt z frontendem Vue
 
 | Warstwa | Technologia |
@@ -190,6 +195,38 @@ Struktura `frontend/src/` jak w 2.0: `pages/` (routing plikowy), `features/<dome
   i dopisujesz sekcję **Co zostało zrobione** z datą, godziną i faktami:
   co powstało, co przetestowano, co odłożono i dlaczego.
 - **`CHANGELOG.md`** — wpis przy każdej zmianie, z datą i godziną.
+- **`docs/en/`** — angielski odpowiednik każdego pliku z `docs/`, aktualizowany
+  w tym samym commicie co polski oryginał.
+
+#### Definicja ukończenia — zadanie NIE jest skończone, dopóki
+
+Reguła „aktualizuj dokumentację" jest bezużyteczna, dopóki nie da się jej
+sprawdzić. Dlatego lista jest jawna i przechodzi się ją **przed commitem**:
+
+1. **Zmieniło się zachowanie systemu?** → poprawiony odpowiedni plik w `docs/`
+   **oraz** jego angielski odpowiednik w `docs/en/`.
+2. **Zmieniła się struktura danych?** → `docs/02-model-danych.md` zgodny ze
+   stanem migracji.
+3. **Podjęto decyzję techniczną?** → nowy numer `D-0xx` w `docs/06-decyzje.md`
+   z uzasadnieniem **i odrzuconymi alternatywami**; starych decyzji nie
+   edytujemy, tylko oznaczamy jako zastąpione.
+4. **Zmieniła się konfiguracja lub deployment?** → `docs/05-deployment.md`
+   i `.env.example`.
+5. **Zmienił się kontrakt API lub zestaw narzędzi MCP?** →
+   `docs/03-mcp-gateway.md`.
+6. **Zawsze** → wpis w `CHANGELOG.md` z datą i godziną.
+7. **Zadanie ukończone?** → sekcja **Co zostało zrobione** i `git mv` do
+   `TODO/DONE/`.
+
+Sprawdzenie mechaniczne: `make sprawdz-dokumentacje` wychwytuje brakujące
+odpowiedniki angielskie i rozjazd numerów decyzji. Nie zastąpi punktów 1–7,
+bo żaden skrypt nie wie, czy opis odpowiada rzeczywistości — ale wyłapie to,
+co da się wyłapać.
+
+**Dlaczego to jest twarda reguła, a nie dobra praktyka:** dokumentacja, która
+raz skłamie, przestaje być czytana. A ta konkretna dokumentacja jest wsadem dla
+agentów AI — nieaktualny opis nie tylko wprowadza w błąd człowieka, ale zostaje
+przez model potraktowany jako fakt i powielony w kolejnych decyzjach.
 
 ### Git — commitujemy każdy zamknięty krok
 
@@ -212,8 +249,16 @@ Zmiana bez commita nie istnieje. Zasady:
   Przykład: `mcp: dodaj ws_search z twardym filtrem przestrzeni`.
 - **Przeniesienie zadania do `DONE/` robimy przez `git mv`**, żeby historia
   pliku została zachowana.
-- **Commitujemy po każdym ukończonym zadaniu z `TODO/`** — nie kumulujemy
-  tygodnia pracy w jednym commicie.
+- **Commitujemy natychmiast po zamknięciu zmiany, nie na koniec zadania.**
+  Skończony plik, poprawiona konfiguracja, przetłumaczony dokument, naprawiony
+  błąd — commit od razu, także przy drobiazgach. Zadanie z `TODO/` daje zwykle
+  kilkanaście commitów, nie jeden.
+
+  Powód jest praktyczny, nie estetyczny: historia gita ma pokazywać **przebieg
+  pracy**, a nie jej wynik. Jeden commit „zrobione wszystko" nie da się
+  przejrzeć, cofnąć w części ani zrozumieć po miesiącu. Do tego praca
+  niezacommitowana ginie przy każdej awarii i koliduje z równoległymi sesjami
+  w tym samym repozytorium.
 - Nie commitujemy: sekretów, tokenów, `.env` z realnymi danymi, dumpów bazy,
   katalogu `vendor/`, plików modeli embeddingów.
 - **Nie przepisujemy historii, która trafiła na `origin`.** Żadnego `--amend`,

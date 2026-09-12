@@ -6,8 +6,8 @@ tags: [ws-memory, dokumentacja, deployment, docker, backup, operacje]
 
 # Deployment
 
-Stan: **projekt**, `docker-compose.yml` jeszcze nie istnieje (2026-09-12).
-Powstanie w zadaniu `TODO/000`.
+Stan: **działa** (2026-09-12). `docker-compose.yml` obejmuje sześć usług;
+brakuje `frontend` (TODO-006) i konfiguracji TLS dla produkcji.
 
 ## Wymagania serwera
 
@@ -39,18 +39,31 @@ dopiero potem myślimy o GPU.
 
 ```bash
 git clone <repo> ws-memory && cd ws-memory
-cp .env.example .env          # hasła, domena, sekret JWT
-docker compose up -d
-docker compose exec backend bin/console doctrine:migrations:migrate
-docker compose exec backend bin/console ws:user:invite twoj@email.pl --admin
+cp .env.example .env
+./docker/wygeneruj-sekrety.sh    # losowe hasła i tokeny
+make start                       # pierwszy start ~3 min (pobranie modelu)
+make migracje
 ```
+
+Weryfikacja, że wszystko żyje:
+
+```bash
+make test-semantyka              # polskie zapytanie znajduje polską treść
+curl http://127.0.0.1:8080/api/health
+```
+
+Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
 
 ## Zmienne środowiskowe
 
 | Zmienna | Rola |
 |---|---|
 | `WS_DOMAIN` | domena publiczna (certyfikat, linki w mailach) |
-| `POSTGRES_PASSWORD` | hasło bazy |
+| `POSTGRES_PASSWORD` | hasło roli nadrzędnej bazy |
+| `MEMPALACE_DB_PASSWORD` | hasło roli `mempalace` (schemat `palace`) |
+| `WS_DB_PASSWORD` | hasło roli `ws_app` (schemat `ws`) |
+| `APP_SECRET` | sekret aplikacji Symfony |
+| `EMBEDDING_MEM_LIMIT`, `EMBEDDING_MAX_BATCH_TOKENS` | limity i bufory serwera embeddingów — patrz niżej |
 | `JWT_SECRET_KEY` / `JWT_PUBLIC_KEY` | podpisywanie tokenów ludzi |
 | `MEMPALACE_MCP_HTTP_TOKEN` | token między backendem a mempalace; **nigdy nie wychodzi na zewnątrz** |
 | `MEMPALACE_BACKEND` | `pgvector` |
@@ -76,7 +89,7 @@ portu na host (D-006).
 w Postgresie (D-002):
 
 ```bash
-docker compose exec -T postgres pg_dump -U ws --format=custom ws_memory \
+docker compose exec -T postgres pg_dump -U postgres --format=custom ws_memory \
   > backup-$(date +%F-%H%M).dump
 ```
 
@@ -84,7 +97,7 @@ Obejmuje: dokumenty, wszystkie rewizje, konta, uprawnienia, audyt **i pałac**
 (wektory razem z metadanymi). Odtworzenie:
 
 ```bash
-docker compose exec -T postgres pg_restore -U ws -d ws_memory --clean < backup.dump
+docker compose exec -T postgres pg_restore -U postgres -d ws_memory --clean < backup.dump
 ```
 
 Poza bazą do skopiowania zostają tylko klucze JWT — serwer nie trzyma żadnych
