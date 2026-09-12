@@ -11,6 +11,57 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 
 ---
 
+## 2026-09-12 21:30 — TODO-003 ukończone: backend czyta i zapisuje pamięć
+
+Powstała jedyna droga między naszymi uprawnieniami a pałacem. Od teraz każde
+zapytanie do pamięci niesie filtr przestrzeni, a każdy zapis jest zaksięgowany
+w `ws.memory_entries` w tej samej transakcji.
+
+**Reguła nr 3 przestała być zabroniona i stała się niewyrażalna.**
+`MemoryStore::search()` przyjmuje `PalaceWing` jako pierwszy, nieopcjonalny
+argument, a ten typ odrzuca wartość pustą. Zapytania bez filtra przestrzeni nie
+trzeba pilnować w przeglądzie kodu — nie da się go napisać.
+
+**Trzy rzeczy, których projekt zadania nie przewidział:**
+
+1. **`mempalace_search` przyjmuje jedno skrzydło, nie listę.** `wing IN (...)`
+   z dokumentacji nie jest wyrażalne jednym wywołaniem. Odczyt rozsyła więc po
+   jednym zapytaniu na dozwoloną przestrzeń i przerankowuje wyniki; puste
+   przecięcie uprawnień nie odpytuje pałaca wcale.
+2. **Graf wiedzy nie ma osi skrzydła w ogóle.** Zakres wszedł do klucza: fakty
+   żyją pod nazwą kwalifikowaną skrzydłem (`wing_alfa::Encja`), więc zapytanie
+   o cudzą przestrzeń ich nie dopasowuje, zamiast dopasować i odfiltrować.
+3. **Sierota przy dwóch magazynach jest nieunikniona** — HTTP nie da się
+   wycofać. Wybraliśmy kierunek: szuflada bez wiersza wolna (jest niewidoczna),
+   wiersz bez szuflady nigdy (byłby wynikiem, którego nie da się otworzyć).
+
+**Powstało:** `src/Domain/Memory/` (11 plików — obiekty wartości i dwa porty),
+`Application/Memory/MemoryService.php`, `Infrastructure/MemPalace/`
+(klient JSON-RPC, adapter portu, `CallOutcome`, wyjątek),
+`Infrastructure/Doctrine/` (rejestr i katalog przestrzeni), migracja
+`Version20260912000003` z tabelą `ws.memory_entries`.
+
+**Decyzje:** D-019 (dwie warstwy filtrowania), D-020 (kierunek awarii i brak
+ponawiania zapisów), D-021 (zakresowanie grafu wiedzy).
+
+**Co wykrył test na żywym pałacu — i nic innego nie mogło:**
+
+- MemPalace odrzuca etykietę autora ze znakami ścieżki (`ws:user/token`),
+  bo używa jej jako segmentu ścieżki przy zapisie do dziennika,
+- `mempalace_diary_write` odpowiada polem `entry_id`, nie `drawer_id`. Bez tego
+  wpis zostałby zapisany i **nigdy zaksięgowany**, czyli nieczytelny na zawsze.
+
+**Testy:** 115 (było 82), 238 asercji. Z tego 27 jednostkowych na uprawnieniach
+bez bazy i bez pałaca, 22 na przewodzie JSON-RPC, 12 bazodanowych i 8 na żywym
+pałacu. PHPStan poziom 8 bez błędów. Wyłączenie drugiej warstwy filtrowania
+przewraca 5 testów — sprawdzone celowo.
+
+**Dokumentacja:** `docs/02`, `docs/03`, `docs/05`, `docs/08`, `docs/09`
+i `docs/06` (trzy decyzje) w obu wersjach językowych. W `docs/03` poprawione
+mapowanie, które obiecywało filtr niewyrażalny w protokole.
+
+---
+
 ## 2026-09-12 17:52 — TODO-000 ukończone: fundament działa, polska semantyka potwierdzona
 
 **Pierwszy kod w projekcie.** Trzy usługi w Dockerze stoją, a założenie, na

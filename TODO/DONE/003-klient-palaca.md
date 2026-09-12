@@ -6,7 +6,7 @@ tags: [ws-memory, todo, backend, mempalace, uprawnienia]
 
 # TODO-003 — Backend: klient MemPalace i serwisy domenowe pamięci
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 22:40** · **Zależności:** 002
+**Utworzono:** 2026-09-12 16:05 · **Stan:** ✅ **UKOŃCZONE 2026-09-12 21:30** · **Zależności:** 002
 
 ## Powód
 
@@ -63,7 +63,7 @@ i „pamięć nie odpowiada" to dla agenta dwie zupełnie różne informacje.
 
 ## Co zostało zrobione
 
-**Ukończono:** 2026-09-12 22:40
+**Ukończono:** 2026-09-12 21:30
 
 ### Kryteria ukończenia — weryfikacja
 
