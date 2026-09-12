@@ -7,10 +7,9 @@ tags: [ws-memory, documentation, mcp, permissions, ai-agents, security]
 
 # MCP gateway
 
-Status: **working** (2026-09-12, `TODO-004`). Seven tools, agent tokens, a rate
-limit and an audit entry for every call. Missing: the `ws_doc_*` tools and
-`ws_propose` — they arrive with the wiki (`TODO-005`), which is where documents and
-revisions first exist.
+Status: **working** (2026-09-12, `TODO-004` and `TODO-005`). Eleven tools, agent
+tokens, a rate limit and an audit entry for every call. The set is complete — further
+tools arrive only with the bridge to local palaces (`TODO-012`).
 
 The backend exposes an MCP server over HTTP (JSON-RPC 2.0) at `/mcp` with a
 **curated set of company tools** — it does not pass MemPalace's 44 tools
@@ -52,8 +51,8 @@ claude mcp add --transport http ws_memory https://wsmemory.twoja-domena.pl/mcp \
 | `ws_search` | `query`, `spaces?`, `kind?`, `limit?`, `since?`, `before?` | semantic matches from spaces the token may reach |
 | `ws_get` | `id` | full content; `found: false` for a missing **and for a forbidden** one |
 | `ws_kg_query` | `entity`, `direction?`, `spaces?` | facts from the knowledge graph with validity windows |
-| `ws_doc_list` | `space?`, `query?`, `status?` | ⏳ `TODO-005` — documents with metadata |
-| `ws_doc_read` | `space`, `slug`, `revision?` | ⏳ `TODO-005` — document content |
+| `ws_doc_list` | `space?`, `query?`, `include_archived?` | documents with revision, `verified` and `authored_by_ai` |
+| `ws_doc_read` | `space`, `slug`, `revision?` | document content; without `revision` — the current one |
 
 ### Writing
 
@@ -62,14 +61,26 @@ claude mcp add --transport http ws_memory https://wsmemory.twoja-domena.pl/mcp \
 | `ws_remember` | `text`, `space?`, `tags?` | a drawer in the palace + a row in `ws.memory_entries`; returns the space it **actually** landed in |
 | `ws_kg_add` | `subject`, `predicate`, `object`, `space?`, `valid_from?`, `valid_to?` | a fact in the knowledge graph |
 | `ws_diary_write` | `text`, `space?`, `topic?` | a session diary entry |
-| `ws_doc_write` | `space`, `slug`, `title`, `content`, `change_note` | ⏳ `TODO-005` — a new revision |
-| `ws_propose` | `space`, `title`, `content` | ⏳ `TODO-005` — an entry in the queue where `spaces.requires_proposal` |
+| `ws_doc_write` | `space`, `slug`, `title`, `content`, `change_note?` | a new revision; creates the document if absent. Replaces the content wholesale |
+| `ws_propose` | `space`, `title`, `content`, `slug?` | an entry in the queue where `spaces.requires_proposal`; needs only the reader role (D-026) |
 
 > **`ws_remember` has no `kind` parameter** and always files a note. Letting an
 > agent pass `document` would put a drawer in the `documentation` room with no row
 > in the `documents` table — a wiki page the wiki does not know about: invisible on
 > every screen and impossible to revise. Documents arrive with `ws_doc_write`,
 > where a revision is created alongside.
+>
+> **Every answer about a document carries `verified` and `authored_by_ai`.** That
+> pair is the whole trust model in two fields. Without it an agent will cite another
+> agent's unverified draft as though a person had checked it.
+>
+> **`ws_doc_write` replaces the content wholesale; it does not append.** That is why
+> the tool description tells the caller to read the current version through
+> `ws_doc_read` first — skipping that step produces no error, only a revision with
+> half the document missing.
+>
+> **A proposal is not in the wiki, and `ws_propose` says so** (`in_wiki: false`).
+> Without it an agent reports a publication that never happened.
 >
 > **A write returns the destination space, not the requested one.** With no `space`
 > parameter the two differ, and an agent answered `null` has no way to know where
@@ -208,6 +219,7 @@ nothing" (D-023).
 | drawer outside permissions (`ws_get`) | `found: false` — identical to a missing one |
 | write to a space without the `writer` role | `-32003`, message naming the missing write permission |
 | space requires the queue, `ws_doc_write` used | `-32004` with a hint to use `ws_propose` |
+| document outside permissions (`ws_doc_read`) | `found: false` — identical to a missing one |
 | rate limit exceeded | `429` + `-32005` |
 | MemPalace unreachable | `-32010`, "memory temporarily unavailable — this does not mean nothing was found" |
 | unknown parameter, wrong type, missing required one | `-32602` with the list of allowed parameters |

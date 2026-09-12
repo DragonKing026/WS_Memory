@@ -6,9 +6,9 @@ tags: [ws-memory, dokumentacja, mcp, uprawnienia, agenci-ai, bezpieczenstwo]
 
 # Gateway MCP
 
-Stan: **działa** (2026-09-12, `TODO-004`). Siedem narzędzi, tokeny agentów,
-limit tempa i audyt każdego wywołania. Brakuje narzędzi `ws_doc_*` i `ws_propose`
-— dochodzą razem z wiki (`TODO-005`), bo dopiero tam istnieją dokumenty i rewizje.
+Stan: **działa** (2026-09-12, `TODO-004` i `TODO-005`). Jedenaście narzędzi,
+tokeny agentów, limit tempa i audyt każdego wywołania. Zestaw jest kompletny —
+kolejne narzędzia dojdą dopiero z mostkiem do lokalnych pałaców (`TODO-012`).
 
 Backend wystawia pod `/mcp` serwer MCP po HTTP (JSON-RPC 2.0) z **kurowanym
 zestawem narzędzi firmowych** — nie przepuszcza 44 narzędzi MemPalace na wylot
@@ -49,8 +49,8 @@ claude mcp add --transport http ws_memory https://wsmemory.twoja-domena.pl/mcp \
 | `ws_search` | `query`, `spaces?`, `kind?`, `limit?`, `since?`, `before?` | dopasowania semantyczne z przestrzeni, do których token ma prawo |
 | `ws_get` | `id` | pełna treść; `found: false` dla nieistniejącej **i dla zabronionej** |
 | `ws_kg_query` | `entity`, `direction?`, `spaces?` | fakty z grafu wiedzy z okresem ważności |
-| `ws_doc_list` | `space?`, `query?`, `status?` | ⏳ `TODO-005` — lista dokumentów z metadanymi |
-| `ws_doc_read` | `space`, `slug`, `revision?` | ⏳ `TODO-005` — treść dokumentu |
+| `ws_doc_list` | `space?`, `query?`, `include_archived?` | lista dokumentów z rewizją, `verified` i `authored_by_ai` |
+| `ws_doc_read` | `space`, `slug`, `revision?` | treść dokumentu; bez `revision` — aktualna |
 
 ### Pisanie
 
@@ -59,14 +59,26 @@ claude mcp add --transport http ws_memory https://wsmemory.twoja-domena.pl/mcp \
 | `ws_remember` | `text`, `space?`, `tags?` | szuflada w pałacu + wiersz w `ws.memory_entries`; zwraca przestrzeń, w której **faktycznie** wylądowała |
 | `ws_kg_add` | `subject`, `predicate`, `object`, `space?`, `valid_from?`, `valid_to?` | fakt w grafie wiedzy |
 | `ws_diary_write` | `text`, `space?`, `topic?` | wpis w dzienniku sesji |
-| `ws_doc_write` | `space`, `slug`, `title`, `content`, `change_note` | ⏳ `TODO-005` — nowa rewizja |
-| `ws_propose` | `space`, `title`, `content` | ⏳ `TODO-005` — wpis do kolejki, gdy `spaces.requires_proposal` |
+| `ws_doc_write` | `space`, `slug`, `title`, `content`, `change_note?` | nowa rewizja; tworzy dokument, jeśli nie istnieje. Zastępuje treść w całości |
+| `ws_propose` | `space`, `title`, `content`, `slug?` | wpis do kolejki, gdy `spaces.requires_proposal`; wymaga tylko roli czytającego (D-026) |
 
 > **`ws_remember` nie ma parametru `kind`** i zawsze zapisuje notatkę. Pozwolenie
 > agentowi na `document` założyłoby szufladę w pokoju `documentation` bez wiersza
 > w tabeli `documents` — czyli stronę wiki, o której wiki nie wie: niewidoczną na
 > każdym ekranie i niemożliwą do poprawienia. Dokumenty dochodzą z `ws_doc_write`,
 > gdzie powstaje też rewizja.
+>
+> **Każda odpowiedź o dokumencie niesie `verified` i `authored_by_ai`.** Ta para
+> jest całym modelem zaufania w dwóch polach. Bez niej agent zacytuje
+> niepotwierdzony szkic innego agenta tak, jakby sprawdził go człowiek.
+>
+> **`ws_doc_write` zastępuje treść w całości, nie dopisuje.** Dlatego opis
+> narzędzia każe najpierw przeczytać aktualną wersję przez `ws_doc_read` —
+> pominięcie tego kroku nie daje błędu, tylko rewizję, w której zginęła połowa
+> dokumentu.
+>
+> **Propozycja nie jest w wiki i `ws_propose` mówi to wprost** (`in_wiki: false`).
+> Bez tego agent zamelduje publikację, której nie było.
 >
 > **Zapis zwraca przestrzeń docelową, nie tę z żądania.** Przy braku parametru
 > `space` te dwie rzeczy się różnią, a agent, któremu odpowiemy `null`, nie ma
@@ -204,6 +216,7 @@ nie znalazłem" (D-023).
 | szuflada poza uprawnieniami (`ws_get`) | `found: false` — identycznie jak nieistniejąca |
 | zapis do przestrzeni bez roli `writer` | `-32003`, komunikat wskazujący brak uprawnienia do zapisu |
 | przestrzeń wymaga kolejki, użyto `ws_doc_write` | `-32004` z podpowiedzią, żeby użyć `ws_propose` |
+| dokument poza uprawnieniami (`ws_doc_read`) | `found: false` — identycznie jak nieistniejący |
 | przekroczony limit tempa | `429` + `-32005` |
 | MemPalace niedostępny | `-32010`, „pamięć chwilowo niedostępna — nie znaczy, że nic nie znaleziono" |
 | nieznany parametr, zły typ, brak wymaganego | `-32602` z listą dozwolonych parametrów |
