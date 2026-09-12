@@ -56,6 +56,36 @@ Zadanie przeniesione do `TODO/DONE/` z pełnym zapisem weryfikacji.
 
 ---
 
+## 2026-09-12 21:55 — TODO-002: konta, przestrzenie, role i audyt
+
+Pierwsze zadanie z prawdziwą logiką uprawnień, więc testy negatywne przed
+kodem: **44 testy, 84 asercje**, z tego 12 negatywnych.
+
+- `SpaceAccessResolver` jako **jedyne miejsce liczące uprawnienia**, z portem
+  repozytorium — reguły testowane bez bazy, więc chodzą przy każdym commicie.
+  Bez cache: odebranie roli działa natychmiast.
+- Zaproszenia z tokenem przechowywanym wyłącznie jako skrót; konto i jego
+  prywatna przestrzeń powstają w jednej transakcji.
+- Logowanie JWT, `/api/me`, przestrzenie, nadawanie ról, `ws:user:invite`.
+- Audyt: `invitation.issued`, `invitation.accepted`, `user.login`,
+  `user.login_failed` (bez aktora — mamy wtedy tożsamość deklarowaną, nie
+  potwierdzoną), `space.created`, `space.member_added`, `space.read`.
+- **Przestrzeń poza uprawnieniami odpowiada bajt w bajt jak nieistniejąca**,
+  a uprawnienie sprawdzane jest przed istnieniem, żeby nie różnicować czasu
+  odpowiedzi.
+- **D-016** — administrator globalny nie czyta cudzych przestrzeni po cichu.
+- **D-017** — odświeżania tokenów nie piszemy własnoręcznie; TTL 8 godzin.
+
+**Luka znaleziona przy pisaniu dokumentacji backendu:** dezaktywacja konta nie
+odcinała dostępu, bo JWT zostaje ważny do wygaśnięcia. Naprawione
+`ActiveAccountCheckerem` działającym przy każdym żądaniu.
+
+Nowy dokument `docs/08-backend.md` (+ angielski): mapa wszystkich plików z rolą
+każdego, przepływy żądań, uprawnienia od końca do końca, instrukcja dodawania
+nowych rzeczy.
+
+---
+
 ## 2026-09-12 20:40 — TODO-013: dokumentacja dwujęzyczna
 
 Wykonane poza kolejnością, na wniosek: każde kolejne zadanie dokłada treści do
