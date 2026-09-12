@@ -15,6 +15,61 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-12 22:12 — TODO-004 ukończone: agent AI może się podłączyć
+
+Gateway MCP działa. Agent dostaje siedem narzędzi `ws_*`, własny token
+i uprawnienia właściciela — nigdy więcej niż on.
+
+```
+claude mcp add --transport http ws_memory http://…/mcp \
+  --header "Authorization: Bearer wsm_…"
+```
+
+Polecenie wypisuje `ws:agent:token`, razem z tokenem. Sprawdzone **przez
+nginxa**, nie tylko w testach: `initialize` uzgadnia `2025-06-18`, `tools/list`
+zwraca siedem narzędzi, `ws_remember` bez wskazanej przestrzeni ląduje
+w prywatnej, a `ws_search` znajduje to innymi słowami (podobieństwo 0,603).
+
+**Zestaw narzędzi JEST granicą uprawnień** (D-007). Żadne nie ma parametru
+autora ani skrzydła, więc podszycie się i obejście filtra przestrzeni są
+**niewyrażalne**, a nie tylko zabronione — test przechodzi wszystkie schematy
+z `tools/list`, żeby tak zostało po dodaniu ósmego narzędzia.
+
+**Nieznany parametr jest błędem, nie rzeczą do zignorowania.** Parametrem, który
+agent wymyśli najczęściej, jest `wing` — nauczony od lokalnego MemPalace,
+podłączonego w tej samej sesji. Zignorowany `wing` znaczyłby, że agent uwierzy,
+iż zawęził wyszukiwanie, choć go nie zawęził.
+
+**Powstało:** `Presentation\Mcp\` (kontroler, serwer JSON-RPC, port narzędzia,
+rejestr tagowany, dekorator audytu, walidacja argumentów, kody błędów, siedem
+narzędzi), `AgentToken\{Issue,Revoke}`, `DoctrineAgentTokenDirectory`,
+`AgentTokenAuthenticator`, `Api\AgentTokenController`, komenda
+`ws:agent:token`, encja i migracja `Version20260912000004`.
+
+**Decyzje:** D-022 (limit tempa w bazie, w tym samym wierszu co „ostatnio
+użyty"), D-023 (błąd narzędzia jako błąd JSON-RPC — wbrew zaleceniu
+specyfikacji MCP, bo MemPalace robi to zgodnie z zaleceniem i kosztowało nas
+to godziny), D-024 (audyt zapisuje się od razu).
+
+**Usterka, którą wykryły testy — poważna:** wpisy audytu **nigdy** nie
+zapisywały się przy wywołaniach MCP. `DoctrineAuditTrail` robił `persist()`
+i zostawiał `flush` wołającemu; wywołanie narzędzia nie zmienia żadnej encji,
+więc nic nie flushowało i cała aktywność agentów przechodziła bez śladu — bez
+żadnego błędu. Naprawione natychmiastowym `INSERT`-em.
+
+**Trzy rzeczy, które wyszły dopiero przy sprawdzaniu przez nginxa:**
+`capabilities.tools` i puste `properties` serializowały się jako `[]` zamiast
+`{}` (pierwsze łamie uzgodnienie MCP, drugie nie jest poprawnym JSON Schema);
+`ws_remember` odpowiadało `space: null` przy zapisie do prywatnej przestrzeni;
+a dekorator audytu, implementując interfejs narzędzia, został przez kontener
+otagowany jako narzędzie i wstrzyknięty do rejestru.
+
+**Testy:** 153 (było 115), 461 asercji. `McpGatewayTest` celowo **nie
+potrzebuje pałaca** — wszystko, co sprawdza, dzieje się przed pamięcią, więc
+chodzi przy każdym commicie. Pełny obieg przez `/mcp` na żywym pałacu jest
+w `Integration/McpOnLivePalaceTest`. PHPStan poziom 8 bez błędów.
+
+---
 ## 2026-09-12 21:31 — TODO-003 ukończone: backend czyta i zapisuje pamięć
 
 Powstała jedyna droga między naszymi uprawnieniami a pałacem. Od teraz każde
