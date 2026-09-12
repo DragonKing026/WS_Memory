@@ -9,9 +9,9 @@ tags: [ws-memory, documentation, backend, symfony, layers, api]
 
 Status: **working** (2026-09-12). Implemented: health, invitations, accounts,
 sign-in, spaces and roles, auditing, access to memory (search, writing, the
-knowledge graph, the diary) and **the MCP gateway with agent tokens**. Missing: the
-wiki (TODO-005), the frontend (TODO-006…008), publishing from local palaces
-(TODO-012).
+knowledge graph, the diary), the MCP gateway with agent tokens and **the wiki with
+revisions, rollback and the review queue**. Missing: the frontend (TODO-006…008),
+publishing from local palaces (TODO-012).
 
 This document describes **every part of the backend and why it exists**. If you
 do not know where a new thing belongs, start here.
@@ -63,6 +63,10 @@ the **persistence model**, and the rules live in `Domain/`.
 | `Memory/MemoryRegistry.php` | **Port**: our own register of content in the palace. It also draws the transaction boundary — a write is real once it is booked (D-020). |
 | `Memory/MemoryWrite.php` | The row to be booked. A parameter object, because the list will grow when publishing from local palaces lands (TODO-012). Derives the title and the content digest in one place. |
 | `Memory/MemoryUnavailable.php` | "I could not look", kept separate from "I found nothing". An agent told "there is nothing" writes the knowledge again, next to the copy it could not see. |
+| `Document/DocumentSlug.php` | A document's address as a value object. It **refuses** a malformed one rather than tidying it: somebody linking to "Umowy Najmu" and getting a document at "umowy-najmu" has a broken link they cannot see. `fromTitle()` offers a suggestion when asked. |
+| `Document/DocumentStatus.php` | `draft` / `published`. **Not** a review gate — an agent's document is visible at once (D-005); draft is the state of a person who has not finished. |
+| `Document/ProposalStatus.php` | The state of a queue entry. The queue is active only where a space asks for it. |
+| `Document/RevisionDiff.php` | The difference between two revisions, computed on demand (line-based LCS). Not stored, because revisions hold complete content — a stored diff would be a second representation of one fact, and two representations eventually disagree. Capped at 5000 lines: the LCS table is O(n·m). |
 | `Memory/StoredMemory.php` | Where a write ended up: drawer, space, kind. A write returns this rather than a bare identifier, because a caller that named no space cannot otherwise learn where its content went (rule 6). |
 | `Identity/AgentIdentity.php` | Who a presented token turns out to be: the actor plus a label. Both at once, because an MCP request needs both and one query is cheaper than two on the path of every call. |
 | `Identity/AgentTokenDirectory.php` | **Port**: turning a secret into an identity and recording its use. In the domain, because both halves are rules: a revoked token must stop working at the **next** call, and every call must leave a trace. |
@@ -80,6 +84,11 @@ the **persistence model**, and the rules live in `Domain/`.
 | `AgentToken/IssueAgentToken.php` | Issues an agent credential. Random secret, hashed in the database, plain value once. Checks the requested scope against the owner's **current** permissions — not because that enforces rule 4 (the resolver intersects on every request), but so a mistake is reported now, to a person who can fix it, rather than becoming a token that reads nothing and cannot be debugged from the agent's side. |
 | `AgentToken/RevokeAgentToken.php` | Revokes — immediately, and only one's own, global administrators included. Somebody else's token answers identically to one that does not exist, or credentials could be enumerated. |
 | `AgentToken/IssuedAgentToken.php` | The result carrying the plain token and a ready `claude mcp add`. **Not a service.** |
+| `Document/DocumentService.php` | **The only way into the wiki.** A document in a space the actor cannot read is NOT FOUND, never forbidden (rule 7). `verify()` takes a `User`, not an `Actor` — an agent cannot be passed (D-005). `rollback()` **adds** a revision holding the old content; history never shrinks. Publication is dispatched after the `flush`, not before: a job for a revision that failed to save would have the worker publishing content nobody can read. |
+| `Document/ProposalService.php` | The review queue. Submitting needs the **reader** role (D-026); accepting goes **through `DocumentService`** — a second path into the wiki would eventually skip the permission check, the publication or the audit entry. |
+| `Document/PublishDocument.php` | The job "publish revision N". It carries the revision number, and that is exactly what makes it safe in any delivery order. |
+| `Document/PublishDocumentHandler.php` | Idempotent and order-proof: a job older than the current revision is **dropped** (D-025). The palace copy is authored by the revision's author rather than "the worker" — for an agent the owner comes from `AgentTokenDirectory::ownerOf()`. |
+| `Document/DocumentNotFound.php`, `Document/ProposalRequired.php` | One exception for "no such thing" and "not yours"; the other **names the way through**, because an error saying only "denied" would have an agent retrying the same call. |
 | `Memory/MemoryService.php` | **The only way into memory.** REST and MCP call this class and nothing below it, so choosing a different door cannot get you a different answer (D-008). This is where the fan-out across wings lives, the re-ranking, the second filtering layer (D-019), the private-space default (rule 6) and the author label. Nothing above this layer may hold a `MemoryStore`. |
 
 ### `Infrastructure/` — port adapters
@@ -112,6 +121,8 @@ the **persistence model**, and the rules live in `Domain/`.
 | `GET /api/spaces`, `GET /api/spaces/{slug}` | `Api/SpaceController.php` | A space outside your permissions answers **byte for byte** like one that does not exist. |
 | `POST /api/spaces`, `POST /api/spaces/{slug}/members` | `Api/SpaceAdministrationController.php` | Creating spaces and granting roles. The creator becomes its administrator at once; the `priv_` prefix is reserved; a private space cannot be shared. |
 | `POST /api/invitations/accept` | `Api/AcceptInvitationController.php` | Public by necessity — the caller has no account yet. The password policy is enforced here, not in the browser. |
+| `GET /api/spaces/{s}/documents`, `GET/PUT .../{slug}`, `.../history`, `.../diff`, `.../rollback`, `.../verify`, `.../archive` | `Api/DocumentController.php` | The routes use `{slug<.+>}`, because an address may contain a slash — without it "umowy/najem" would be unreachable. The mapping from refusals to HTTP lives in one place, because that is where a mistake becomes a disclosure. |
+| `GET/POST /api/spaces/{s}/proposals`, `POST /api/proposals/{id}/accept`, `/reject` | `Api/ProposalController.php` | Review is a human act, so there is no MCP counterpart (D-005). |
 | `GET/POST /api/agent-tokens`, `DELETE /api/agent-tokens/{id}` | `Api/AgentTokenController.php` | One's **own** tokens only, global administrators included (D-016). The plain value appears in one response — the one that created it. |
 | `ws:agent:token` | `Console/IssueAgentTokenCommand.php` | The only route to connecting an agent until the screens exist (TODO-008). Prints a ready `claude mcp add`, because the alternative is everybody reconstructing it from the documentation and getting the header wrong. |
 | `ws:user:invite` | `Console/InviteUserCommand.php` | The only route to the first account. It prints the link, because the first invitation is usually issued before the mailer is configured. |
@@ -133,6 +144,10 @@ the **persistence model**, and the rules live in `Domain/`.
 | `Tool/KgQueryTool.php` | `ws_kg_query`. Entity names are wing-qualified in storage and bare here (D-021). |
 | `Tool/RememberTool.php` | `ws_remember`. No author parameter **and no `kind`** — see `docs/03`. |
 | `Tool/KgAddTool.php` | `ws_kg_add`. A fact belongs to one space and is invisible from others; the description says so outright, so an agent does not write it twice. |
+| `Tool/DocListTool.php` | `ws_doc_list`. Separate from `ws_search` because the questions differ: "what do we know about X" versus "what documents are there". Every row carries `verified` and `authored_by_ai`. |
+| `Tool/DocReadTool.php` | `ws_doc_read`. `found: false` for a forbidden document and a missing one alike. |
+| `Tool/DocWriteTool.php` | `ws_doc_write`. Writes directly (D-005); in a queued space it answers `-32004` and **names** `ws_propose`. |
+| `Tool/ProposeTool.php` | `ws_propose`. Needs the reader role; answers `in_wiki: false` so an agent does not report a publication that never happened. |
 | `Tool/DiaryWriteTool.php` | `ws_diary_write`. Private by default — session notes are the content people most expect to be theirs. |
 
 ### `Entity/` — the persistence model
@@ -231,6 +246,21 @@ an `invitation.accepted` entry.
 6. The result travels as an MCP text part with JSON inside. A failure travels as a
    **JSON-RPC error**, not a success with an error in its payload (D-023).
 
+### Writing a document in the wiki
+
+1. `DocumentService` checks the **write** permission. A queued space refuses an
+   agent's write and **names** `ws_propose` (`-32004`); a person writes there
+   directly, because they are the reviewer — putting them in their own queue would
+   leave nobody to empty it.
+2. `Document::addRevision()` assigns the number, moves the current pointer, copies the
+   title, sets the AI flag and **clears the verification**.
+3. An audit entry, the `flush`, and **then** the publish job. In that order, because a
+   job for a revision that failed to save would have the worker publishing content
+   nobody can read.
+4. The `worker` picks the job up. If the document already has a newer revision it
+   **drops it** (D-025). Otherwise it updates the document's single drawer in place.
+5. From then on the document is findable semantically, and the old text is not.
+
 ## Permissions end to end
 
 Six layers, each covered by a negative test:
@@ -266,6 +296,7 @@ with `doctrine:schema:validate --skip-sync`.
 | `Version20260912000002` | Accounts, invitations, spaces, roles, the audit log. |
 | `Version20260912000003` | The register of content in the palace (`ws.memory_entries`). |
 | `Version20260912000004` | AI agent tokens (`ws.agent_tokens`) with the rate-limit counter. |
+| `Version20260912000005` | The wiki: documents, revisions, the review queue; the `memory_entries.document_id` foreign key deferred from TODO-003. |
 
 **The `schema_filter` trap** — described in `docs/en/05-deployment.md`. In short:
 a `~^ws\.~` filter rejects our own tables, because with `search_path = ws` DBAL
@@ -286,6 +317,10 @@ returns them unqualified. The correct pattern **excludes** `palace`.
 | `Infrastructure/Doctrine/DoctrineMemoryRegistryTest.php` | What a double cannot check: the unique index, the foreign key, the transaction rollback, `tags` round-tripping. |
 | `Infrastructure/Doctrine/DoctrineSpaceCatalogTest.php` | A wing differing from its slug, the private space created on accepting an invitation, a `priv_*` impostor without the flag. |
 | `Api/McpGatewayTest.php` | The gateway as an agent meets it: the protocol, version negotiation, no batch requests, `401` for a revoked token, an expired one and one whose owner was deactivated, **a foreign space as an empty result rather than an error**, a refused write, an unknown parameter, the per-token rate limit, auditing of successful and failed calls. Deliberately **needs no palace** — all of it happens before memory, so it runs on every commit. |
+| `Api/WikiTest.php` | The wiki without a palace: revisions, history carrying each era's title, the diff, a rollback that moves **forward**, verification cleared by a new revision, no path at all for an agent to verify, an address with a slash, the review queue. Asserts that the publish job was **enqueued**. |
+| `Integration/WikiOnLivePalaceTest.php` | What a double cannot show: a second revision **replaces** the first in the palace (the old content stops being findable, so `update_drawer` really does recompute the vector) and three quick saves with the queue drained **newest first** end with the newest text. |
+| `Domain/Document/RevisionDiffTest.php` | The only real algorithm in the project. A wrong diff is not an error anybody sees — it is a reviewer trusting a change on the strength of a picture that does not match the text. |
+| `Domain/Document/DocumentSlugTest.php` | 16 refused addresses. The test that matters most asserts an address is **refused**, not tidied up. |
 | `Integration/McpOnLivePalaceTest.php` | The full round trip through `/mcp` against a live palace: `ws_remember` → `ws_search` in Polish by different words → `ws_get`, a write with no space landing in the private one, the counts in `ws_status`, a fact round trip, the diary. |
 | `Integration/MemoryOnLivePalaceTest.php` | **The whole chain against a live palace**: a Polish query in different words, a refusal for a stranger, a drawer filed past the registry, the room filter, a fact round-tripping through the graph. Skipped when the palace does not answer, so the fast CI run stays fast and the nightly run covers it. |
 
@@ -315,6 +350,10 @@ prefix in its name. The tag adds it to the registry — you touch neither the
 controller nor any list. The schema **must** set `additionalProperties: false` and
 must not carry an author or a wing field; `McpGatewayTest` checks both.
 
+**A new wiki operation:** a method on `DocumentService`. Do not build a revision
+outside `Document::addRevision()` — that is where the verification clearing and the
+numbering live, and a second path will eventually miss one of the two.
+
 **A new memory operation:** a method on `MemoryService`, never a new caller of
 `MemoryStore`. The service is the permission boundary; going around it skips both
 filters (D-019) and the bookkeeping (D-020). If you need a new MemPalace tool,
@@ -330,7 +369,7 @@ travel further up.
 | `config/services.yaml` | Autowiring, the health probe and **MCP tool** tags, the rate limit, the MemPalace URL, **the palace token and timeout**, explicit port-to-adapter bindings, the public URL. A `when@test` block exposes a few services to the tests by name. |
 | `config/packages/doctrine.yaml` | The connection, the `schema_filter` hiding `palace`, entity mapping. |
 | `config/packages/security.yaml` | Firewalls: health unsecured, `json_login`, **a separate `/mcp` firewall for agent tokens**, JWT for `/api`. Lowered hashing cost in tests. |
-| `config/packages/messenger.yaml` | The queue in the database, `auto_setup: false` — the table comes from a migration. |
+| `config/packages/messenger.yaml` | The queue in the database, `auto_setup: false` — the table comes from a migration. `PublishDocument` is routed to the `async` transport. |
 | `config/packages/api_platform.yaml` | The contract at `/api/docs.json`, **Swagger UI disabled** (it needs Twig, and the backend renders no interface). |
 
 ## Known limitations

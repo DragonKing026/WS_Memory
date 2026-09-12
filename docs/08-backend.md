@@ -6,8 +6,9 @@ tags: [ws-memory, dokumentacja, backend, symfony, warstwy, api]
 
 Stan: **działa** (2026-09-12). Zaimplementowane: zdrowie, zaproszenia, konta,
 logowanie, przestrzenie i role, audyt, dostęp do pamięci (szukanie, zapis, graf
-wiedzy, dziennik) oraz **gateway MCP z tokenami agentów**. Brakuje: wiki
-(TODO-005), frontend (TODO-006…008), publikacja z lokalnych pałaców (TODO-012).
+wiedzy, dziennik), gateway MCP z tokenami agentów oraz **wiki z rewizjami,
+cofaniem i kolejką propozycji**. Brakuje: frontend (TODO-006…008), publikacja
+z lokalnych pałaców (TODO-012).
 
 Ten dokument opisuje **każdy element backendu i powód jego istnienia**. Jeśli
 nie wiesz, gdzie dopisać nową rzecz — zacznij tutaj.
@@ -58,6 +59,10 @@ mieszkają w `Domain/`.
 | `Memory/MemoryRegistry.php` | **Port**: nasz rejestr treści w pałacu. Wyznacza też granicę transakcji — zapis jest realny, gdy jest zaksięgowany (D-020). |
 | `Memory/MemoryWrite.php` | Wiersz do zaksięgowania. Obiekt parametrów, bo lista będzie rosła przy publikacji z lokalnych pałaców (TODO-012). Tytuł i skrót treści wylicza w jednym miejscu. |
 | `Memory/MemoryUnavailable.php` | „Nie mogłem sprawdzić" — odrębne od „nic nie znalazłem". Agent, któremu powiemy „nic nie ma", zapisze tę wiedzę drugi raz obok kopii, której nie zobaczył. |
+| `Document/DocumentSlug.php` | Adres dokumentu jako obiekt wartości. **Odrzuca** niepoprawny, nie sprząta go: kto linkuje do „Umowy Najmu" i dostanie dokument pod „umowy-najmu", ma zepsuty odsyłacz, którego nie widzi. `fromTitle()` daje podpowiedź, gdy ktoś o nią prosi. |
+| `Document/DocumentStatus.php` | `draft` / `published`. **Nie** jest bramką przeglądu — dokument agenta jest widoczny od razu (D-005); szkic to stan człowieka, który jeszcze nie skończył. |
+| `Document/ProposalStatus.php` | Stan wpisu w kolejce. Kolejka działa tylko tam, gdzie przestrzeń o nią prosi. |
+| `Document/RevisionDiff.php` | Różnica dwóch rewizji, liczona na żądanie (LCS po wierszach). Nie jest przechowywana, bo rewizje trzymają pełne treści — zapisany diff byłby drugą reprezentacją tego samego faktu, a dwie reprezentacje jednego faktu kiedyś się rozejdą. Limit 5000 wierszy: tablica LCS jest O(n·m). |
 | `Memory/StoredMemory.php` | Gdzie wylądował zapis: szuflada, przestrzeń, klasa wiedzy. Zapis zwraca to, a nie sam identyfikator, bo wołający, który nie wskazał przestrzeni, inaczej nie wie, gdzie trafiła jego treść (reguła 6). |
 | `Identity/AgentIdentity.php` | Kim okazuje się przedstawiony token: aktor plus etykieta. Dwie odpowiedzi naraz, bo żądanie MCP potrzebuje obu, a jedno zapytanie jest tańsze niż dwa na ścieżce każdego wywołania. |
 | `Identity/AgentTokenDirectory.php` | **Port**: zamiana sekretu na tożsamość i odnotowanie użycia. W domenie, bo obie połowy są regułami: unieważniony token musi przestać działać przy **następnym** wywołaniu, a każde wywołanie musi zostawić ślad. |
@@ -75,6 +80,11 @@ mieszkają w `Domain/`.
 | `AgentToken/IssueAgentToken.php` | Wystawia poświadczenie agenta. Sekret losowy, w bazie skrót, jawna wartość raz. Sprawdza żądany zakres wobec **bieżących** uprawnień właściciela — nie dlatego, że to egzekwuje regułę 4 (to robi resolver na każdym żądaniu), ale żeby pomyłka zgłosiła się teraz, człowiekowi, a nie zamieniła w token, który nic nie czyta i nie da się tego zdiagnozować od strony agenta. |
 | `AgentToken/RevokeAgentToken.php` | Unieważnia — natychmiast i tylko własny, również dla administratora globalnego. Cudzy token odpowiada identycznie jak nieistniejący, inaczej dałoby się enumerować cudze poświadczenia. |
 | `AgentToken/IssuedAgentToken.php` | Wynik z jawnym tokenem i gotowym `claude mcp add`. **Nie jest usługą.** |
+| `Document/DocumentService.php` | **Jedyne wejście do wiki.** Dokument w przestrzeni bez prawa odczytu jest NIEZNALEZIONY, nigdy zabroniony (reguła 7). `verify()` przyjmuje `User`, nie `Actor` — agenta nie da się przekazać (D-005). `rollback()` **dopisuje** rewizję o starej treści; historia nigdy się nie skraca. Publikacja jest wysyłana do kolejki po `flush`, nie przed: zlecenie dla rewizji, która się nie zapisała, kazałoby pracownikowi opublikować treść, której nikt nie przeczyta. |
+| `Document/ProposalService.php` | Kolejka propozycji. Złożenie wymaga roli **czytającego** (D-026), przyjęcie idzie **przez `DocumentService`** — druga droga do wiki kiedyś ominęłaby sprawdzenie uprawnień, publikację albo wpis w audycie. |
+| `Document/PublishDocument.php` | Zlecenie „opublikuj rewizję N". Niesie numer rewizji i to właśnie czyni je bezpiecznym przy dowolnej kolejności dostarczenia. |
+| `Document/PublishDocumentHandler.php` | Idempotentny i odporny na kolejność: zlecenie starsze niż bieżąca rewizja jest **porzucane** (D-025). Autorem kopii w pałacu jest autor rewizji, nie „pracownik" — dla agenta właściciela tokena ustala `AgentTokenDirectory::ownerOf()`. |
+| `Document/DocumentNotFound.php`, `Document/ProposalRequired.php` | Jeden wyjątek na „nie ma" i „nie twoje"; drugi **nazywa drogę dalej**, bo błąd mówiący tylko „odmowa" kazałby agentowi powtarzać to samo wywołanie. |
 | `Memory/MemoryService.php` | **Jedyne wejście do pamięci.** REST i MCP wołają tę klasę i nic pod nią, więc wybór drzwi nie zmienia odpowiedzi (D-008). Tu mieszka rozsyłanie zapytania po skrzydłach, przerankowanie wyników, druga warstwa filtrowania (D-019), domyślna przestrzeń prywatna (reguła 6) i etykieta autora. Nic powyżej tej warstwy nie ma prawa trzymać `MemoryStore`. |
 
 ### `Infrastructure/` — adaptery portów
@@ -107,6 +117,8 @@ mieszkają w `Domain/`.
 | `GET /api/spaces`, `GET /api/spaces/{slug}` | `Api/SpaceController.php` | Przestrzeń poza uprawnieniami odpowiada **bajt w bajt** tak samo jak nieistniejąca. |
 | `POST /api/spaces`, `POST /api/spaces/{slug}/members` | `Api/SpaceAdministrationController.php` | Tworzenie przestrzeni i nadawanie ról. Twórca od razu zostaje administratorem; prefiks `priv_` zarezerwowany; przestrzeni prywatnej nie da się udostępnić. |
 | `POST /api/invitations/accept` | `Api/AcceptInvitationController.php` | Publiczna z konieczności — wołający nie ma jeszcze konta. Polityka haseł egzekwowana tutaj, nie w przeglądarce. |
+| `GET /api/spaces/{s}/documents`, `GET/PUT .../{slug}`, `.../history`, `.../diff`, `.../rollback`, `.../verify`, `.../archive` | `Api/DocumentController.php` | Trasy używają `{slug<.+>}`, bo adres może zawierać ukośnik — bez tego „umowy/najem" byłoby nieosiągalne. Mapowanie odmów na HTTP jest w jednym miejscu, bo tam błąd zamienia się w ujawnienie. |
+| `GET/POST /api/spaces/{s}/proposals`, `POST /api/proposals/{id}/accept`, `/reject` | `Api/ProposalController.php` | Przegląd jest czynnością człowieka, więc nie ma odpowiednika MCP (D-005). |
 | `GET/POST /api/agent-tokens`, `DELETE /api/agent-tokens/{id}` | `Api/AgentTokenController.php` | Wyłącznie **własne** tokeny, również dla administratora globalnego (D-016). Jawna wartość w jednej odpowiedzi — tej, która token utworzyła. |
 | `ws:user:invite` | `Console/InviteUserCommand.php` | Jedyna droga do pierwszego konta. Wypisuje link, bo pierwsze zaproszenie powstaje zwykle przed konfiguracją poczty. |
 | `ws:agent:token` | `Console/IssueAgentTokenCommand.php` | Jedyna droga do podłączenia agenta, dopóki nie ma ekranów (TODO-008). Wypisuje gotowe `claude mcp add`, bo alternatywą jest odtwarzanie polecenia z dokumentacji i mylenie nagłówka. |
@@ -128,6 +140,10 @@ mieszkają w `Domain/`.
 | `Tool/KgQueryTool.php` | `ws_kg_query`. Nazwy encji kwalifikowane skrzydłem w magazynie, nagie tutaj (D-021). |
 | `Tool/RememberTool.php` | `ws_remember`. Bez parametru autora **i bez `kind`** — patrz `docs/03`. |
 | `Tool/KgAddTool.php` | `ws_kg_add`. Fakt należy do jednej przestrzeni i nie jest widoczny z innych; opis narzędzia mówi to wprost, żeby agent nie zapisywał go dwa razy. |
+| `Tool/DocListTool.php` | `ws_doc_list`. Osobne od `ws_search`, bo pytania są inne: „co wiemy o X" a „jakie są dokumenty". Każdy wiersz niesie `verified` i `authored_by_ai`. |
+| `Tool/DocReadTool.php` | `ws_doc_read`. `found: false` dla dokumentu poza uprawnieniami i nieistniejącego. |
+| `Tool/DocWriteTool.php` | `ws_doc_write`. Pisze wprost (D-005); w przestrzeni z kolejką odpowiada `-32004` i **nazywa** `ws_propose`. |
+| `Tool/ProposeTool.php` | `ws_propose`. Wymaga roli czytającego; odpowiada `in_wiki: false`, żeby agent nie zameldował publikacji, której nie było. |
 | `Tool/DiaryWriteTool.php` | `ws_diary_write`. Domyślnie prywatnie — notatki z sesji to treść, której ludzie najbardziej oczekują jako swojej. |
 
 ### `Entity/` — model trwałości
@@ -138,6 +154,9 @@ mieszkają w `Domain/`.
 | `Space` | `Space::privateFor()` tworzy przestrzeń prywatną `priv_<uuid>` — konwencję slugu trzyma `SpaceId::privateFor()`, żeby zapis i wyszukanie nie mogły się rozjechać. `palace_namespace` niepuste = osobne tabele pgvector dla przestrzeni wrażliwych. |
 | `SpaceMember` | **Klucz złożony** `(space, user)`: dwie role jednej osoby w jednej przestrzeni są niereprezentowalne, więc pytanie „która wygrywa" nie może paść. |
 | `Invitation` | Tylko skrót tokena. `isUsable()` łączy „niewykorzystane" i „nieprzeterminowane" w jednym miejscu, żeby drugie wejście nie zapomniało o jednym z warunków. |
+| `Document` | `addRevision()` robi wszystko, co musi się stać razem: numer, wskaźnik bieżącej rewizji, tytuł, flagę AI i **wyczyszczenie weryfikacji**. Rozniesione po serwisie to ostatnie jest tym, o którym ktoś zapomni — a skutkiem jest dokument oznaczony jako sprawdzony przez osobę, która tego tekstu nie widziała. `verify()` przyjmuje `User`, więc agent jest niewyrażalny. |
+| `DocumentRevision` | **Niezmienna** — nie ma settera. Jedyną drogą zmiany jest dopisanie rewizji. Tytuł jest kopiowany, nie czytany z dokumentu: historia z dzisiejszym tytułem na starych rewizjach kłamałaby o tym, co dokument wtedy mówił. |
+| `Proposal` | `accept()` i `reject()` są nieodwracalne w jedną stronę: rozpatrzona propozycja nie wraca do kolejki, więc dwóch recenzentów klikających naraz nie zrobi z jednej propozycji dwóch dokumentów. |
 | `AuditLog` | Dopisywany, nigdy nie zmieniany. Aktor zapisany **zwykłym identyfikatorem, nie kluczem obcym** — dezaktywacja konta nie rusza zapisu tego, co zrobiło. |
 
 ## Jak przechodzi żądanie
@@ -220,6 +239,21 @@ konto, prywatną przestrzeń i członkostwo w jednej transakcji → wpis
 6. Wynik wraca jako część tekstowa MCP z JSON-em w środku. Awaria — jako **błąd
    JSON-RPC**, nie jako udana odpowiedź z błędem w treści (D-023).
 
+### Zapis dokumentu w wiki
+
+1. `DocumentService` sprawdza prawo **zapisu**. Przestrzeń z kolejką odrzuca zapis
+   agenta i **nazywa** `ws_propose` (`-32004`); człowiek pisze tam wprost, bo
+   jest recenzentem — wstawienie go do własnej kolejki oznaczałoby, że nie ma
+   jej komu opróżnić.
+2. `Document::addRevision()` nadaje numer, przestawia wskaźnik bieżącej rewizji,
+   kopiuje tytuł, ustawia flagę autorstwa AI i **czyści weryfikację**.
+3. Wpis w audycie, `flush`, a **potem** zlecenie publikacji do kolejki. W tej
+   kolejności, bo zlecenie dla rewizji, która się nie zapisała, kazałoby
+   pracownikowi opublikować treść, której nikt nie przeczyta.
+4. `worker` bierze zlecenie. Jeśli dokument ma już nowszą rewizję — **porzuca je**
+   (D-025). Inaczej aktualizuje jedną szufladę dokumentu w miejscu.
+5. Od tej chwili dokument jest znajdowalny semantycznie, a stara treść — nie.
+
 ## Uprawnienia od końca do końca
 
 Sześć warstw, każda pokryta testem negatywnym:
@@ -254,6 +288,7 @@ różnic wymaga DBAL `^4.5`, a stabilne jest 4.4.4. Mapowanie sprawdzamy przez
 | `Version20260912000002` | Konta, zaproszenia, przestrzenie, role, dziennik audytu. |
 | `Version20260912000003` | Rejestr treści w pałacu (`ws.memory_entries`). |
 | `Version20260912000004` | Tokeny agentów AI (`ws.agent_tokens`) z licznikiem limitu tempa. |
+| `Version20260912000005` | Wiki: dokumenty, rewizje, kolejka propozycji; klucz obcy `memory_entries.document_id` odłożony z TODO-003. |
 
 **Pułapka `schema_filter`** — opisana w `docs/05-deployment.md`. W skrócie: filtr
 `~^ws\.~` odrzuca własne tabele, bo przy `search_path = ws` DBAL zwraca je bez
@@ -274,6 +309,10 @@ kwalifikacji schematem. Poprawny wzorzec **wyklucza** `palace`.
 | `Infrastructure/Doctrine/DoctrineMemoryRegistryTest.php` | To, czego podwójka sprawdzić nie może: indeks unikalny, klucz obcy, wycofanie transakcji, `tags` w obie strony. |
 | `Infrastructure/Doctrine/DoctrineSpaceCatalogTest.php` | Skrzydło różne od slugu, przestrzeń prywatna po akceptacji zaproszenia, podróbka `priv_*` bez flagi. |
 | `Api/McpGatewayTest.php` | Gateway tak, jak spotyka go agent: protokół, uzgodnienie wersji, brak żądań wsadowych, 401 dla tokena unieważnionego, wygasłego i po wyłączeniu konta właściciela, **obca przestrzeń jako pusty wynik, nie błąd**, odmowa zapisu, nieznany parametr, limit tempa per token, audyt wywołań udanych i nieudanych. Celowo **nie potrzebuje pałaca** — wszystko to dzieje się przed pamięcią, więc chodzi przy każdym commicie. |
+| `Api/WikiTest.php` | Wiki bez pałaca: rewizje, historia z tytułem z epoki, różnica, cofnięcie idące **do przodu**, weryfikacja czyszczona nową rewizją, brak jakiejkolwiek drogi dla agenta do weryfikacji, adres z ukośnikiem, kolejka propozycji. Sprawdza, że zlecenie publikacji **zostało złożone**. |
+| `Integration/WikiOnLivePalaceTest.php` | To, czego podwójka pokazać nie może: druga rewizja **zastępuje** pierwszą w pałacu (stara treść przestaje być znajdowalna, czyli `update_drawer` naprawdę przelicza wektor) i trzy szybkie zapisy z kolejką opróżnioną **od najnowszego** kończą się najnowszym tekstem. |
+| `Domain/Document/RevisionDiffTest.php` | Jedyny prawdziwy algorytm w projekcie. Zły diff nie jest błędem, który ktoś zobaczy — jest recenzentem ufającym zmianie na podstawie obrazka, który nie odpowiada tekstowi. |
+| `Domain/Document/DocumentSlugTest.php` | 16 odrzucanych adresów. Test, który liczy się najbardziej, sprawdza, że adres jest **odrzucany**, a nie sprzątany. |
 | `Integration/McpOnLivePalaceTest.php` | Pełny obieg przez `/mcp` na żywym pałacu: `ws_remember` → `ws_search` po polsku innymi słowami → `ws_get`, zapis bez przestrzeni do prywatnej, liczby w `ws_status`, obieg faktu, dziennik. |
 | `Integration/MemoryOnLivePalaceTest.php` | **Cały łańcuch na żywym pałacu**: polskie zapytanie innymi słowami, odmowa dla obcego, szuflada wstawiona poza rejestrem, filtr pokoju, obieg faktu w grafie. Pomijany, gdy pałac nie odpowiada — więc szybkie CI zostaje szybkie, a przebieg nocny to wykonuje. |
 
@@ -304,6 +343,10 @@ kontrolera, ani listy narzędzi. Schemat **musi** mieć
 `additionalProperties: false` i nie może mieć pola autora ani skrzydła; oba
 warunki sprawdza `McpGatewayTest`.
 
+**Nową operację na wiki:** metoda w `DocumentService`. Nie buduj rewizji poza
+`Document::addRevision()` — tam siedzi czyszczenie weryfikacji i numeracja,
+a druga droga kiedyś pominie jedno z dwóch.
+
 **Nową operację na pamięci:** metoda w `MemoryService`, nigdy nowy wołający
 `MemoryStore`. Serwis jest granicą uprawnień; obejście go omija oba filtry
 (D-019) i księgowanie (D-020). Jeśli potrzebujesz nowego narzędzia MemPalace,
@@ -319,7 +362,7 @@ wolno wypuszczać wyżej.
 | `config/services.yaml` | Autowiring, tagi sond zdrowia i **narzędzi MCP**, limit tempa, adres MemPalace, **token i limit czasu pałaca**, jawne powiązania portów z adapterami, publiczny adres. Blok `when@test` udostępnia testom kilka usług po nazwie. |
 | `config/packages/doctrine.yaml` | Połączenie, `schema_filter` ukrywający `palace`, mapowanie encji. |
 | `config/packages/security.yaml` | Firewalle: zdrowie bez zabezpieczeń, `json_login`, **osobny firewall `/mcp` na tokeny agentów**, JWT dla `/api`. W testach obniżony koszt hashowania. |
-| `config/packages/messenger.yaml` | Kolejka w bazie, `auto_setup: false` — tabelę tworzy migracja. |
+| `config/packages/messenger.yaml` | Kolejka w bazie, `auto_setup: false` — tabelę tworzy migracja. `PublishDocument` trafia do transportu `async`. |
 | `config/packages/api_platform.yaml` | Kontrakt pod `/api/docs.json`, **Swagger UI wyłączone** (wymaga Twiga, a backend nie renderuje interfejsu). |
 
 ## Znane ograniczenia
