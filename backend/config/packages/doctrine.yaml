@@ -1,10 +1,18 @@
 doctrine:
     dbal:
         url: '%env(resolve:DATABASE_URL)%'
-        # Migracje i walidacja schematu widzą WYŁĄCZNIE schemat ws. Bez tego
-        # Doctrine zobaczyłaby tabele MemPalace w schemacie palace i przy
-        # pierwszej migracji zaproponowała ich usunięcie (D-002, D-004).
-        schema_filter: '~^ws\.~'
+        # Hide the palace schema from Doctrine: without this it would see
+        # MemPalace's tables and a future diff would propose dropping them
+        # (D-002, D-004).
+        #
+        # Phrased as "everything except palace" rather than "only ws" on
+        # purpose. The application role runs with `search_path = ws, public`,
+        # so DBAL returns our own tables UNQUALIFIED — a `^ws\.` filter
+        # rejects them, and Doctrine then fails to find its own migrations
+        # table and tries to create it again. Palace tables are outside the
+        # search path, so they always arrive schema-qualified and this pattern
+        # catches them.
+        schema_filter: '~^(?!palace\.)~'
         profiling_collect_backtrace: '%kernel.debug%'
     orm:
         auto_mapping: true

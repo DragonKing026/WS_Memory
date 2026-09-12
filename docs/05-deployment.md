@@ -137,6 +137,28 @@ Do czasu wydania DBAL 4.5:
 Filtr nie jest ozdobnikiem: rola `ws_app` **widzi** tabele w schemacie `palace`,
 więc bez niego generator różnic zaproponowałby kiedyś ich usunięcie.
 
+## Pułapka: filtr schematu a `search_path`
+
+`schema_filter` w Doctrine porównuje wzorzec z nazwami tabel **tak, jak zwraca
+je DBAL** — a te zależą od `search_path`. Rola `ws_app` ma `search_path =
+ws, public`, więc własne tabele wracają **bez kwalifikacji schematem**
+(`users`, a nie `ws.users`). Filtr `~^ws\.~` odrzucał je wszystkie, przez co
+Doctrine nie widział własnej tabeli migracji i przy drugim uruchomieniu
+próbował ją utworzyć ponownie:
+
+```
+SQLSTATE[42P07]: Duplicate table: relation "doctrine_migration_versions" already exists
+```
+
+Poprawny wzorzec jest odwrotny — **wyklucza** `palace`, zamiast wymagać `ws`:
+
+```yaml
+schema_filter: '~^(?!palace\.)~'
+```
+
+Działa, bo `palace` jest poza `search_path`, więc jego tabele zawsze wracają
+kwalifikowane i wzorzec je łapie.
+
 ## Monitorowanie
 
 | Co | Jak |

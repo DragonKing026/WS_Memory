@@ -141,6 +141,29 @@ The filter is not decorative: the `ws_app` role **can see** the tables in the
 `palace` schema, so without it the diff generator would one day propose
 dropping them.
 
+## A trap: the schema filter versus `search_path`
+
+Doctrine's `schema_filter` matches the pattern against table names **as DBAL
+returns them** — and those depend on `search_path`. The `ws_app` role runs with
+`search_path = ws, public`, so our own tables come back **unqualified**
+(`users`, not `ws.users`). A `~^ws\.~` filter rejected all of them, so Doctrine
+could not see its own migrations table and tried to create it again on the
+second run:
+
+```
+SQLSTATE[42P07]: Duplicate table: relation "doctrine_migration_versions" already exists
+```
+
+The correct pattern is the inverse — it **excludes** `palace` instead of
+requiring `ws`:
+
+```yaml
+schema_filter: '~^(?!palace\.)~'
+```
+
+This works because `palace` sits outside `search_path`, so its tables always
+arrive schema-qualified and the pattern catches them.
+
 ## Monitoring
 
 | What | How |
