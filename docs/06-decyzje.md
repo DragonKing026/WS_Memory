@@ -27,7 +27,7 @@ skrzynka.
 > Symfony jest czystym API, interfejs jest osobną aplikacją Vue. Pozostała
 > część decyzji (Symfony jako backend, MemPalace jako sidecar) obowiązuje.
 
-**Dlaczego:** zespół Web Systems utrzymuje kod w Symfony (główna aplikacja Symfony zespołu: Symfony 8,
+**Dlaczego:** zespół Web Systems utrzymuje kod w Symfony (w głównej aplikacji Symfony zespołu: Symfony 8,
 PHP 8.4, Doctrine, Twig). Kod w technologii, której zespół nie używa
 codziennie, gnije szybciej niż rośnie. Traktowanie MemPalace jako czarnej
 skrzynki za granicą HTTP oznacza, że jego aktualizacja do nowej wersji nie
@@ -299,7 +299,7 @@ dokumencie krążącym między człowiekiem i AI ta utrata kumuluje się cicho.
 Markdown jako **jedyna** reprezentacja usuwa tę klasę błędów całkowicie: to,
 co agent zapisał, jest dokładnie tym, co człowiek widzi i edytuje.
 
-**Odrzucono:** *TipTap* — używany w nowszy projekt z frontendem Vue i dobry w swojej
+**Odrzucono:** *TipTap* — używany w nowszym projekcie z frontendem Vue i dobry w swojej
 roli (treści redakcyjne pisane wyłącznie przez ludzi), ale tutaj jego model
 dokumentu stałby się drugą reprezentacją prawdy.
 

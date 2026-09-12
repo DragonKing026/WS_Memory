@@ -9,7 +9,7 @@ tags: [ws-memory, dokumentacja, frontend, vue, vite, ui]
 Stan: **projekt**, nieimplementowany (2026-09-12).
 
 Osobna aplikacja Vue 3, niezależna od backendu (D-008). Stack i struktura
-przeniesione z nowszy projekt z frontendem Vue, żeby zespół nie uczył się drugiego
+przeniesione z nowszego projektu z frontendem Vue, żeby zespół nie uczył się drugiego
 zestawu konwencji.
 
 ## Stack

@@ -102,7 +102,7 @@ Details: `docs/en/01-architecture.md`, `docs/en/02-data-model.md`,
 | D-005 | the agent writes without a gate | AI will produce most writes; a gate would be routed around |
 | D-006 | a closed network, transcripts over HTTPS | the alternative required Postgres on the internet |
 | D-007 | a curated MCP tool set | the tool boundary is the permission boundary |
-| D-008 | separating backend and frontend | the backend must run independently; the nowszy projekt z frontendem Vue pattern |
+| D-008 | separating backend and frontend | the backend must run independently; the the newer Vue-frontend project pattern |
 | D-009 | CodeMirror 6, not WYSIWYG | documents circulate between people and AI; every WYSIWYG round trip loses content |
 
 Full reasoning and rejected alternatives: `docs/en/06-decisions.md`.

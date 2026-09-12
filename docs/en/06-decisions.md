@@ -30,7 +30,7 @@ box.
 > application. The rest of the decision (Symfony as the backend, MemPalace as a
 > sidecar) still holds.
 
-**Why:** the Web Systems team maintains code in Symfony (główna aplikacja Symfony zespołu: Symfony 8,
+**Why:** the Web Systems team maintains code in Symfony (the team's main Symfony application: Symfony 8,
 PHP 8.4, Doctrine, Twig). Code written in a technology the team does not use
 daily rots faster than it grows. Treating MemPalace as a black box behind an
 HTTP boundary means upgrading it never touches our code.
@@ -257,7 +257,7 @@ in Vue 3 on Vite 7, built independently. The only contract between them is
 OpenAPI. `nginx` routes `/` to the frontend and `/api` and `/mcp` to the
 backend — the same origin, so the browser never touches CORS.
 
-The pattern is carried over from **nowszy projekt z frontendem Vue**, where this split has
+The pattern is carried over from **the newer Vue-frontend project**, where this split has
 already proven itself: separate application directories, nginx as a same-origin
 proxy, Vite with HMR behind nginx in development.
 
@@ -271,8 +271,8 @@ proxy, Vite with HMR behind nginx in development.
   revision comparison, an editor with preview, a space tree. Rendering that
   server-side in Twig would mean writing the same thing twice: once in HTML,
   once in JS.
-- **The team is competent on both sides** — Symfony (główna aplikacja Symfony zespołu) and Vue 3
-  (nowszy projekt z frontendem Vue). We introduce no new technology, only use two already
+- **The team is competent on both sides** — Symfony (the team's main Symfony application) and Vue 3
+  (the newer Vue-frontend project). We introduce no new technology, only use two already
   in use.
 - **The frontend can be replaced without touching the backend**, and the backend
   tested without the frontend. The OpenAPI contract is documentation and a test
@@ -305,7 +305,7 @@ accumulates silently.
 Markdown as the **only** representation removes this class of fault entirely:
 what the agent wrote is exactly what the person sees and edits.
 
-**Rejected:** *TipTap* — used in nowszy projekt z frontendem Vue and good in its role
+**Rejected:** *TipTap* — used in the newer Vue-frontend project and good in its role
 (editorial content written by people only), but here its document model would
 become a second representation of the truth.
 

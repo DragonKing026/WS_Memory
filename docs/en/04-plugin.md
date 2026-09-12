@@ -72,7 +72,7 @@ the `extract` extra, so PDFs and DOCX files can be mined) and the first
     "url": {
       "type": "string",
       "title": "WS_Memory URL",
-      "description": "e.g. https://wsmemory.twoja-domena.pl"
+      "description": "e.g. https://wsmemory.your-domain.example"
     },
     "token": {
       "type": "string",
@@ -245,7 +245,7 @@ somebody actually uses them.
 ## Installing on a developer machine
 
 ```bash
-claude plugin marketplace add https://git.twoja-domena.pl/ws-memory-plugin
+claude plugin marketplace add https://git.your-domain.example/ws-memory-plugin
 claude plugin install ws-memory
 ```
 

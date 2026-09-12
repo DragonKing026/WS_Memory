@@ -99,7 +99,7 @@ Szczegóły: `docs/01-architektura.md`, `docs/02-model-danych.md`,
 | D-005 | agent zapisuje bez bramki | AI wytworzy większość zapisów; bramka byłaby obchodzona |
 | D-006 | zamknięta sieć, transkrypty przez HTTPS | alternatywa wymagała Postgresa w internecie |
 | D-007 | kurowany zestaw narzędzi MCP | granica narzędzi jest granicą uprawnień |
-| D-008 | rozdzielenie backendu i frontendu | backend musi działać niezależnie; wzorzec z nowszy projekt z frontendem Vue |
+| D-008 | rozdzielenie backendu i frontendu | backend musi działać niezależnie; wzorzec z nowszego projektu z frontendem Vue |
 | D-009 | CodeMirror 6, nie WYSIWYG | dokumenty krążą między ludźmi i AI; każdy obieg przez WYSIWYG gubi treść |
 
 Pełne uzasadnienia i odrzucone alternatywy: `docs/06-decyzje.md`.

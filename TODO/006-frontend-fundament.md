@@ -19,7 +19,7 @@ Zależność jest od zadania 002, nie od całego backendu — wystarczy logowani
 
 ## Analiza
 
-Stack przenoszony z nowszy projekt z frontendem Vue (`docs/07-frontend.md`), żeby zespół
+Stack przenoszony z nowszego projektu z frontendem Vue (`docs/07-frontend.md`), żeby zespół
 nie uczył się drugiego zestawu konwencji. Wzorzec dev z 2.0: kontener Node 22 +
 pnpm + Vite, nginx proxuje `/` na `frontend:5173` razem z websocketem HMR, a
 `/api` na backend — **jeden origin, więc zero CORS-a**.

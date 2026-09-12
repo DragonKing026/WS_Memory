@@ -159,7 +159,7 @@ it.
 
 | Layer | Technology | Note |
 |---|---|---|
-| Framework | Symfony 8.0, PHP 8.4 | as in główna aplikacja Symfony zespołu |
+| Framework | Symfony 8.0, PHP 8.4 | as in the team's main Symfony application |
 | API | API Platform 4.3 | `/api`, OpenAPI contract |
 | Authentication | JWT (access + refresh) | stateless API; agents use a separate token |
 | Database | **PostgreSQL 18 + pgvector** | a departure from the company MariaDB — D-002 |
@@ -173,7 +173,7 @@ it.
 > `^4.5`, while the stable release is 4.4.4. Migrations are written by hand and
 > mapping is checked with `--skip-sync` (`docs/en/05-deployment.md`).
 
-### Frontend — a separate application, the pattern from nowszy projekt z frontendem Vue
+### Frontend — a separate application, the pattern from the newer Vue-frontend project
 
 | Layer | Technology |
 |---|---|
@@ -330,7 +330,7 @@ our imagination.
 ### Language
 
 **Everything in the code is in English** — class, method, variable, table and
-column names, JSON keys, **and comments and PHPDoc**. That is the główna aplikacja Symfony zespołu
+column names, JSON keys, **and comments and PHPDoc**. That is the the team's main Symfony application
 convention (`SendContractEndRemindersCommand`, `AuthEndpoint`) and we do not
 introduce a second one. It applies to comments in code configuration files
 (`services.yaml`, `doctrine.yaml`) and to test names as well.

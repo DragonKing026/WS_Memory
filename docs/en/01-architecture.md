@@ -16,7 +16,7 @@ same task.
 ## Separating backend and frontend
 
 Backend and frontend are **two independent applications** (D-008, a pattern
-carried over from nowszy projekt z frontendem Vue). The backend renders no page; the
+carried over from the newer Vue-frontend project). The backend renders no page; the
 frontend knows nothing about the database. The only contract is the OpenAPI
 document published by API Platform.
 

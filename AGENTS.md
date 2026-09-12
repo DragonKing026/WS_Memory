@@ -149,7 +149,7 @@ tam, gdzie treść naprawdę tego wymaga.
 
 | Warstwa | Technologia | Uwaga |
 |---|---|---|
-| Framework | Symfony 8.0, PHP 8.4 | jak w główna aplikacja Symfony zespołu |
+| Framework | Symfony 8.0, PHP 8.4 | jak w głównej aplikacji Symfony zespołu |
 | API | API Platform 4.3 | `/api`, kontrakt OpenAPI |
 | Uwierzytelnianie | JWT (dostępowy + odświeżający) | API bezstanowe; agenci osobnym tokenem |
 | Baza | **PostgreSQL 18 + pgvector** | odejście od firmowego MariaDB — D-002 |
@@ -163,7 +163,7 @@ tam, gdzie treść naprawdę tego wymaga.
 > `^4.5`, a stabilne jest 4.4.4. Migracje piszemy ręcznie, mapowanie
 > sprawdzamy `--skip-sync` (`docs/05-deployment.md`).
 
-### Frontend — osobna aplikacja, wzorzec z nowszy projekt z frontendem Vue
+### Frontend — osobna aplikacja, wzorzec z nowszego projektu z frontendem Vue
 
 | Warstwa | Technologia |
 |---|---|

@@ -10,7 +10,7 @@ tags: [ws-memory, documentation, frontend, vue, vite, ui]
 Status: **design**, not implemented (2026-09-12).
 
 A separate Vue 3 application, independent of the backend (D-008). Stack and
-structure carried over from nowszy projekt z frontendem Vue so the team does not have to
+structure carried over from the newer Vue-frontend project so the team does not have to
 learn a second set of conventions.
 
 ## Stack

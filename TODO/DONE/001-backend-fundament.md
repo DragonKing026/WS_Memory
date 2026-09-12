@@ -134,7 +134,7 @@ numer 1 kontenera, więc to pytanie dokładniejsze, nie tylko tańsze.
 ### Decyzje językowe podjęte przy okazji
 
 Ujednolicono konwencję: **w kodzie wszystko po angielsku**, łącznie z
-komentarzami i PHPDoc (tak jak w główna aplikacja Symfony zespołu). Pierwsza wersja kontrolera miała
+komentarzami i PHPDoc (tak jak w głównej aplikacji Symfony zespołu). Pierwsza wersja kontrolera miała
 polskie nazwy — przepisana, zanim urosło. Dokumentacja ma być **dwujęzyczna**,
 z polskim jako wersją wiodącą; angielskie odpowiedniki to `TODO-013`.
 

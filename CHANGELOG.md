@@ -129,7 +129,7 @@ adaptery zbierane po tagu. Monitorowanie kolejnej zależności to dodanie klasy,
 nie edycja kontrolera.
 
 **Ustalenia językowe:** w kodzie wszystko po angielsku, łącznie z komentarzami
-(konwencja główna aplikacja Symfony zespołu); dokumentacja dwujęzyczna z polskim jako wersją wiodącą.
+(konwencja głównej aplikacji Symfony zespołu); dokumentacja dwujęzyczna z polskim jako wersją wiodącą.
 Pierwsza wersja kontrolera miała polskie nazwy — przepisana, zanim urosło.
 Angielskie odpowiedniki dokumentacji to nowe `TODO-013`.
 
