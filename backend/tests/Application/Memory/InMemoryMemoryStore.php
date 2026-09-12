@@ -31,6 +31,9 @@ final class InMemoryMemoryStore implements MemoryStore
     /** @var list<string> */
     public array $factQueries = [];
 
+    /** @var list<array{drawer: string, content: string}> */
+    public array $replacements = [];
+
     /** @var list<KnowledgeFact> */
     public array $facts = [];
 
@@ -79,6 +82,31 @@ final class InMemoryMemoryStore implements MemoryStore
 
         $drawer = new DrawerId(\sprintf('drawer_%s_%s_%d', $wing->value, $kind->room(), ++$this->counter));
         $this->drawers[$drawer->value] = new MemoryFragment($drawer, $wing, $kind->room(), $content);
+
+        return $drawer;
+    }
+
+    public function replace(
+        DrawerId $drawer,
+        PalaceWing $wing,
+        MemoryKind $kind,
+        string $content,
+        string $addedBy,
+    ): DrawerId {
+        $this->guard();
+
+        if (!isset($this->drawers[$drawer->value])) {
+            return $this->store($wing, $kind, $content, $addedBy);
+        }
+
+        $this->replacements[] = ['drawer' => $drawer->value, 'content' => $content];
+        $this->drawers[$drawer->value] = new MemoryFragment($drawer, $wing, $kind->room(), $content);
+
+        foreach ($this->contents[$wing->value] ?? [] as $index => $fragment) {
+            if ($fragment->id->equals($drawer)) {
+                $this->contents[$wing->value][$index] = $this->drawers[$drawer->value];
+            }
+        }
 
         return $drawer;
     }

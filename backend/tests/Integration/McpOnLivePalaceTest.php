@@ -12,6 +12,7 @@ use App\Entity\Space;
 use App\Entity\SpaceMember;
 use App\Entity\User;
 use App\Infrastructure\MemPalace\MemPalaceClient;
+use App\Infrastructure\MemPalace\MemPalaceHealthProbe;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -32,6 +33,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 #[Group('integracja')]
 final class McpOnLivePalaceTest extends WebTestCase
 {
+    use RequiresLivePalace;
+
     private const CONTENT = 'Faktury kosztowe księgujemy w miesiącu wykonania usługi, nie w miesiącu wpływu';
     private const OTHER_WORDS = 'do jakiego okresu trafia rachunek od podwykonawcy';
 
@@ -49,11 +52,9 @@ final class McpOnLivePalaceTest extends WebTestCase
         $palace = $container->get(MemPalaceClient::class);
         self::assertInstanceOf(MemPalaceClient::class, $palace);
 
-        try {
-            $palace->call('mempalace_status', []);
-        } catch (\Throwable $e) {
-            self::markTestSkipped('Pałac nie odpowiada — pomijam: ' . $e->getMessage());
-        }
+        $zdrowie = $container->get(MemPalaceHealthProbe::class);
+        self::assertInstanceOf(MemPalaceHealthProbe::class, $zdrowie);
+        self::skipUnlessPalaceAnswers($zdrowie);
 
         $this->em = $container->get(EntityManagerInterface::class);
         $this->em->getConnection()->executeStatement(

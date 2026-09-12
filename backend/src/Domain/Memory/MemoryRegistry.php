@@ -38,6 +38,23 @@ interface MemoryRegistry
     public function spaceFor(DrawerId $id): ?SpaceId;
 
     /**
+     * The drawer a document's content currently lives in, if it has been published.
+     *
+     * One row per document, which the schema enforces. Without this lookup a
+     * republish could not find what to update and would file a second copy.
+     */
+    public function drawerForDocument(string $documentId): ?DrawerId;
+
+    /**
+     * Points a document's existing row at a different drawer.
+     *
+     * Only needed when a republish had to file a fresh drawer because the old one
+     * was gone. Kept separate from register() so that the ordinary path cannot
+     * accidentally move a row.
+     */
+    public function rebind(DrawerId $from, DrawerId $to): void;
+
+    /**
      * How many entries each of these spaces holds.
      *
      * Answered from our own table rather than from the palace, which is the whole

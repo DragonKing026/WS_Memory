@@ -125,6 +125,32 @@ final readonly class McpMemoryStore implements MemoryStore
         return $this->drawerIdFrom($payload, 'mempalace_add_drawer');
     }
 
+    public function replace(
+        DrawerId $drawer,
+        PalaceWing $wing,
+        MemoryKind $kind,
+        string $content,
+        string $addedBy,
+    ): DrawerId {
+        $outcome = $this->client->tryCall('mempalace_update_drawer', [
+            'drawer_id' => $drawer->value,
+            'content' => $content,
+            'wing' => $wing->value,
+            'room' => $kind->room(),
+        ]);
+
+        if ($outcome->isMissing()) {
+            // The drawer is gone — restored from an older backup, deleted by hand.
+            // Filing a fresh one and telling the caller its new identifier beats
+            // failing a republish over content the palace simply no longer has.
+            return $this->store($wing, $kind, $content, $addedBy);
+        }
+
+        $outcome->payloadOrFail();
+
+        return $drawer;
+    }
+
     public function queryFacts(string $entity, ?string $direction = null): array
     {
         $arguments = ['entity' => $entity];

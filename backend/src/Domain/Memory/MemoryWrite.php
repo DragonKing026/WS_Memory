@@ -29,6 +29,8 @@ final readonly class MemoryWrite
         public string $title,
         public string $contentHash,
         public array $tags = [],
+        /** Set when this drawer is the published copy of a wiki document. */
+        public ?string $documentId = null,
         public ?string $sourceReplica = null,
         public ?string $sourceDrawerId = null,
         public ?string $publishBatchId = null,
@@ -52,6 +54,7 @@ final readonly class MemoryWrite
         Actor $author,
         string $content,
         array $tags = [],
+        ?string $documentId = null,
     ): self {
         return new self(
             $drawer,
@@ -61,6 +64,35 @@ final readonly class MemoryWrite
             MemoryFragment::titleOf($content),
             hash('sha256', $content),
             $tags,
+            $documentId,
+        );
+    }
+
+    /**
+     * The registry row for the published copy of a wiki document.
+     *
+     * A named constructor rather than arguments at the call site, because the title
+     * comes from the document and not from the content: a document's title is a
+     * field somebody wrote, while for a note it has to be guessed from the first
+     * line. Losing that distinction would put "# Umowa najmu" in listings.
+     */
+    public static function forDocument(
+        DrawerId $drawer,
+        SpaceId $space,
+        Actor $author,
+        string $documentId,
+        string $title,
+        string $content,
+    ): self {
+        return new self(
+            $drawer,
+            $space,
+            MemoryKind::Document,
+            $author,
+            mb_substr(trim($title), 0, 200),
+            hash('sha256', $content),
+            [],
+            $documentId,
         );
     }
 }

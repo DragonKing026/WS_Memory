@@ -18,6 +18,7 @@ use App\Entity\Space;
 use App\Entity\SpaceMember;
 use App\Entity\User;
 use App\Infrastructure\MemPalace\MemPalaceClient;
+use App\Infrastructure\MemPalace\MemPalaceHealthProbe;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -43,6 +44,8 @@ use Symfony\Component\Uid\Uuid;
 #[Group('integracja')]
 final class MemoryOnLivePalaceTest extends KernelTestCase
 {
+    use RequiresLivePalace;
+
     private const CONTENT = 'Umowa najmu lokalu wymaga aneksu przy zmianie stawki czynszu';
     private const UNRELATED_WORDS = 'zmiana opłaty za wynajem — jakie dokumenty';
 
@@ -62,11 +65,9 @@ final class MemoryOnLivePalaceTest extends KernelTestCase
         self::assertInstanceOf(MemPalaceClient::class, $client);
         $this->client = $client;
 
-        try {
-            $this->client->call('mempalace_status', []);
-        } catch (\Throwable $e) {
-            self::markTestSkipped('Pałac nie odpowiada — pomijam test integracyjny: ' . $e->getMessage());
-        }
+        $zdrowie = $container->get(MemPalaceHealthProbe::class);
+        self::assertInstanceOf(MemPalaceHealthProbe::class, $zdrowie);
+        self::skipUnlessPalaceAnswers($zdrowie);
 
         $memory = $container->get(MemoryService::class);
         self::assertInstanceOf(MemoryService::class, $memory);

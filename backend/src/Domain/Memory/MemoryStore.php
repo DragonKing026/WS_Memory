@@ -47,6 +47,28 @@ interface MemoryStore
     ): DrawerId;
 
     /**
+     * Replaces the content of a drawer that already exists.
+     *
+     * Exists because a document is republished on every revision, and filing a new
+     * drawer each time would leave older versions searchable — an agent would find
+     * the superseded text and have no way to tell. One drawer per document, updated
+     * in place, keeps "what does the wiki say" a question with one answer.
+     *
+     * Returns the identifier the content now lives under. Usually the one passed in;
+     * a different one when the drawer had vanished and had to be filed afresh, which
+     * the caller must then record.
+     *
+     * @throws MemoryUnavailable
+     */
+    public function replace(
+        DrawerId $drawer,
+        PalaceWing $wing,
+        MemoryKind $kind,
+        string $content,
+        string $addedBy,
+    ): DrawerId;
+
+    /**
      * @param 'outgoing'|'incoming'|'both'|null $direction
      *
      * @return list<KnowledgeFact>

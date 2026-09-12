@@ -37,12 +37,12 @@ final readonly class DoctrineMemoryRegistry implements MemoryRegistry
             <<<'SQL'
                 INSERT INTO ws.memory_entries (
                     id, drawer_id, space_id, kind, author_user_id, author_agent_token_id,
-                    title, tags, content_hash, source_replica, source_drawer_id,
+                    document_id, title, tags, content_hash, source_replica, source_drawer_id,
                     publish_batch_id, created_at
                 )
                 SELECT
                     :id, :drawerId, s.id, :kind, :authorUserId, :authorTokenId,
-                    :title, CAST(:tags AS JSONB), :contentHash, :sourceReplica, :sourceDrawerId,
+                    :documentId, :title, CAST(:tags AS JSONB), :contentHash, :sourceReplica, :sourceDrawerId,
                     :publishBatchId, :createdAt
                 FROM ws.spaces s
                 WHERE s.slug = :spaceSlug
@@ -54,6 +54,7 @@ final readonly class DoctrineMemoryRegistry implements MemoryRegistry
                 'kind' => $write->kind->value,
                 'authorUserId' => $write->author->userId,
                 'authorTokenId' => $write->author->agentTokenId,
+                'documentId' => $write->documentId,
                 'title' => $write->title,
                 'tags' => json_encode($write->tags, \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR),
                 'contentHash' => $write->contentHash,
@@ -121,6 +122,28 @@ final readonly class DoctrineMemoryRegistry implements MemoryRegistry
         );
 
         return \is_string($slug) ? new SpaceId($slug) : null;
+    }
+
+    public function drawerForDocument(string $documentId): ?DrawerId
+    {
+        $drawer = $this->connection->fetchOne(
+            'SELECT drawer_id FROM ws.memory_entries WHERE document_id = :documentId',
+            ['documentId' => $documentId],
+        );
+
+        return \is_string($drawer) ? new DrawerId($drawer) : null;
+    }
+
+    public function rebind(DrawerId $from, DrawerId $to): void
+    {
+        $affected = $this->connection->executeStatement(
+            'UPDATE ws.memory_entries SET drawer_id = :to WHERE drawer_id = :from',
+            ['from' => $from->value, 'to' => $to->value],
+        );
+
+        if (0 === $affected) {
+            throw new \DomainException(\sprintf('Rejestr nie zna szuflady %s.', $from->value));
+        }
     }
 
     public function countsFor(array $spaces): array

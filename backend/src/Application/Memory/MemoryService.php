@@ -185,6 +185,70 @@ final readonly class MemoryService
     }
 
     /**
+     * Publishes a document's current content into the palace, replacing the copy.
+     *
+     * The wiki is the source of truth and the palace holds a copy for semantic
+     * search (D-004). "A copy" is the operative word: one drawer per document,
+     * updated in place. Filing a new drawer per revision would leave every
+     * superseded version searchable, and an agent finding old text has no way to
+     * tell that a newer one exists.
+     *
+     * Permission is NOT checked here. The caller is the publishing worker, acting
+     * for a document whose write was already authorised — re-checking would mean
+     * asking whether the author still has the role they had when they wrote it,
+     * and answering "no" by silently dropping content that is already in the wiki.
+     */
+    public function publishDocument(
+        Actor $author,
+        SpaceId $space,
+        string $documentId,
+        string $title,
+        string $content,
+    ): StoredMemory {
+        $wing = $this->wingOf($space);
+        $existing = $this->registry->drawerForDocument($documentId);
+
+        if (null === $existing) {
+            return $this->registry->transactional(function () use ($author, $space, $wing, $documentId, $title, $content): StoredMemory {
+                $drawer = $this->store->store($wing, MemoryKind::Document, $content, $this->palaceAuthor($author));
+
+                $this->registry->register(
+                    MemoryWrite::forDocument($drawer, $space, $author, $documentId, $title, $content),
+                );
+
+                $this->audit->record('memory.document_published', $author, $space->value, [
+                    'document' => $documentId,
+                    'drawer' => $drawer->value,
+                ]);
+
+                return new StoredMemory($drawer, $space, MemoryKind::Document);
+            });
+        }
+
+        // Outside a transaction on purpose: the palace call is the slow part and
+        // the row is only touched if the identifier changed, which is rare. Wrapping
+        // it would hold a row lock for the length of an embedding computation over a
+        // whole document.
+        $current = $this->store->replace($existing, $wing, MemoryKind::Document, $content, $this->palaceAuthor($author));
+
+        if (!$current->equals($existing)) {
+            // The old drawer was gone and a fresh one was filed. Repointing the row
+            // is what keeps the document readable; without it the registry would
+            // name a drawer that no longer exists and the second filtering layer
+            // would drop every result for this document (D-019).
+            $this->registry->rebind($existing, $current);
+        }
+
+        $this->audit->record('memory.document_published', $author, $space->value, [
+            'document' => $documentId,
+            'drawer' => $current->value,
+            'replaced' => true,
+        ]);
+
+        return new StoredMemory($current, $space, MemoryKind::Document);
+    }
+
+    /**
      * A session diary entry — raw material, written by agents about their own work.
      */
     public function diaryWrite(

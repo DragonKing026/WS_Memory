@@ -52,6 +52,27 @@ final class InMemoryMemoryRegistry implements MemoryRegistry
         return $this->rows[$id->value]->space ?? null;
     }
 
+    public function drawerForDocument(string $documentId): ?DrawerId
+    {
+        foreach ($this->rows as $id => $row) {
+            if ($documentId === $row->documentId) {
+                return new DrawerId($id);
+            }
+        }
+
+        return null;
+    }
+
+    public function rebind(DrawerId $from, DrawerId $to): void
+    {
+        if (!isset($this->rows[$from->value])) {
+            throw new \DomainException('Rejestr nie zna tej szuflady.');
+        }
+
+        $this->rows[$to->value] = $this->rows[$from->value];
+        unset($this->rows[$from->value]);
+    }
+
     public function countsFor(array $spaces): array
     {
         $counts = [];
