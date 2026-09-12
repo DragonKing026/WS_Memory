@@ -348,6 +348,11 @@ translation, not a parallel source.
 Outside the code, Polish remains for: `CHANGELOG.md`, tasks in `TODO/`,
 user-facing messages in the interface, and commit messages.
 
+**CI files are Polish too** — `.github/workflows/`, `.github/dependabot.yml`.
+They are read like documentation, and job names appear in the GitHub interface
+where the team looks at them. This is not application code but a description of
+what should happen and when.
+
 Technical exception: documentation and task files have Polish names, because
 they are read, not imported.
 

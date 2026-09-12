@@ -1,0 +1,87 @@
+# Dependabot — pilnowanie zależności.
+#
+# Trzy ekosystemy, bo tyle mamy: pakiety PHP, akcje GitHuba i obrazy Dockera.
+# Frontend dojdzie razem z katalogiem `frontend/` (TODO-006) — wpis na
+# nieistniejący katalog kończy się błędem konfiguracji, więc dopisujemy go
+# wtedy, nie wcześniej.
+#
+# Aktualizacje są **grupowane**. Dwadzieścia osobnych pull requestów tygodniowo
+# nikt nie przegląda, a nieprzeglądane PR-y to gorszy stan niż ich brak: dają
+# złudzenie, że ktoś nad tym panuje.
+
+version: 2
+
+updates:
+  # --- Backend PHP ------------------------------------------------------------
+  - package-ecosystem: composer
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'backend'
+      include: scope
+    groups:
+      # Symfony aktualizuje się w komplecie — rozbicie na osobne PR-y daje
+      # kombinacje wersji, których nikt nie testował.
+      symfony:
+        patterns:
+          - 'symfony/*'
+      doctrine:
+        patterns:
+          - 'doctrine/*'
+      narzedzia-deweloperskie:
+        dependency-type: development
+    ignore:
+      # Główne wersje Symfony i Doctrine to migracja, nie aktualizacja —
+      # wchodzą świadomie, z własnym zadaniem w TODO.
+      - dependency-name: 'symfony/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'doctrine/*'
+        update-types: ['version-update:semver-major']
+
+  # --- Workflowy --------------------------------------------------------------
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/Warsaw
+    commit-message:
+      prefix: 'ci'
+    groups:
+      akcje:
+        patterns:
+          - '*'
+
+  # --- Obrazy Dockera ---------------------------------------------------------
+  - package-ecosystem: docker
+    directories:
+      - /docker/backend
+      - /docker/mempalace
+      - /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/Warsaw
+    commit-message:
+      prefix: 'infra'
+    groups:
+      obrazy:
+        patterns:
+          - '*'
+    ignore:
+      # Zmiana głównej wersji Postgresa to `pg_upgrade` i okno serwisowe,
+      # a nie scalenie pull requesta.
+      - dependency-name: 'pgvector/pgvector'
+        update-types: ['version-update:semver-major']
+      # MemPalace aktualizujemy świadomie: wymaga backupu bazy i przejścia
+      # testu polskiej semantyki (docs/05-deployment.md). Dependabot ma o tym
+      # informować, ale sam pull request nie jest zgodą na scalenie.
+      - dependency-name: 'python'
+        update-types: ['version-update:semver-major']

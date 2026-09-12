@@ -336,6 +336,11 @@ jest tłumaczeniem, nie równoległym źródłem.
 Poza kodem po polsku zostają: `CHANGELOG.md`, zadania w `TODO/`, komunikaty
 widoczne dla użytkownika w interfejsie oraz opisy commitów.
 
+**Pliki CI też po polsku** — `.github/workflows/`, `.github/dependabot.yml`.
+Są czytane jak dokumentacja, a nazwy zadań widać w interfejsie GitHuba, gdzie
+patrzy na nie zespół. To nie jest kod aplikacji, tylko opis, co i kiedy ma się
+wydarzyć.
+
 Wyjątek techniczny: pliki dokumentacji i zadań mają polskie nazwy, bo są
 czytane, nie importowane.
 
