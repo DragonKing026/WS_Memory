@@ -83,6 +83,22 @@ final readonly class ToolArguments
         return $value;
     }
 
+    public function optionalBool(string $key): ?bool
+    {
+        if (!isset($this->raw[$key])) {
+            return null;
+        }
+
+        $value = $this->raw[$key];
+        if (!\is_bool($value)) {
+            // Deliberately strict: "false" and 0 are both truthy-looking strings in
+            // a JSON payload, and a flag read the wrong way round is a silent bug.
+            throw McpError::invalidParams(\sprintf('Parametr „%s" musi być true albo false.', $key));
+        }
+
+        return $value;
+    }
+
     public function optionalInt(string $key, int $min, int $max): ?int
     {
         if (!isset($this->raw[$key])) {

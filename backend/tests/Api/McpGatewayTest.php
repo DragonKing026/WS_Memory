@@ -107,13 +107,24 @@ final class McpGatewayTest extends WebTestCase
 
         self::assertSame([
             'ws_diary_write',
+            'ws_doc_list',
+            'ws_doc_read',
+            'ws_doc_write',
             'ws_get',
             'ws_kg_add',
             'ws_kg_query',
+            'ws_propose',
             'ws_remember',
             'ws_search',
             'ws_status',
         ], $names, 'the tool set is the permission boundary — its contents are a contract');
+
+        // Named absences, each with a reason in docs/03: an agent does not confirm
+        // its own entries (D-005), documents are archived rather than deleted, and
+        // administration is a human act.
+        foreach (['ws_doc_verify', 'ws_doc_delete', 'ws_space_create', 'ws_token_issue'] as $refused) {
+            self::assertNotContains($refused, $names);
+        }
     }
 
     public function testNoToolLetsTheCallerNameItsAuthor(): void
