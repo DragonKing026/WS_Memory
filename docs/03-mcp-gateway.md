@@ -6,7 +6,10 @@ tags: [ws-memory, dokumentacja, mcp, uprawnienia, agenci-ai, bezpieczenstwo]
 
 # Gateway MCP
 
-Stan: **projekt**, nieimplementowany (2026-09-12).
+Stan: **projekt** (2026-09-12). Sam gateway powstaje w `TODO-004`, ale
+**warstwa pod nim już działa**: `MemoryService` egzekwuje uprawnienia dla obu
+powierzchni (`TODO-003`). Narzędzia MCP będą więc cienkie — tłumaczą żądanie na
+wywołanie serwisu i nic więcej.
 
 Backend wystawia pod `/mcp` serwer MCP po HTTP (JSON-RPC 2.0) z **kurowanym
 zestawem narzędzi firmowych** — nie przepuszcza 36 narzędzi MemPalace na wylot
@@ -75,18 +78,38 @@ Cztery reguły, każda pokryta testem negatywnym:
 
 Wspólne serwisy domenowe dla `/api` i `/mcp` (D-008) są tu istotne: reguła
 uprawnień istnieje w jednym miejscu, więc nie da się jej obejść, wybierając
-drogę wejścia.
+drogę wejścia. Tym miejscem jest `MemoryService` — narzędzie MCP, które wołałoby
+pałac wprost, omijałoby oba filtry (D-019) i księgowanie zapisu (D-020).
+
+Do tego dochodzi **druga warstwa filtrowania**: treść, której `memory_entries`
+nie umieszcza w dozwolonej przestrzeni, nie wychodzi, choćby wróciła ze skrzydła,
+o które sami zapytaliśmy (D-019).
 
 ## Mapowanie na MemPalace
 
-| Narzędzie WS | Wywołanie MemPalace | Co dokłada gateway |
+| Narzędzie WS | Wywołanie MemPalace | Co dokłada warstwa pamięci |
 |---|---|---|
-| `ws_search` | `mempalace_search` | `wing IN (...)`, tłumaczenie `kind` → `room`, filtr wyników po `memory_entries` |
-| `ws_get` | `mempalace_get_drawer` | sprawdzenie, że szuflada należy do dozwolonej przestrzeni |
-| `ws_remember` | `mempalace_add_drawer` | `wing` przestrzeni, autor z tokena, wpis w `memory_entries` |
-| `ws_kg_query` / `ws_kg_add` | `mempalace_kg_query` / `mempalace_kg_add` | zakres przestrzeni, autor |
-| `ws_diary_write` | `mempalace_diary_write` | przypisanie do przestrzeni i autora |
+| `ws_search` | `mempalace_search` × liczba dozwolonych przestrzeni | jedno skrzydło na wywołanie, przerankowanie wyników, `kind` → `room`, filtr wyników po `memory_entries` |
+| `ws_get` | `mempalace_get_drawer` | sprawdzenie przynależności **przed** pobraniem; zgodność skrzydła z przestrzenią po pobraniu |
+| `ws_remember` | `mempalace_add_drawer` | `wing` przestrzeni, autor z tokena, wiersz w `memory_entries` w jednej transakcji |
+| `ws_kg_query` / `ws_kg_add` | `mempalace_kg_query` / `mempalace_kg_add` | nazwa encji kwalifikowana skrzydłem (D-021), autor |
+| `ws_diary_write` | `mempalace_diary_write` | **jawne skrzydło przestrzeni** — bez niego pałac wkłada wpis do `wing_{agent_name}`, poza mapowaniem przestrzeni |
 | `ws_doc_*` | — | wyłącznie SQL na `ws`; publikacja do pałaca idzie przez `worker` |
+
+> **`mempalace_search` przyjmuje jedno skrzydło, nie listę.** `wing IN (...)` nie
+> jest więc wyrażalne jednym wywołaniem — odczyt rozsyła po jednym zapytaniu na
+> dozwoloną przestrzeń i przerankowuje wyniki. Kosztuje to N zapytań przy N
+> przestrzeniach, ale utrzymuje regułę nr 3 bez wyjątku, a puste przecięcie
+> uprawnień nie odpytuje pałaca wcale.
+>
+> **Graf wiedzy nie ma osi skrzydła w ogóle.** Zakres wchodzi więc do klucza:
+> fakty zapisujemy i czytamy pod nazwą kwalifikowaną (`wing_alfa::Encja`), więc
+> zapytanie o cudzą przestrzeń ich nie dopasowuje, zamiast dopasować i odfiltrować
+> (D-021). Konsekwencja: relacje nie przechodzą między przestrzeniami — zamierzona.
+>
+> **`agent_name` w dzienniku jest segmentem ścieżki.** Etykieta autora nie może
+> zawierać `:` ani `/`, więc ma postać `ws_<użytkownik>__<token>`. Jedna etykieta
+> dla wszystkich narzędzi, nie etykieta na narzędzie.
 
 Token MemPalace zna **tylko** backend. Agent nigdy go nie widzi.
 

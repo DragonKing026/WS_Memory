@@ -7,7 +7,10 @@ tags: [ws-memory, documentation, mcp, permissions, ai-agents, security]
 
 # MCP gateway
 
-Status: **design**, not implemented (2026-09-12).
+Status: **design** (2026-09-12). The gateway itself arrives in `TODO-004`, but
+**the layer beneath it already works**: `MemoryService` enforces permissions for
+both surfaces (`TODO-003`). The MCP tools will therefore be thin — they translate
+a request into a service call and nothing more.
 
 The backend exposes an MCP server over HTTP (JSON-RPC 2.0) at `/mcp` with a
 **curated set of company tools** — it does not pass MemPalace's 36 tools
@@ -75,18 +78,40 @@ Four rules, each covered by a negative test:
 
 Shared domain services behind `/api` and `/mcp` (D-008) matter here: a
 permission rule exists in exactly one place, so it cannot be bypassed by
-choosing a different entry point.
+choosing a different entry point. That place is `MemoryService` — an MCP tool
+calling the palace directly would skip both filters (D-019) and the bookkeeping
+of the write (D-020).
+
+On top of that comes the **second filtering layer**: content that
+`memory_entries` does not place in a permitted space does not leave, even when it
+came back from a wing we asked about ourselves (D-019).
 
 ## Mapping onto MemPalace
 
-| WS tool | MemPalace call | What the gateway adds |
+| WS tool | MemPalace call | What the memory layer adds |
 |---|---|---|
-| `ws_search` | `mempalace_search` | `wing IN (...)`, translation of `kind` → `room`, result filtering against `memory_entries` |
-| `ws_get` | `mempalace_get_drawer` | verifies the drawer belongs to a permitted space |
-| `ws_remember` | `mempalace_add_drawer` | the space's `wing`, author from the token, a row in `memory_entries` |
-| `ws_kg_query` / `ws_kg_add` | `mempalace_kg_query` / `mempalace_kg_add` | space scope, author |
-| `ws_diary_write` | `mempalace_diary_write` | assignment to a space and an author |
+| `ws_search` | `mempalace_search` × the number of permitted spaces | one wing per call, re-ranking of the results, `kind` → `room`, result filtering against `memory_entries` |
+| `ws_get` | `mempalace_get_drawer` | ownership verified **before** fetching; wing-to-space agreement verified after |
+| `ws_remember` | `mempalace_add_drawer` | the space's `wing`, author from the token, a row in `memory_entries` in one transaction |
+| `ws_kg_query` / `ws_kg_add` | `mempalace_kg_query` / `mempalace_kg_add` | the entity name qualified by the wing (D-021), author |
+| `ws_diary_write` | `mempalace_diary_write` | **an explicit space wing** — without it the palace files the entry into `wing_{agent_name}`, outside every space mapping |
 | `ws_doc_*` | — | SQL against `ws` only; publishing to the palace goes through `worker` |
+
+> **`mempalace_search` takes one wing, not a list.** `wing IN (...)` is therefore
+> not expressible in a single call — a read fans out into one query per permitted
+> space and re-ranks the results. That costs N queries for N spaces, but keeps
+> rule 3 without an exception, and an empty intersection of permissions never asks
+> the palace at all.
+>
+> **The knowledge graph has no wing axis whatsoever.** So the scope goes into the
+> key: facts are written and read under a qualified name (`wing_alfa::Entity`), and
+> a query about another space does not match them rather than matching and
+> filtering them out (D-021). The consequence: relationships do not cross space
+> boundaries — which is intended.
+>
+> **`agent_name` in the diary is a path segment.** The author label may contain
+> neither `:` nor `/`, so it takes the form `ws_<user>__<token>`. One label for
+> every tool, not a label per tool.
 
 The MemPalace token is known to the backend **alone**. An agent never sees it.
 
