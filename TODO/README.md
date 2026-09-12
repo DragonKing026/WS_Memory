@@ -21,6 +21,11 @@ Każde zadanie ma cztery sekcje:
 - **Kryteria ukończenia** — sprawdzalne warunki. Nie „działa", a „polecenie X
   zwraca Y".
 
+## Zrzuty ekranu
+
+Zrzuty z weryfikacji trafiają do `TODO/zrzuty/`, nazwane `NNN-krotki-opis.png`
+— **nigdy do korzenia repozytorium**. Zasady i uzasadnienie: `TODO/zrzuty/README.md`.
+
 ## Po ukończeniu
 
 1. Dopisz sekcję **Co zostało zrobione** z datą i godziną: co powstało, co

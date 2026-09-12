@@ -95,6 +95,11 @@ services:
       # Wykrywanie encji po polsku — domyślnie byłoby angielskie (D-011).
       MEMPALACE_ENTITY_LANGUAGES: ${MEMPALACE_ENTITY_LANGUAGES:-pl,en}
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN:?ustaw MEMPALACE_MCP_HTTP_TOKEN w .env}
+    # MemPalace nie reaguje na SIGTERM: Docker czekał dziesięć sekund i zabijał
+    # go SIGKILL-em, co dawało kod wyjścia 137 wyglądający jak awaria. Na SIGINT
+    # kończy się czysto w 0,2 sekundy (sprawdzone). Stąd ten sygnał — zamiast
+    # wydłużania limitu, który i tak by nie pomógł.
+    stop_signal: SIGINT
       EMBEDDINGS_HEALTH_URL: http://embeddings:80/health
     volumes:
       - mempalace-dane:/data

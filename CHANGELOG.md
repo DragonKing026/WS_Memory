@@ -15,6 +15,38 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-12 23:45 — Porządek: zrzuty mają swoje miejsce, pałac kończy czysto
+
+**Zrzut ekranu wylądował w korzeniu repozytorium** i tak został wypchnięty.
+Przeniesiony do `TODO/zrzuty/`, a konwencja dopisana do `AGENTS.md`,
+`TODO/README.md` i osobnego `TODO/zrzuty/README.md`: nazwa `NNN-krotki-opis.png`,
+nigdy w korzeniu, i **obejrzeć przed dodaniem** — obrazu z tokenem nie da się
+usunąć z historii publicznego repozytorium. Ten akurat był czysty: token
+w kadrze był ucięty przez przewijanie poziome.
+
+**MemPalace kończył się kodem 137**, bo nie reaguje na SIGTERM — Docker czekał
+dziesięć sekund i zabijał go SIGKILL-em. Na SIGINT kończy się czysto w 0,2
+sekundy (sprawdzone), więc `stop_signal: SIGINT` w compose. Danych to nie
+dotyczyło, ale każde zatrzymanie stosu trwało dziesięć sekund dłużej, a kod
+wyjścia wyglądał w interfejsie Dockera jak awaria.
+
+**Szybki przebieg CI padał na frontendzie.** `pnpm/action-setup` szuka pola
+„packageManager" w `package.json` w **korzeniu** repozytorium, a nasz frontend
+jest w podkatalogu — przebieg kończył się „No pnpm version is specified", mimo
+że wersja jest zapisana tam, gdzie należy. Wskazanie pliku naprawia sprawę.
+
+**Dependabot objął `/frontend`** (ekosystem npm, z grupowaniem Vite/Vue/UI
+i pominięciem głównych wersji Vue, Nuxt UI i TypeScriptu).
+
+**Otwarte zgłoszenie bezpieczeństwa, którego nie da się teraz zamknąć:**
+`esbuild` poniżej 0.28.1 pozwala odczytać dowolny plik, gdy serwer deweloperski
+działa **na Windowsie**. Dependabot zgłasza `security_update_not_possible` —
+najwyższa wersja osiągalna w naszym drzewie to 0.27.7, bo Vite 8 przypina
+zakres. Faktyczna ekspozycja: **żadna** — serwer deweloperski chodzi w kontenerze
+Linuksa, wystawiony wyłącznie przez nginxa na pętli zwrotnej, a produkcja nie ma
+serwera deweloperskiego w ogóle. Zniknie, gdy Vite podniesie zakres.
+
+---
 ## 2026-09-12 23:22 — TODO-006 ukończone: aplikacja dla ludzi stoi
 
 Frontend działa pod `http://127.0.0.1:8080`. Logowanie, akceptacja zaproszenia,

@@ -78,6 +78,13 @@ The administrator account arrives together with user management (TODO-002).
 | `FRONTEND_TARGET` | `dev` (Vite with hot reload) or `prod` (static `dist/` served by nginx) |
 | `WS_DEV_PORT` | the port the browser reaches the application on; the HMR websocket must be advertised there, not on Vite's port |
 
+> **MemPalace is stopped with SIGINT, not SIGTERM.** It does not react to SIGTERM:
+> Docker waited ten seconds and then killed it with SIGKILL, producing exit code
+> **137**, which looks like a crash in any interface. On SIGINT it exits cleanly in
+> 0.2 seconds — hence `stop_signal: SIGINT` in `docker-compose.yml`. No data was ever
+> at risk (it writes to Postgres), but every stop of the stack took ten seconds longer
+> than it needed to.
+
 > **The `worker` service is required from `TODO-005` on, not optional.** Publishing
 > documents to the palace goes through the queue; a stopped worker does not break
 > writing to the wiki, but documents stop being findable semantically and nobody

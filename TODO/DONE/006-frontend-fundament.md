@@ -135,6 +135,18 @@ Do tego drobiazg z oczu użytkownika: nagłówek zbijał się do lewej, bo
 wyszukiwarka ma `flex-1` z `max-w-2xl` i na szerokim ekranie zostawało
 niezagospodarowane miejsce. `ml-auto` na grupie przycisków.
 
+### Zrzuty
+
+`TODO/zrzuty/006-ekran-glowny-po-zalogowaniu.png` — aplikacja po zalogowaniu.
+`TODO/zrzuty/006-naglowek-po-poprawce.png` — nagłówek po dosunięciu przycisków
+do prawej krawędzi.
+
+Drugi z nich wylądował najpierw w **korzeniu repozytorium** i tak został
+zacommitowany oraz wypchnięty. Sprzątnięte `git mv`, a konwencja („zrzuty do
+`TODO/zrzuty/`, nigdy do korzenia") dopisana do `AGENTS.md` i `TODO/README.md`,
+żeby się nie powtórzyło. Obraz obejrzany przed przeniesieniem: token był ucięty
+przez przewijanie poziome, więc do publicznego repozytorium nic nie wyciekło.
+
 ### Czego nie zrobiono
 
 - **Brak ekranów wyszukiwania, dokumentu i edytora** — to `TODO-007` i `TODO-008`.

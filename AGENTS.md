@@ -9,7 +9,7 @@ tags: [ws-memory, kontrakt-projektu, architektura, konwencje, agenci-ai]
 Ten plik jest kontraktem dla każdego agenta AI i każdej osoby, która pracuje
 nad **WS_Memory**. Czytasz go przed pierwszą zmianą w repozytorium.
 
-Ostatnia aktualizacja: 2026-09-12 19:59 CEST (commit `ebbaffc`)
+Ostatnia aktualizacja: 2026-09-12 23:42 CEST
 
 ---
 
@@ -194,6 +194,11 @@ Struktura `frontend/src/` jak w 2.0: `pages/` (routing plikowy), `features/<dome
 - **`TODO/DONE/`** — po ukończeniu **przenosisz** tam plik zadania (`git mv`)
   i dopisujesz sekcję **Co zostało zrobione** z datą, godziną i faktami:
   co powstało, co przetestowano, co odłożono i dlaczego.
+- **`TODO/zrzuty/`** — zrzuty ekranu z weryfikacji zadań, nazwane
+  `NNN-krotki-opis.png`. **Nigdy w korzeniu repozytorium**: katalog główny jest
+  spisem treści projektu, a plik, który się w nim znajdzie „na chwilę", zostaje
+  tam na zawsze. Przed dodaniem zrzut się **ogląda** — obrazu z tokenem albo
+  hasłem nie da się później usunąć z historii publicznego repozytorium.
 - **`CHANGELOG.md`** — wpis przy każdej zmianie, z datą i godziną.
 - **`docs/en/`** — angielski odpowiednik każdego pliku z `docs/`, aktualizowany
   w tym samym commicie co polski oryginał.

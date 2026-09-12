@@ -24,6 +24,12 @@ Every task has four sections:
 - **Kryteria ukończenia** (Completion criteria) — verifiable conditions. Not
   "it works", but "command X returns Y".
 
+## Screenshots
+
+Screenshots taken while verifying a task go into `TODO/zrzuty/`, named
+`NNN-short-description.png` — **never into the repository root**. The rules and the
+reasoning: `TODO/zrzuty/README.md`.
+
 ## When finished
 
 1. Add a **Co zostało zrobione** (What was done) section with the date and

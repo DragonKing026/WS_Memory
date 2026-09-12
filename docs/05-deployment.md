@@ -77,6 +77,13 @@ Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
 | `FRONTEND_TARGET` | `dev` (Vite z przeładowaniem na gorąco) albo `prod` (statyczne `dist/` w nginxie) |
 | `WS_DEV_PORT` | port, pod którym przeglądarka widzi aplikację; websocket HMR musi być ogłoszony na nim, nie na porcie Vite |
 
+> **MemPalace zatrzymujemy SIGINT-em, nie SIGTERM-em.** Na SIGTERM nie reaguje:
+> Docker czekał dziesięć sekund i zabijał go SIGKILL-em, co dawało kod wyjścia
+> **137** wyglądający w interfejsie jak awaria. Na SIGINT kończy się czysto
+> w 0,2 sekundy — stąd `stop_signal: SIGINT` w `docker-compose.yml`. Danych to
+> nie dotyczyło (pisze do Postgresa), ale każde zatrzymanie stosu trwało
+> dziesięć sekund dłużej niż powinno.
+
 > **Usługa `worker` jest od `TODO-005` niezbędna, nie opcjonalna.** Publikacja
 > dokumentów do pałaca idzie przez kolejkę; zatrzymany worker nie psuje zapisu
 > w wiki, ale dokumenty przestają być wyszukiwalne semantycznie i nikt tego nie

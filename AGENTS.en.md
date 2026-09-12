@@ -206,6 +206,11 @@ The structure of `frontend/src/` follows 2.0: `pages/` (file-based routing),
 - **`TODO/DONE/`** — once finished you **move** the task file there (`git mv`)
   and add a **Co zostało zrobione** (What was done) section with the date, time
   and facts: what was built, what was tested, what was deferred and why.
+- **`TODO/zrzuty/`** — screenshots from verifying tasks, named
+  `NNN-short-description.png`. **Never in the repository root**: the root is the
+  project's table of contents, and a file that lands there "for a moment" stays
+  there for good. **Look at** a screenshot before adding it — an image containing a
+  token or a password cannot be removed from a public repository's history later.
 - **`CHANGELOG.md`** — an entry for every change, with date and time.
 - **`docs/en/`** — an English counterpart of every file in `docs/`, updated in
   the same commit as the Polish original.
