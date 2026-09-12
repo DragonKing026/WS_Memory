@@ -7,7 +7,7 @@ tags: [ws-memory, dokumentacja, architektura, docker, bezpieczenstwo, mempalace]
 # Architektura
 
 Stan: **fundament działa** (2026-09-12). Stoją: `postgres`, `embeddings`,
-`mempalace`, `backend`, `worker`, `nginx`. Brakuje `frontend` (TODO-006).
+`mempalace`, `backend`, `worker`, `frontend`, `nginx` — komplet.
 Ten dokument opisuje stan docelowy; rozbieżność z kodem = błąd w dokumentacji
 albo w kodzie, do naprawy w tym samym zadaniu.
 
@@ -21,7 +21,7 @@ Backend wystawia **dwie powierzchnie nad tą samą logiką domenową**:
 
 | Powierzchnia | Dla kogo | Uwierzytelnianie |
 |---|---|---|
-| REST `/api` | frontend Vue (ludzie) | JWT: token dostępowy + odświeżający |
+| REST `/api` | frontend Vue (ludzie) | JWT, sam token dostępowy — odświeżania nie ma (D-017) |
 | MCP `/mcp` | agenci AI | token agenta (`Authorization: Bearer`) |
 
 To rozdzielenie powierzchni przy wspólnej logice jest celowe: jedna zmiana

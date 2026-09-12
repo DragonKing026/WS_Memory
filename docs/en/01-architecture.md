@@ -8,8 +8,8 @@ tags: [ws-memory, documentation, architecture, docker, security, mempalace]
 # Architecture
 
 Status: **the foundation works** (2026-09-12). Running: `postgres`,
-`embeddings`, `mempalace`, `backend`, `worker`, `nginx`. Missing: `frontend`
-(TODO-006). This document describes the target state; any divergence from the
+`embeddings`, `mempalace`, `backend`, `worker`, `frontend`, `nginx` — all of them.
+This document describes the target state; any divergence from the
 code is a bug — in the documentation or in the code — to be fixed within the
 same task.
 
@@ -24,7 +24,7 @@ The backend exposes **two surfaces over the same domain logic**:
 
 | Surface | For whom | Authentication |
 |---|---|---|
-| REST `/api` | the Vue frontend (people) | JWT: access + refresh token |
+| REST `/api` | the Vue frontend (people) | JWT, access token only — there is no refresh (D-017) |
 | MCP `/mcp` | AI agents | agent token (`Authorization: Bearer`) |
 
 Splitting the surfaces while sharing the logic is deliberate: one change to a
