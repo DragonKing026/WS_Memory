@@ -6,21 +6,33 @@ tags: [ws-memory, dokumentacja, mcp, uprawnienia, agenci-ai, bezpieczenstwo]
 
 # Gateway MCP
 
-Stan: **projekt** (2026-09-12). Sam gateway powstaje w `TODO-004`, ale
-**warstwa pod nim już działa**: `MemoryService` egzekwuje uprawnienia dla obu
-powierzchni (`TODO-003`). Narzędzia MCP będą więc cienkie — tłumaczą żądanie na
-wywołanie serwisu i nic więcej.
+Stan: **działa** (2026-09-12, `TODO-004`). Siedem narzędzi, tokeny agentów,
+limit tempa i audyt każdego wywołania. Brakuje narzędzi `ws_doc_*` i `ws_propose`
+— dochodzą razem z wiki (`TODO-005`), bo dopiero tam istnieją dokumenty i rewizje.
 
 Backend wystawia pod `/mcp` serwer MCP po HTTP (JSON-RPC 2.0) z **kurowanym
-zestawem narzędzi firmowych** — nie przepuszcza 36 narzędzi MemPalace na wylot
+zestawem narzędzi firmowych** — nie przepuszcza 44 narzędzi MemPalace na wylot
 (D-007). Granica narzędzi **jest** granicą uprawnień.
 
 ## Protokół
 
 `POST /mcp`, JSON-RPC 2.0, nagłówek `Authorization: Bearer <token agenta>`.
-Obsługiwane metody: `initialize`, `tools/list`, `tools/call`.
+Obsługiwane metody: `initialize`, `tools/list`, `tools/call`, `ping` oraz
+notyfikacje `notifications/initialized` i `notifications/cancelled`.
 
-Klient (Claude Code) konfiguruje się jednym poleceniem:
+Deklarowana wersja protokołu: **2025-06-18**. Klient proszący o znaną starszą
+(`2025-03-26`, `2024-11-05`) dostaje swoją — odmowa zablokowałaby klienty, które
+działałyby bez problemu, bo schematy narzędzi się między wersjami nie różnią.
+
+**Żądania wsadowe nie są obsługiwane** (`-32600`). Jedno wywołanie na żądanie
+utrzymuje limit tempa i audyt w zgodzie z rzeczywistością: wsad liczyłby się jako
+jedno wywołanie, robiąc dwadzieścia.
+
+Notyfikacja (żądanie bez pola `id`) dostaje **HTTP 202 i puste ciało**. Odesłanie
+czegokolwiek innego wiesza klienty, które na odpowiedź nie czekają.
+
+Klient (Claude Code) konfiguruje się jednym poleceniem — wypisuje je
+`ws:agent:token` razem z tokenem:
 
 ```bash
 claude mcp add --transport http ws_memory https://wsmemory.twoja-domena.pl/mcp \
@@ -33,22 +45,33 @@ claude mcp add --transport http ws_memory https://wsmemory.twoja-domena.pl/mcp \
 
 | Narzędzie | Parametry | Zwraca |
 |---|---|---|
-| `ws_status` | — | kim jest token, jakie przestrzenie, liczby szuflad i dokumentów |
-| `ws_search` | `query`, `spaces?`, `kind?`, `limit?`, `since?` | dopasowania semantyczne + leksykalne z przestrzeni, do których token ma prawo |
-| `ws_get` | `id` | pełna treść szuflady albo dokumentu |
-| `ws_doc_list` | `space?`, `query?`, `status?` | lista dokumentów z metadanymi (autor, weryfikacja, rewizja) |
-| `ws_doc_read` | `space`, `slug`, `revision?` | treść dokumentu; bez `revision` — aktualna |
-| `ws_kg_query` | `subject?`, `predicate?`, `space?` | fakty z grafu wiedzy |
+| `ws_status` | — | kim jest token, do jakich przestrzeni ma prawo z rolą i liczbą wpisów, **gdzie trafi zapis bez wskazanej przestrzeni** |
+| `ws_search` | `query`, `spaces?`, `kind?`, `limit?`, `since?`, `before?` | dopasowania semantyczne z przestrzeni, do których token ma prawo |
+| `ws_get` | `id` | pełna treść; `found: false` dla nieistniejącej **i dla zabronionej** |
+| `ws_kg_query` | `entity`, `direction?`, `spaces?` | fakty z grafu wiedzy z okresem ważności |
+| `ws_doc_list` | `space?`, `query?`, `status?` | ⏳ `TODO-005` — lista dokumentów z metadanymi |
+| `ws_doc_read` | `space`, `slug`, `revision?` | ⏳ `TODO-005` — treść dokumentu |
 
 ### Pisanie
 
 | Narzędzie | Parametry | Efekt |
 |---|---|---|
-| `ws_remember` | `text`, `space?`, `kind?`, `tags?` | szuflada w pałacu + wiersz w `ws.memory_entries` |
-| `ws_doc_write` | `space`, `slug`, `title`, `content`, `change_note` | nowa rewizja; tworzy dokument, jeśli nie istnieje |
-| `ws_kg_add` | `subject`, `predicate`, `object`, `space?` | fakt w grafie wiedzy |
-| `ws_diary_write` | `text`, `space?` | wpis w dzienniku sesji |
-| `ws_propose` | `space`, `title`, `content` | wpis do kolejki — tylko gdy `spaces.requires_proposal` |
+| `ws_remember` | `text`, `space?`, `tags?` | szuflada w pałacu + wiersz w `ws.memory_entries`; zwraca przestrzeń, w której **faktycznie** wylądowała |
+| `ws_kg_add` | `subject`, `predicate`, `object`, `space?`, `valid_from?`, `valid_to?` | fakt w grafie wiedzy |
+| `ws_diary_write` | `text`, `space?`, `topic?` | wpis w dzienniku sesji |
+| `ws_doc_write` | `space`, `slug`, `title`, `content`, `change_note` | ⏳ `TODO-005` — nowa rewizja |
+| `ws_propose` | `space`, `title`, `content` | ⏳ `TODO-005` — wpis do kolejki, gdy `spaces.requires_proposal` |
+
+> **`ws_remember` nie ma parametru `kind`** i zawsze zapisuje notatkę. Pozwolenie
+> agentowi na `document` założyłoby szufladę w pokoju `documentation` bez wiersza
+> w tabeli `documents` — czyli stronę wiki, o której wiki nie wie: niewidoczną na
+> każdym ekranie i niemożliwą do poprawienia. Dokumenty dochodzą z `ws_doc_write`,
+> gdzie powstaje też rewizja.
+>
+> **Zapis zwraca przestrzeń docelową, nie tę z żądania.** Przy braku parametru
+> `space` te dwie rzeczy się różnią, a agent, któremu odpowiemy `null`, nie ma
+> skąd wiedzieć, gdzie trafiła treść — ani zauważyć, że trafiła nie tam, gdzie
+> chciał (reguła nienaruszalna 6).
 
 Czego **nie ma i nie będzie**:
 
@@ -58,6 +81,19 @@ Czego **nie ma i nie będzie**:
   nigdy się nie skraca.
 - **narzędzia administracyjnego** — zakładanie przestrzeni, nadawanie roli,
   wystawianie tokena to wyłącznie interfejs człowieka.
+- **parametru `wing`** — w żadnym narzędziu. Skrzydło wybiera serwer; nazwa
+  skrzydła w żądaniu unieważniłaby cały model uprawnień.
+
+### Nieznany parametr jest błędem
+
+Każde narzędzie odrzuca parametr, którego nie zna (`-32602`), razem z listą
+dozwolonych. **Nie ignoruje go po cichu**, i to jest rozstrzygnięcie, nie
+niedopatrzenie: parametrem, który agent wymyśli najczęściej, jest `wing` —
+nauczony od lokalnego serwera MemPalace, podłączonego w tej samej sesji.
+Zignorowany `wing` znaczyłby, że agent **uwierzy, iż zawęził wyszukiwanie**,
+choć go nie zawęził. Usłyszenie „nie ma takiego parametru" kosztuje jedno
+ponowienie; przemilczenie kosztuje błędny wniosek o tym, co agent właśnie
+przeczytał.
 
 ## Jak egzekwowane są uprawnienia
 
@@ -113,18 +149,72 @@ o które sami zapytaliśmy (D-019).
 
 Token MemPalace zna **tylko** backend. Agent nigdy go nie widzi.
 
+## Tokeny agentów
+
+Token to **nie JWT** i nie jest to przeoczenie: żyje miesiącami, musi umrzeć
+w chwili, gdy ktoś tak powie, nosi zakres zawężający uprawnienia właściciela
+i pokazuje, kiedy był ostatnio użyty. JWT nie robi żadnej z tych rzeczy.
+
+Wystawienie z wiersza poleceń — jedyna droga, dopóki nie ma ekranów
+(`TODO-008`):
+
+```bash
+docker compose exec backend php bin/console ws:agent:token \
+  artur@web-systems.pl "laptop Artura" --space=projekt-alfa
+```
+
+Polecenie wypisuje gotowe `claude mcp add`. **Token widać jeden raz** — w bazie
+jest tylko skrót `sha256`. Przedrostek `wsm_` nie jest ozdobą: pozwala skanerom
+sekretów i ludziom rozpoznać, na co patrzą w pliku konfiguracyjnym.
+
+Dla frontendu: `GET /api/agent-tokens`, `POST /api/agent-tokens`,
+`DELETE /api/agent-tokens/{id}`. Wszystko **wyłącznie własne tokeny**, również
+dla administratora globalnego — kto mógłby po cichu wycofać cudzego agenta,
+mógłby zatrzymać czyjąś pracę bez śladu (D-016). Widoczna droga to dezaktywacja
+konta, która jest zapisana.
+
+Lista pokazuje `lastUsedAt`. To pole, bez którego nikt nie odważy się wycofać
+żadnego tokena, więc lista rośnie w nieskończoność.
+
+### Limit tempa
+
+**120 wywołań na minutę na token** (`MCP_CALLS_PER_MINUTE`), liczone w bazie
+w tym samym zapisie co „ostatnio użyty" (D-022). Przekroczenie daje `429`
+i kod `-32005`.
+
+Limit jest **per token, nie per konto**: rozbiegana pętla w jednym agencie nie
+zatrzymuje wszystkiego, co dana osoba ma uruchomione. Liczą się wszystkie
+metody, `tools/list` włącznie — pętla po katalogu narzędzi obciąża tak samo jak
+pętla po wyszukiwaniach.
+
 ## Błędy
 
-Standardowe kody JSON-RPC. Dodatkowo:
+Awaria narzędzia wraca jako **błąd JSON-RPC**, nie jako udana odpowiedź
+z błędem w treści. To świadome odstępstwo od zalecenia specyfikacji MCP
+i powód jest empiryczny — MemPalace robi to zgodnie z zaleceniem, a przy
+zatrzymanym serwerze embeddingów jego odpowiedź była nie do odróżnienia od „nic
+nie znalazłem" (D-023).
 
 | Sytuacja | Odpowiedź |
 |---|---|
 | brak / zły token | `401` HTTP, bez treści JSON-RPC |
 | token unieważniony albo wygasły | `401` + nagłówek `WWW-Authenticate` |
-| przestrzeń poza uprawnieniami | **pusty wynik**, nie błąd (nie ujawniamy istnienia) |
+| konto właściciela wyłączone | `401` — bez unieważniania tokenów po kolei |
+| przestrzeń poza uprawnieniami (odczyt) | **pusty wynik**, nie błąd (nie ujawniamy istnienia) |
+| szuflada poza uprawnieniami (`ws_get`) | `found: false` — identycznie jak nieistniejąca |
 | zapis do przestrzeni bez roli `writer` | `-32003`, komunikat wskazujący brak uprawnienia do zapisu |
 | przestrzeń wymaga kolejki, użyto `ws_doc_write` | `-32004` z podpowiedzią, żeby użyć `ws_propose` |
-| MemPalace niedostępny | `-32010`, komunikat „pamięć chwilowo niedostępna" |
+| przekroczony limit tempa | `429` + `-32005` |
+| MemPalace niedostępny | `-32010`, „pamięć chwilowo niedostępna — nie znaczy, że nic nie znaleziono" |
+| nieznany parametr, zły typ, brak wymaganego | `-32602` z listą dozwolonych parametrów |
+| nieznane narzędzie albo metoda | `-32601` z podpowiedzią `tools/list` |
+| ciało nie jest JSON-em | `-32700` |
+| żądanie wsadowe albo bez `jsonrpc: "2.0"` | `-32600` |
+| błąd wewnętrzny | `-32603`, celowo bez szczegółów — te idą do dziennika serwera |
 
 Rozróżnienie między „pusty wynik" i „brak uprawnień" jest celowe: komunikat
 „nie masz dostępu do przestrzeni *Kadry*" sam jest wyciekiem informacji.
+
+Rozróżnienie w drugą stronę jest równie celowe: „nie udało się sprawdzić" nigdy
+nie zamienia się w pusty wynik. Agent, któremu powiemy „nic nie ma", zapisze
+wiedzę drugi raz obok kopii, której nie zobaczył.

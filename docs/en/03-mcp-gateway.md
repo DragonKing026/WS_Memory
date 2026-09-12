@@ -7,21 +7,35 @@ tags: [ws-memory, documentation, mcp, permissions, ai-agents, security]
 
 # MCP gateway
 
-Status: **design** (2026-09-12). The gateway itself arrives in `TODO-004`, but
-**the layer beneath it already works**: `MemoryService` enforces permissions for
-both surfaces (`TODO-003`). The MCP tools will therefore be thin — they translate
-a request into a service call and nothing more.
+Status: **working** (2026-09-12, `TODO-004`). Seven tools, agent tokens, a rate
+limit and an audit entry for every call. Missing: the `ws_doc_*` tools and
+`ws_propose` — they arrive with the wiki (`TODO-005`), which is where documents and
+revisions first exist.
 
 The backend exposes an MCP server over HTTP (JSON-RPC 2.0) at `/mcp` with a
-**curated set of company tools** — it does not pass MemPalace's 36 tools
+**curated set of company tools** — it does not pass MemPalace's 44 tools
 straight through (D-007). The tool boundary **is** the permission boundary.
 
 ## Protocol
 
 `POST /mcp`, JSON-RPC 2.0, header `Authorization: Bearer <agent token>`.
-Supported methods: `initialize`, `tools/list`, `tools/call`.
+Supported methods: `initialize`, `tools/list`, `tools/call`, `ping`, plus the
+`notifications/initialized` and `notifications/cancelled` notifications.
 
-A client (Claude Code) is configured with a single command:
+The declared protocol revision is **2025-06-18**. A client asking for a known older
+one (`2025-03-26`, `2024-11-05`) gets its own back — refusing would lock out
+clients that would work perfectly well, since the tool schemas do not differ
+between revisions.
+
+**Batch requests are not supported** (`-32600`). One call per request keeps the
+rate limit and the audit trail honest: a batch would count as one call while doing
+twenty.
+
+A notification (a request with no `id`) gets **HTTP 202 and an empty body**.
+Anything else hangs clients that are not waiting for an answer.
+
+A client (Claude Code) is configured with a single command — `ws:agent:token`
+prints it alongside the token:
 
 ```bash
 claude mcp add --transport http ws_memory https://wsmemory.twoja-domena.pl/mcp \
@@ -34,22 +48,33 @@ claude mcp add --transport http ws_memory https://wsmemory.twoja-domena.pl/mcp \
 
 | Tool | Parameters | Returns |
 |---|---|---|
-| `ws_status` | — | who the token belongs to, which spaces, drawer and document counts |
-| `ws_search` | `query`, `spaces?`, `kind?`, `limit?`, `since?` | semantic + lexical matches from spaces the token may reach |
-| `ws_get` | `id` | full content of a drawer or document |
-| `ws_doc_list` | `space?`, `query?`, `status?` | documents with metadata (author, verification, revision) |
-| `ws_doc_read` | `space`, `slug`, `revision?` | document content; without `revision` — the current one |
-| `ws_kg_query` | `subject?`, `predicate?`, `space?` | facts from the knowledge graph |
+| `ws_status` | — | who the token belongs to, which spaces with role and entry count, **where an unaddressed write will land** |
+| `ws_search` | `query`, `spaces?`, `kind?`, `limit?`, `since?`, `before?` | semantic matches from spaces the token may reach |
+| `ws_get` | `id` | full content; `found: false` for a missing **and for a forbidden** one |
+| `ws_kg_query` | `entity`, `direction?`, `spaces?` | facts from the knowledge graph with validity windows |
+| `ws_doc_list` | `space?`, `query?`, `status?` | ⏳ `TODO-005` — documents with metadata |
+| `ws_doc_read` | `space`, `slug`, `revision?` | ⏳ `TODO-005` — document content |
 
 ### Writing
 
 | Tool | Parameters | Effect |
 |---|---|---|
-| `ws_remember` | `text`, `space?`, `kind?`, `tags?` | a drawer in the palace + a row in `ws.memory_entries` |
-| `ws_doc_write` | `space`, `slug`, `title`, `content`, `change_note` | a new revision; creates the document if absent |
-| `ws_kg_add` | `subject`, `predicate`, `object`, `space?` | a fact in the knowledge graph |
-| `ws_diary_write` | `text`, `space?` | a session diary entry |
-| `ws_propose` | `space`, `title`, `content` | an entry in the queue — only where `spaces.requires_proposal` |
+| `ws_remember` | `text`, `space?`, `tags?` | a drawer in the palace + a row in `ws.memory_entries`; returns the space it **actually** landed in |
+| `ws_kg_add` | `subject`, `predicate`, `object`, `space?`, `valid_from?`, `valid_to?` | a fact in the knowledge graph |
+| `ws_diary_write` | `text`, `space?`, `topic?` | a session diary entry |
+| `ws_doc_write` | `space`, `slug`, `title`, `content`, `change_note` | ⏳ `TODO-005` — a new revision |
+| `ws_propose` | `space`, `title`, `content` | ⏳ `TODO-005` — an entry in the queue where `spaces.requires_proposal` |
+
+> **`ws_remember` has no `kind` parameter** and always files a note. Letting an
+> agent pass `document` would put a drawer in the `documentation` room with no row
+> in the `documents` table — a wiki page the wiki does not know about: invisible on
+> every screen and impossible to revise. Documents arrive with `ws_doc_write`,
+> where a revision is created alongside.
+>
+> **A write returns the destination space, not the requested one.** With no `space`
+> parameter the two differ, and an agent answered `null` has no way to know where
+> its content went — nor to notice that it went somewhere it did not intend
+> (inviolable rule 6).
 
 What **does not exist and will not**:
 
@@ -57,8 +82,20 @@ What **does not exist and will not**:
   does not confirm its own entries (D-005).
 - **`ws_doc_delete`** — documents are archived, never deleted. Revision history
   never shrinks.
+- **a `wing` parameter** — in no tool at all. The server chooses the wing; a wing
+  name in a request would invalidate the entire permission model.
 - **any administrative tool** — creating spaces, granting roles and issuing
   tokens belong to the human interface alone.
+
+### An unknown parameter is an error
+
+Every tool refuses a parameter it does not recognise (`-32602`), together with the
+list of allowed ones. It does **not** ignore it quietly, and that is a decision
+rather than an oversight: the parameter an agent is most likely to invent is
+`wing` — learned from the local MemPalace server, connected in the same session.
+An ignored `wing` would mean the agent **believes it narrowed its search** when it
+did not. Hearing "no such parameter" costs one retry; being ignored costs a wrong
+conclusion about what the agent has just read.
 
 ## How permissions are enforced
 
@@ -115,18 +152,73 @@ came back from a wing we asked about ourselves (D-019).
 
 The MemPalace token is known to the backend **alone**. An agent never sees it.
 
+## Agent tokens
+
+A token is **not a JWT**, and that is not an oversight: it lives for months, has to
+die the moment somebody says so, carries a scope that narrows its owner's
+permissions, and shows when it was last used. A JWT does none of those.
+
+Issuing one from the command line — the only route until the screens exist
+(`TODO-008`):
+
+```bash
+docker compose exec backend php bin/console ws:agent:token \
+  artur@web-systems.pl "Artur's laptop" --space=projekt-alfa
+```
+
+The command prints a ready `claude mcp add`. **The token is shown once** — the
+database holds only its `sha256` digest. The `wsm_` prefix is not decoration: it
+lets secret scanners and humans recognise what they are looking at in a
+configuration file.
+
+For the frontend: `GET /api/agent-tokens`, `POST /api/agent-tokens`,
+`DELETE /api/agent-tokens/{id}`. All of them cover **one's own tokens only**,
+global administrators included — somebody who could quietly retire another
+person's agent could stop their work without a trace (D-016). The visible route is
+deactivating the account, which is recorded.
+
+The listing shows `lastUsedAt`. It is the field without which nobody dares retire
+any token, so the list only ever grows.
+
+### Rate limit
+
+**120 calls per minute per token** (`MCP_CALLS_PER_MINUTE`), counted in the
+database by the same write that records "last used" (D-022). Exceeding it gives
+`429` and code `-32005`.
+
+The limit is **per token, not per account**: a runaway loop in one agent does not
+stop everything else that person has running. Every method counts, `tools/list`
+included — looping over the tool catalogue loads the palace just as much as looping
+over searches.
+
 ## Errors
 
-Standard JSON-RPC codes, plus:
+A tool failure comes back as a **JSON-RPC error**, not as a successful response
+with an error inside. This deliberately departs from the MCP specification's
+recommendation, for an empirical reason — MemPalace follows the recommendation, and
+with the embedding service stopped its answer was indistinguishable from "found
+nothing" (D-023).
 
 | Situation | Response |
 |---|---|
 | missing / wrong token | HTTP `401`, no JSON-RPC body |
 | revoked or expired token | `401` + `WWW-Authenticate` header |
-| space outside permissions | **empty result**, not an error (existence is not disclosed) |
+| owner's account deactivated | `401` — without revoking tokens one by one |
+| space outside permissions (read) | **empty result**, not an error (existence is not disclosed) |
+| drawer outside permissions (`ws_get`) | `found: false` — identical to a missing one |
 | write to a space without the `writer` role | `-32003`, message naming the missing write permission |
 | space requires the queue, `ws_doc_write` used | `-32004` with a hint to use `ws_propose` |
-| MemPalace unreachable | `-32010`, "memory temporarily unavailable" |
+| rate limit exceeded | `429` + `-32005` |
+| MemPalace unreachable | `-32010`, "memory temporarily unavailable — this does not mean nothing was found" |
+| unknown parameter, wrong type, missing required one | `-32602` with the list of allowed parameters |
+| unknown tool or method | `-32601` with a hint to call `tools/list` |
+| body is not JSON | `-32700` |
+| batch request, or missing `jsonrpc: "2.0"` | `-32600` |
+| internal error | `-32603`, deliberately without detail — that goes to the server log |
 
 The distinction between "empty result" and "no permission" is deliberate: the
 message "you have no access to the *HR* space" is itself an information leak.
+
+The distinction the other way round is just as deliberate: "I could not look" never
+turns into an empty result. An agent told "there is nothing" writes the knowledge
+down again, next to the copy it never saw.
