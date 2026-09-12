@@ -74,6 +74,10 @@ jobs:
           # tworzy dopiero migracja. Wystartowany wcześniej wpada w pętlę
           # restartów i cały przebieg pada na jego stanie zdrowia.
           docker compose up -d --wait --wait-timeout 300 backend nginx
+          # Obraz deweloperski celowo nie zawiera kodu ani zależności — źródła
+          # są montowane wolumenem, żeby zmiana pliku na hoście była widoczna
+          # od razu. Na czystym runnerze nie ma więc katalogu vendor.
+          docker compose exec -T backend composer install --no-interaction --no-progress
           docker compose exec -T backend php bin/console doctrine:migrations:migrate --no-interaction
           docker compose up -d --wait --wait-timeout 120 worker
           # Tutaj — inaczej niż w szybkim przebiegu — oczekujemy 200:
