@@ -7,7 +7,11 @@ tags: [ws-memory, documentation, data-model, postgres, doctrine, pgvector]
 
 # Data model
 
-Status: **design**; Doctrine entities do not exist yet (2026-09-12).
+Status: **partly implemented** (2026-09-12). Present in the database: `users`,
+`invitations`, `spaces`, `space_members`, `audit_log` (migration
+`Version20260912000002`) and `memory_entries` (`Version20260912000003`). The
+remaining tables described below are design — each arrives with the task that
+needs it.
 
 One PostgreSQL 18 database, two schemas:
 
@@ -80,13 +84,34 @@ an invitation is accepted.
 ### The bridge to the palace
 
 **`memory_entries`** — a register of everything of ours that reached the palace.
-`id`, `drawer_id` (the MemPalace identifier), `space_id`, `kind`
-(`note` / `document` / `diary` / `kg_fact` / `transcript`), `author_user_id`,
-`author_agent_token_id`, `document_id` (when `kind = document`), `title`,
-`created_at`, `source_replica` (identifier of the local palace the content came
-from — `null` for writes originating on the server), `source_drawer_id` (the
-drawer identifier in that palace), `publish_batch_id`, `content_hash` (a digest
-used to skip repeats during automatic transfer).
+**Exists** (`Version20260912000003`).
+`id`, `drawer_id` (the MemPalace identifier, **unique**), `space_id`, `kind`
+(`note` / `document` / `diary` / `kg_fact` / `transcript`, enforced by a
+`CHECK`), `author_user_id`, `author_agent_token_id`, `document_id` (when
+`kind = document`), `title` (the first non-empty line of the content — the
+palace has no title field), `tags` (`JSONB`), `created_at`, `source_replica`
+(identifier of the local palace the content came from — `null` for writes
+originating on the server), `source_drawer_id` (the drawer identifier in that
+palace), `publish_batch_id`, `content_hash` (a digest used to skip repeats
+during automatic transfer).
+
+> `drawer_id` is **unique**, because one piece of content belongs to exactly one
+> space: "which one?" cannot have two answers when every read depends on it.
+>
+> `author_agent_token_id` and `document_id` carry **no foreign key** — the
+> `agent_tokens` and `documents` tables arrive in `TODO-004` and `TODO-005`. For
+> the token that is in fact permanent, as in `audit_log`: the record of what a
+> credential did must not be deletable by deleting the credential.
+>
+> The foreign key to the space is `ON DELETE RESTRICT`. Deleting a space would
+> leave its drawers in the palace with nothing pointing at them, and content the
+> registry does not know is unreachable for ever (D-019). A space with history is
+> archived, not dropped.
+>
+> A knowledge-graph fact (`kind = kg_fact`) gets a row here too, although it is
+> not a drawer: the palace returns no identifier for a fact, so we derive a
+> stable fingerprint from the fact and the space (D-021). That is why a fact's
+> `drawer_id` starts with `fact_`, and a diary entry's with `diary_`.
 
 > The pair `(source_replica, source_drawer_id)` is **unique**. It is what makes
 > re-publishing the same local drawer update the row instead of creating a
@@ -97,6 +122,11 @@ used to skip repeats during automatic transfer).
 > (D-014), three people mining the same repository would send identical content
 > three times. The index `(space_id, content_hash)` makes the second and third
 > copy **within the same space** get skipped.
+>
+> That index is deliberately **not unique**. Skipping repeats is a publishing
+> policy, not an invariant of the data: two people may record the same sentence
+> and the registry must not refuse them with a write error. Publishing does the
+> checking, not the table.
 
 > Why this table exists when the data is in the palace: **so permissions and
 > auditing work in SQL rather than on results returned by the palace.** We

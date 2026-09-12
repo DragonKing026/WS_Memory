@@ -6,7 +6,11 @@ tags: [ws-memory, dokumentacja, model-danych, postgres, doctrine, pgvector]
 
 # Model danych
 
-Stan: **projekt**, encje Doctrine jeszcze nie istnieją (2026-09-12).
+Stan: **częściowo wdrożony** (2026-09-12). Istnieją w bazie: `users`,
+`invitations`, `spaces`, `space_members`, `audit_log` (migracja
+`Version20260912000002`) oraz `memory_entries` (`Version20260912000003`).
+Reszta tabel opisanych niżej to projekt — powstaną wraz z zadaniami, które ich
+potrzebują.
 
 Jedna baza PostgreSQL 18, dwa schematy:
 
@@ -78,13 +82,35 @@ przy akceptacji zaproszenia.
 ### Most do pałaca
 
 **`memory_entries`** — rejestr wszystkiego, co nasze trafiło do pałaca.
-`id`, `drawer_id` (identyfikator w MemPalace), `space_id`, `kind`
-(`note` / `document` / `diary` / `kg_fact` / `transcript`), `author_user_id`,
-`author_agent_token_id`, `document_id` (gdy `kind = document`), `title`,
-`created_at`, `source_replica` (identyfikator lokalnego pałaca, skąd przyszła
-treść — `null` dla zapisów powstałych na serwerze), `source_drawer_id`
-(identyfikator szuflady w tamtym pałacu), `publish_batch_id`,
-`content_hash` (skrót treści — odsiew powtórzeń przy automatycznej wysyłce).
+**Istnieje** (`Version20260912000003`).
+`id`, `drawer_id` (identyfikator w MemPalace, **unikalny**), `space_id`, `kind`
+(`note` / `document` / `diary` / `kg_fact` / `transcript`, pilnowane przez
+`CHECK`), `author_user_id`, `author_agent_token_id`, `document_id`
+(gdy `kind = document`), `title` (pierwszy niepusty wiersz treści — pałac nie
+ma pola tytułu), `tags` (`JSONB`), `created_at`, `source_replica`
+(identyfikator lokalnego pałaca, skąd przyszła treść — `null` dla zapisów
+powstałych na serwerze), `source_drawer_id` (identyfikator szuflady w tamtym
+pałacu), `publish_batch_id`, `content_hash` (skrót treści — odsiew powtórzeń
+przy automatycznej wysyłce).
+
+> `drawer_id` jest **unikalny**, bo jedna treść należy do dokładnie jednej
+> przestrzeni: pytanie „w której?" nie może mieć dwóch odpowiedzi, skoro na nim
+> opiera się każdy odczyt.
+>
+> `author_agent_token_id` i `document_id` **nie mają klucza obcego** — tabele
+> `agent_tokens` i `documents` powstają w `TODO-004` i `TODO-005`. Dla tokena
+> jest to zresztą docelowe, tak jak w `audit_log`: śladu po tym, co zrobił
+> token, nie wolno dać się usunąć przez usunięcie tokena.
+>
+> Klucz obcy do przestrzeni ma `ON DELETE RESTRICT`. Usunięcie przestrzeni
+> zostawiłoby jej szuflady w pałacu bez żadnego wskazania, a treść, której
+> rejestr nie zna, jest nieosiągalna na zawsze (D-019). Przestrzeń z historią
+> się archiwizuje, nie usuwa.
+>
+> Fakt grafu wiedzy (`kind = kg_fact`) też ma tu wiersz, choć nie jest
+> szufladą: pałac nie zwraca dla faktu żadnego identyfikatora, więc
+> wyliczamy stabilny odcisk z samego faktu i przestrzeni (D-021). Dlatego
+> `drawer_id` faktu zaczyna się od `fact_`, a wpisu w dzienniku od `diary_`.
 
 > Para `(source_replica, source_drawer_id)` jest **unikalna**. To ona sprawia,
 > że powtórna publikacja tej samej lokalnej szuflady aktualizuje wpis, zamiast
@@ -95,6 +121,11 @@ treść — `null` dla zapisów powstałych na serwerze), `source_drawer_id`
 > (D-014) trzy osoby mielące to samo repozytorium przysłałyby tę samą treść
 > trzy razy. Indeks `(space_id, content_hash)` sprawia, że druga i trzecia
 > kopia w **tej samej** przestrzeni jest pomijana.
+>
+> Ten indeks celowo **nie jest unikalny**. Odsiew powtórzeń to polityka
+> publikacji, a nie niezmiennik danych: dwie osoby mogą zapisać to samo zdanie
+> i rejestr nie może im tego odmówić błędem zapisu. Sprawdzenie robi
+> publikacja, nie tabela.
 
 > Po co ta tabela, skoro dane są w pałacu: **żeby uprawnienia i audyt działały
 > w SQL, a nie na wynikach z pałaca.** Filtrujemy przed zapytaniem
