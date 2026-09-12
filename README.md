@@ -70,6 +70,7 @@ Pełny opis: [README.docker.md](README.docker.md).
 | [docs/05-deployment.md](docs/05-deployment.md) | Docker, TLS, backup, aktualizacje |
 | [docs/06-decyzje.md](docs/06-decyzje.md) | Decyzje techniczne z uzasadnieniem |
 | [docs/07-frontend.md](docs/07-frontend.md) | Konwencje frontendu Vue, ekrany, zasady |
+| [docs/08-backend.md](docs/08-backend.md) | **Backend: co do czego służy** — mapa plików, przepływy, jak dodać nową rzecz |
 | [README.docker.md](README.docker.md) | Uruchomienie stosu, co gdzie jest, sprzątanie |
 | [docs/en/](docs/en/) | Angielskie odpowiedniki (polski jest wersją wiodącą) |
 | [CHANGELOG.md](CHANGELOG.md) | Historia zmian z datami i godzinami |

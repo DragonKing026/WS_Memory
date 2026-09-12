@@ -32,6 +32,7 @@ ODPOWIEDNIKI = {
     "05-deployment.md": "05-deployment.md",
     "06-decyzje.md": "06-decisions.md",
     "07-frontend.md": "07-frontend.md",
+    "08-backend.md": "08-backend.md",
 }
 
 PARY_POZA_DOCS = {
