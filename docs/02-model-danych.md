@@ -8,7 +8,8 @@ tags: [ws-memory, dokumentacja, model-danych, postgres, doctrine, pgvector]
 
 Stan: **częściowo wdrożony** (2026-09-12). Istnieją w bazie: `users`,
 `invitations`, `spaces`, `space_members`, `audit_log` (migracja
-`Version20260912000002`) oraz `memory_entries` (`Version20260912000003`).
+`Version20260912000002`), `memory_entries` (`Version20260912000003`) oraz
+`agent_tokens` (`Version20260912000004`).
 Reszta tabel opisanych niżej to projekt — powstaną wraz z zadaniami, które ich
 potrzebują.
 
@@ -31,10 +32,25 @@ Jedna baza PostgreSQL 18, dwa schematy:
 `id`, `email`, `token_hash`, `invited_by`, `role`, `expires_at`, `accepted_at`.
 Token widoczny raz, w chwili wystawienia.
 
-**`agent_tokens`** — poświadczenie maszyny.
+**`agent_tokens`** — poświadczenie maszyny. **Istnieje**
+(`Version20260912000004`).
 `id`, `user_id` (właściciel), `label` („laptop Artura"), `token_hash`,
 `space_scope` (`JSONB`: podzbiór przestrzeni właściciela lub `null` = wszystkie
-jego), `expires_at`, `revoked_at`, `last_used_at`, `last_used_ip`.
+jego), `expires_at`, `revoked_at`, `last_used_at`, `last_used_ip`,
+`calls_in_window`, `window_started_at`, `created_at`.
+
+> `space_scope` = `null` znaczy „wszystko, co widzi właściciel". **Pusta lista
+> znaczy „nic"** — i zostaje wyrażalna celowo: tak wygląda token wygaszany
+> przed usunięciem.
+>
+> `calls_in_window` i `window_started_at` niosą limit tempa (D-022). Siedzą tu,
+> a nie w cache, bo zapis, który je aktualizuje, to ten sam zapis, który
+> odnotowuje `last_used_at` — jedno zapytanie, żadnej nowej zależności i limit
+> obowiązujący przy kilku kontenerach backendu.
+>
+> Klucz obcy do właściciela ma `ON DELETE CASCADE`, inaczej niż w reszcie tego
+> schematu. Token nie nosi własnej historii — co zrobił, zapisują `audit_log`
+> i `memory_entries`, a żadna z tych tabel nie ma do niego klucza obcego.
 
 > Token rozwiązuje się na właściciela i **przecięcie** jego uprawnień ze
 > `space_scope`. Nigdy sumę. Zakres może tylko zawężać.
@@ -97,9 +113,9 @@ przy automatycznej wysyłce).
 > przestrzeni: pytanie „w której?" nie może mieć dwóch odpowiedzi, skoro na nim
 > opiera się każdy odczyt.
 >
-> `author_agent_token_id` i `document_id` **nie mają klucza obcego** — tabele
-> `agent_tokens` i `documents` powstają w `TODO-004` i `TODO-005`. Dla tokena
-> jest to zresztą docelowe, tak jak w `audit_log`: śladu po tym, co zrobił
+> `author_agent_token_id` i `document_id` **nie mają klucza obcego**. Tabela
+> `documents` powstaje w `TODO-005`; dla tokena jest to stan docelowy, tak jak
+> w `audit_log`: śladu po tym, co zrobił
 > token, nie wolno dać się usunąć przez usunięcie tokena.
 >
 > Klucz obcy do przestrzeni ma `ON DELETE RESTRICT`. Usunięcie przestrzeni

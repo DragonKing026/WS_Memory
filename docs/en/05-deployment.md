@@ -74,6 +74,7 @@ The administrator account arrives together with user management (TODO-002).
 | `MEMPALACE_EMBEDDING_API_MODEL` | `BAAI/bge-m3` |
 | `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — entity detection; defaults to `en`, see D-011 |
 | `MEMPALACE_TIMEOUT` | timeout for one palace tool call, in seconds (15 by default, set in `backend/.env`) |
+| `MCP_CALLS_PER_MINUTE` | calls per minute one agent token may make (120 by default, `backend/.env`) |
 | `MAILER_DSN` | invitations and notifications |
 
 The three MemPalace embedding variables (`MEMPALACE_EMBEDDING_*`) are

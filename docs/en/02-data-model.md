@@ -9,7 +9,8 @@ tags: [ws-memory, documentation, data-model, postgres, doctrine, pgvector]
 
 Status: **partly implemented** (2026-09-12). Present in the database: `users`,
 `invitations`, `spaces`, `space_members`, `audit_log` (migration
-`Version20260912000002`) and `memory_entries` (`Version20260912000003`). The
+`Version20260912000002`), `memory_entries` (`Version20260912000003`) and
+`agent_tokens` (`Version20260912000004`). The
 remaining tables described below are design — each arrives with the task that
 needs it.
 
@@ -33,13 +34,28 @@ One PostgreSQL 18 database, two schemas:
 `id`, `email`, `token_hash`, `invited_by`, `role`, `expires_at`, `accepted_at`.
 The token is shown once, at the moment it is issued.
 
-**`agent_tokens`** — a machine credential.
-`id`, `user_id` (owner), `label` ("Artur's laptop"), `token_hash`,
-`space_scope` (`JSONB`: a subset of the owner's spaces, or `null` = all of
-them), `expires_at`, `revoked_at`, `last_used_at`, `last_used_ip`.
+**`agent_tokens`** — a machine credential. **Exists**
+(`Version20260912000004`).
+`id`, `user_id` (the owner), `label` ("Artur's laptop"), `token_hash`,
+`space_scope` (`JSONB`: a subset of the owner's spaces, or `null` = all of them),
+`expires_at`, `revoked_at`, `last_used_at`, `last_used_ip`, `calls_in_window`,
+`window_started_at`, `created_at`.
 
-> A token resolves to its owner and the **intersection** of their permissions
-> with `space_scope`. Never the union. The scope can only narrow.
+> `space_scope` = `null` means "everything the owner may see". **An empty list
+> means "nothing"** — and stays expressible on purpose: that is what a token being
+> wound down before deletion looks like.
+>
+> `calls_in_window` and `window_started_at` carry the rate limit (D-022). They live
+> here rather than in a cache because the write that updates them is the write that
+> records `last_used_at` — one statement, no new dependency, and a limit that holds
+> across several backend containers.
+>
+> The foreign key to the owner is `ON DELETE CASCADE`, unlike everywhere else in
+> this schema. A token carries no history of its own — what it did is recorded in
+> `audit_log` and `memory_entries`, neither of which has a foreign key to it.
+
+> A token resolves to its owner and the **intersection** of their permissions with
+> `space_scope`. Never the union. A scope can only narrow.
 
 ### Spaces
 
@@ -98,8 +114,8 @@ during automatic transfer).
 > `drawer_id` is **unique**, because one piece of content belongs to exactly one
 > space: "which one?" cannot have two answers when every read depends on it.
 >
-> `author_agent_token_id` and `document_id` carry **no foreign key** — the
-> `agent_tokens` and `documents` tables arrive in `TODO-004` and `TODO-005`. For
+> `author_agent_token_id` and `document_id` carry **no foreign key**. The
+> `documents` table arrives in `TODO-005`; for the token this is permanent. For
 > the token that is in fact permanent, as in `audit_log`: the record of what a
 > credential did must not be deletable by deleting the credential.
 >

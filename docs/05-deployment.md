@@ -73,6 +73,7 @@ Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
 | `MEMPALACE_EMBEDDING_API_MODEL` | `BAAI/bge-m3` |
 | `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — wykrywanie encji; domyślnie `en`, patrz D-011 |
 | `MEMPALACE_TIMEOUT` | limit czasu na jedno wywołanie narzędzia pałaca, w sekundach (domyślnie 15, ustawiany w `backend/.env`) |
+| `MCP_CALLS_PER_MINUTE` | ile wywołań na minutę może wykonać jeden token agenta (domyślnie 120, `backend/.env`) |
 | `MAILER_DSN` | zaproszenia i powiadomienia |
 
 Trzy zmienne embeddingów (`MEMPALACE_EMBEDDING_*`) są **nierozdzielne** — patrz
