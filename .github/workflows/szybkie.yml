@@ -155,8 +155,11 @@ jobs:
       - name: pnpm
         uses: pnpm/action-setup@v4
         with:
-          # Wersja bierze się z pola "packageManager" w package.json — jedno
-          # miejsce zamiast dwóch, które kiedyś by się rozjechały.
+          # Wskazanie pliku jest konieczne: akcja szuka pola "packageManager"
+          # w package.json w KORZENIU repozytorium, a nasz frontend jest
+          # w podkatalogu. Bez tego przebieg pada z „No pnpm version is
+          # specified" — mimo że wersja jest zapisana tam, gdzie trzeba.
+          package_json_file: frontend/package.json
           run_install: false
 
       - name: Cache zależności pnpm

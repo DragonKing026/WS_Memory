@@ -1,9 +1,7 @@
 # Dependabot — pilnowanie zależności.
 #
-# Trzy ekosystemy, bo tyle mamy: pakiety PHP, akcje GitHuba i obrazy Dockera.
-# Frontend dojdzie razem z katalogiem `frontend/` (TODO-006) — wpis na
-# nieistniejący katalog kończy się błędem konfiguracji, więc dopisujemy go
-# wtedy, nie wcześniej.
+# Cztery ekosystemy: pakiety PHP, pakiety npm frontendu, akcje GitHuba
+# i obrazy Dockera.
 #
 # Aktualizacje są **grupowane**. Dwadzieścia osobnych pull requestów tygodniowo
 # nikt nie przegląda, a nieprzeglądane PR-y to gorszy stan niż ich brak: dają
@@ -41,6 +39,52 @@ updates:
       - dependency-name: 'symfony/*'
         update-types: ['version-update:semver-major']
       - dependency-name: 'doctrine/*'
+        update-types: ['version-update:semver-major']
+
+  # --- Frontend npm -----------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '07:00'
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'frontend'
+      include: scope
+    groups:
+      # Vite ciągnie za sobą Rolldown i esbuild — rozbite na osobne PR-y dają
+      # kombinacje, których nikt nie zbudował.
+      vite:
+        patterns:
+          - 'vite'
+          - 'vitest'
+          - '@vitejs/*'
+          - 'esbuild'
+      vue:
+        patterns:
+          - 'vue'
+          - 'vue-router'
+          - 'vue-tsc'
+          - 'pinia'
+          - '@vue/*'
+      ui:
+        patterns:
+          - '@nuxt/ui'
+          - 'tailwindcss'
+      narzedzia-deweloperskie:
+        dependency-type: development
+    ignore:
+      # Główna wersja Vue albo Nuxt UI to migracja z własnym zadaniem, a nie
+      # scalenie pull requesta w poniedziałek rano.
+      - dependency-name: 'vue'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@nuxt/ui'
+        update-types: ['version-update:semver-major']
+      # TypeScript 7 to przepisany rdzeń, a vue-tsc stoi na API poprzedniej
+      # generacji (docs/07-frontend.md). Wchodzi świadomie, gdy vue-tsc nadrobi.
+      - dependency-name: 'typescript'
         update-types: ['version-update:semver-major']
 
   # --- Workflowy --------------------------------------------------------------
