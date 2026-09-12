@@ -45,7 +45,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Przygotuj konfigurację
         run: |
@@ -56,7 +56,7 @@ jobs:
         # Bez tego każdy przebieg pobiera 2 GB z Hugging Face. Klucz zawiera
         # nazwę modelu, więc jego zmiana unieważnia cache — i słusznie, bo
         # zmiana modelu unieważnia też wszystkie wektory (D-003).
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /tmp/model-embeddingow
           key: embeddings-bge-m3-v1
