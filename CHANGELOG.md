@@ -15,6 +15,54 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-12 23:22 — TODO-006 ukończone: aplikacja dla ludzi stoi
+
+Frontend działa pod `http://127.0.0.1:8080`. Logowanie, akceptacja zaproszenia,
+layout z przestrzeniami, zarządzanie tokenami agentów. Jeden origin przez
+nginxa, więc przeglądarka nigdy nie dotyka CORS-a; HMR przez websocket na
+porcie nginxa.
+
+**Sprawdzone w przeglądarce, nie tylko w testach:** niezalogowany na `/` trafia
+na `/login` z zapamiętanym celem, logowanie działa, token jest odtwarzany po
+przeładowaniu, lista i wystawianie tokenów agentów idą przez prawdziwe API,
+a edycja pliku na hoście zmienia stronę bez przeładowania. Konsola czysta.
+
+**Jedno kryterium było niewykonalne i jest to zapisane wprost.** Zadanie
+wymagało przezroczystego odświeżania tokena — endpointu odświeżania nie ma
+(D-017). Zrealizowana jest intencja, która za tym stała: 401 kończy sesję
+jawnie, klient zapamiętuje, **gdzie** był użytkownik, i wraca tam po
+zalogowaniu. Test pilnuje, że po 401 **nie ma ponowienia** — bez odświeżania
+byłoby to drugie identyczne 401, a „na wszelki wypadek" ktoś takie dopisze.
+
+**Decyzje:** D-027 (trasy wypisane jawnie — `unplugin-vue-router` wymaga
+`vue-router ^4.6`, a stack mówi 5; cofanie routera o major to dług migracyjny
+wzięty pierwszego dnia), D-028 (token w `localStorage`, z ryzykiem nazwanym
+w `SECURITY.md`, bo ryzyko znane tylko autorowi kodu nie jest przyjęte).
+
+**Cztery rzeczy warte zapamiętania:**
+
+1. **Polski cudzysłów zamknięty znakiem `"` zamyka atrybut HTML.** Kompilacja
+   strony wywracała się komunikatem o `trim` w kompilatorze szablonu, który nie
+   wskazywał przyczyny.
+2. **`vue-tsc` przeszedł, choć był błąd typu** — gdy jeden plik nie daje się
+   sparsować, sprawdzenie po cichu zawęża zakres i mówi „czysto". Wyszło dopiero
+   przy `pnpm build`, dlatego CI ma oba kroki.
+3. **`instanceof AxiosError` zawodzi** przy dwóch kopiach axiosa w grafie: każdy
+   błąd stawał się „nieoczekiwanym błędem przeglądarki". Zamienione na
+   `axios.isAxiosError()`, złapane przez test.
+4. **Nie było pliku blokady pnpm** — build nie był powtarzalny. Wygenerowany
+   i commitowany, a `--frozen-lockfile` jest teraz bez awarii do zwykłego
+   `install`.
+
+**Wersje:** Vite 8 i Vitest 5 zamiast zapisanych 7 i 4 (to wersje bieżące),
+TypeScript celowo 5.9 zamiast 7 — TS 7 to przepisany rdzeń, a `vue-tsc` stoi na
+API poprzedniej generacji.
+
+**Testy:** 24 w Vitest, `vue-tsc` czysty, obraz produkcyjny serwuje `dist/`
+i **nie zawiera `node`**. Szybki przebieg CI ma teraz zadanie frontendu: typy,
+testy, build.
+
+---
 ## 2026-09-12 22:52 — TODO-005 ukończone: wiki z rewizjami, cofaniem i kolejką
 
 Dokumentacja kanoniczna działa. Dokument, pełna historia rewizji, różnica między
