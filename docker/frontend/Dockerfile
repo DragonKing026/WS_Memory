@@ -14,6 +14,12 @@ FROM node:22-alpine AS baza
 # Wersja przypięta w package.json ("packageManager") — corepack ją respektuje.
 RUN corepack enable
 
+# Magazyn pnpm POZA /app. W compose /app to bind mount z hosta, więc domyślny
+# magazyn (obok node_modules) wysypałby kilkaset megabajtów prosto do repozytorium
+# przy pierwszym `pnpm install` uruchomionym w kontenerze.
+ENV PNPM_HOME=/pnpm
+ENV npm_config_store_dir=/pnpm/store
+
 WORKDIR /app
 
 # ------------------------------------------------------------------------- dev

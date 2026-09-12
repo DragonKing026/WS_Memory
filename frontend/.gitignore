@@ -2,3 +2,6 @@ node_modules/
 dist/
 .vite/
 *.local
+
+# Magazyn pnpm, gdyby ktoś uruchomił install ze starym obrazem (patrz docker/frontend/Dockerfile).
+.pnpm-store/

@@ -129,3 +129,21 @@ Plik `pnpm-lock.yaml` jest commitowany, a build używa `--frozen-lockfile` bez
 awarii do zwykłego `install`: build, który po cichu rozwiązuje zależności inaczej
 niż plik blokady, przestaje być powtarzalny — czyli traci jedyny powód, po który
 ten plik się trzyma.
+
+## Nadpisania zależności
+
+W `package.json` jest jedno `pnpm.overrides`: **`esbuild: ^0.28.2`**.
+
+Powód: esbuild poniżej 0.28.1 pozwala odczytać dowolny plik, gdy serwer
+deweloperski działa na Windowsie (GHSA-g7r4-m6w7-qqqr). Vite 8 dopuszcza
+`^0.27.0 || ^0.28.0`, ale `fontless@0.2.1` — wciągany przez `@nuxt/ui` →
+`@nuxt/fonts` — deklaruje `^0.27.0` i trzymał całe drzewo na 0.27.7.
+
+**Nadpisanie zakresu zadeklarowanego przez zależność jest ryzykiem i wymaga
+dowodu, nie założenia.** Ten został sprawdzony na cztery sposoby: typecheck,
+testy, `pnpm build` i budowa obrazu produkcyjnego od zera z `--frozen-lockfile`.
+Każde podbicie tego wpisu wymaga powtórzenia całej czwórki.
+
+Wpis **ma zniknąć**, gdy `@nuxt/fonts` podniesie `fontless` powyżej `^0.2.1`:
+`fontless` 0.3+ nie zależy już od esbuilda w ogóle. Nadpisanie, które przestało
+być potrzebne, to zamrożona wersja, o której nikt nie pamięta.

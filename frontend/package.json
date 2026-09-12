@@ -32,5 +32,10 @@
     "vitest": "^5.0.0",
     "vue-tsc": "^3.3.11",
     "axios-mock-adapter": "^2.1.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "esbuild": "^0.28.2"
+    }
   }
 }

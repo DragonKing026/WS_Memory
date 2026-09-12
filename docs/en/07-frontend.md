@@ -116,3 +116,21 @@ Production: `pnpm build` → static `dist/` served by nginx. The production imag
 `pnpm-lock.yaml` is committed and the build uses `--frozen-lockfile` with no fallback to
 a plain `install`: a build that quietly resolves dependencies differently from the
 lockfile is no longer reproducible — which is the only reason to keep the file.
+
+## Dependency overrides
+
+`package.json` carries a single `pnpm.overrides` entry: **`esbuild: ^0.28.2`**.
+
+Why: esbuild below 0.28.1 allows arbitrary file reads when the development server runs
+on Windows (GHSA-g7r4-m6w7-qqqr). Vite 8 accepts `^0.27.0 || ^0.28.0`, but
+`fontless@0.2.1` — pulled in by `@nuxt/ui` → `@nuxt/fonts` — declares `^0.27.0` and held
+the whole tree at 0.27.7.
+
+**Overriding a range a dependency declared is a risk and needs proof, not an
+assumption.** This one was checked four ways: typecheck, tests, `pnpm build`, and a
+from-scratch production image build with `--frozen-lockfile`. Any bump to this entry
+means repeating all four.
+
+The entry is **meant to disappear** once `@nuxt/fonts` raises `fontless` above `^0.2.1`:
+`fontless` 0.3+ no longer depends on esbuild at all. An override that is no longer needed
+is a frozen version nobody remembers.

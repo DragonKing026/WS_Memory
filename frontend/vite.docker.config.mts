@@ -1,6 +1,6 @@
 import { defineConfig, mergeConfig } from 'vitest/config'
 
-import { baseConfig } from './vite.config'
+import { baseConfig } from './vite.config.ts'
 
 /**
  * The overlay used inside the container.
@@ -24,9 +24,10 @@ export default defineConfig(
       // always cross that boundary. Polling is the difference between HMR working
       // and a developer wondering why nothing happens.
       watch: { usePolling: true, interval: 300 },
-      hmr: {
+      ws: {
         // The browser talks to nginx, not to Vite, so the websocket has to be
-        // advertised on the port the browser actually reached.
+        // advertised on the port the browser actually reached. This lives under
+        // `ws`, not `hmr`: Vite 8 deprecated the connection options on `hmr`.
         clientPort: Number(process.env.WS_DEV_PORT ?? 8080),
       },
       // Vite's own proxy is pointless here: nginx already puts /api and the app on

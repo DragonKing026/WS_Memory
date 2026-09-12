@@ -15,6 +15,32 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 00:00 — esbuild podbity do 0.28.2, zgłoszenie bezpieczeństwa zamknięte
+
+**Poprzedni wpis podawał złą przyczynę.** Napisałem tam, że zakres esbuilda
+przypina Vite 8 — nieprawda. Vite 8.3.0 deklaruje `^0.27.0 || ^0.28.0`,
+czyli 0.28 dopuszcza od dawna. Jedyną twardą zależnością był `fontless@0.2.1`
+(przez `@nuxt/fonts`, przez `@nuxt/ui`) z zakresem `^0.27.0`. Dependabot nie
+podnosi wersji przechodniej wbrew zakresowi pakietu pośredniego i dlatego
+raportował `security_update_not_possible` — a nie dlatego, że podbicie było
+niemożliwe.
+
+**Rozwiązanie: `pnpm.overrides` na `esbuild: ^0.28.2`.** Nadpisanie zakresu
+zadeklarowanego przez zależność to decyzja, którą trzeba udowodnić, a nie
+założyć, więc sprawdzone zostały wszystkie cztery drogi: `typecheck`, `24/24`
+testów, `pnpm build` (901 modułów) i **budowa obrazu produkcyjnego od zera**
+z `--frozen-lockfile`. Dodatkowo serwer deweloperski wstaje, strona się
+renderuje, a konsola przeglądarki jest pusta. Nowszy `fontless` (0.3+) w ogóle
+porzucił esbuilda, więc nadpisanie zniknie samo, gdy `@nuxt/fonts` podniesie
+zależność ponad `^0.2.1`.
+
+**Przy okazji dwa ostrzeżenia Vite w `vite.docker.config.mts`**, obie w kodzie
+z tej samej sesji: `server.hmr.clientPort` jest wycofane na rzecz
+`server.ws.clientPort`, a import `./vite.config` bez rozszerzenia nie przejdzie
+przez `configLoader: 'native'`, który ma być domyślny. Poprawione i sprawdzone
+na żywym HMR — websocket łączy się przez nginxa (`[vite] connected`).
+
+---
 ## 2026-09-12 23:45 — Porządek: zrzuty mają swoje miejsce, pałac kończy czysto
 
 **Zrzut ekranu wylądował w korzeniu repozytorium** i tak został wypchnięty.
