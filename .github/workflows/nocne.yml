@@ -1,0 +1,97 @@
+# Przebieg nocny — pełny stos, łącznie z modelem embeddingów.
+#
+# Odpowiada na pytanie, którego szybki przebieg celowo nie zadaje: czy cały
+# system wstaje i czy polskie zapytanie znajduje polską treść. To założenie
+# stoi u podstaw projektu (D-003) i jego złamanie jest CICHE — wyszukiwanie
+# nadal działa, tylko przestaje trafiać.
+#
+# Nocą, a nie przy każdym pushu, bo pobranie bge-m3 to ~2 GB i kilka minut,
+# a założenie zmienia się raz na kwartał, nie przy każdej literówce.
+
+name: Nocne sprawdzenie pełnego stosu
+
+on:
+  schedule:
+    # 03:17 UTC — nie o pełnej godzinie, bo wtedy kolejki GitHuba są najdłuższe.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+  push:
+    # Zmiana konfiguracji embeddingów albo obrazu pamięci musi być sprawdzona
+    # od razu, nie następnej nocy: to jedyne miejsca, które mogą po cichu
+    # zepsuć trafność wyszukiwania.
+    paths:
+      - 'docker-compose.yml'
+      - 'docker/mempalace/**'
+      - '.env.example'
+      - 'test/semantyka.sh'
+      - '.github/workflows/nocne.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nocne
+  cancel-in-progress: false
+
+jobs:
+  pelny-stos:
+    name: Pełny stos i polska semantyka
+    runs-on: ubuntu-latest
+    # Pobranie modelu przy zimnym cache potrafi trwać kilka minut; limit
+    # z zapasem, ale nie nieskończony — zawieszony przebieg ma się skończyć.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Przygotuj konfigurację
+        run: |
+          cp .env.example .env
+          ./docker/wygeneruj-sekrety.sh
+
+      - name: Cache modelu embeddingów
+        # Bez tego każdy przebieg pobiera 2 GB z Hugging Face. Klucz zawiera
+        # nazwę modelu, więc jego zmiana unieważnia cache — i słusznie, bo
+        # zmiana modelu unieważnia też wszystkie wektory (D-003).
+        uses: actions/cache@v4
+        with:
+          path: /tmp/model-embeddingow
+          key: embeddings-bge-m3-v1
+
+      - name: Podnieś stos
+        run: |
+          docker compose up -d --wait --wait-timeout 900 postgres mempalace embeddings \
+            || (docker compose logs --tail 50; exit 1)
+
+      - name: Test polskiej semantyki
+        # Sedno tego przebiegu. Zapisuje zdanie po polsku i szuka go frazą bez
+        # wspólnych słów; przechodzi tylko wtedy, gdy wektory rozumieją polski.
+        run: ./test/semantyka.sh
+
+      - name: Backend i sprawdzenie zdrowia
+        run: |
+          docker compose up -d --wait --wait-timeout 300 backend worker nginx
+          docker compose exec -T backend php bin/console doctrine:migrations:migrate --no-interaction
+          # Tutaj — inaczej niż w szybkim przebiegu — oczekujemy 200:
+          # wszystkie zależności mają działać naprawdę.
+          kod=$(curl -s -o /tmp/zdrowie.json -w '%{http_code}' http://127.0.0.1:8080/api/health)
+          cat /tmp/zdrowie.json
+          test "$kod" = "200" || { echo "Endpoint zdrowia zwrócił $kod"; exit 1; }
+
+      - name: Testy backendu na pełnym stosie
+        run: make test
+
+      - name: Zużycie pamięci przez usługi
+        # Nie jest to asercja, tylko zapis w dzienniku przebiegu. Serwer
+        # embeddingów potrafił kiedyś zająć 21 GB i zdławić maszynę; regularny
+        # pomiar pokaże, gdyby zaczął rosnąć ponownie.
+        if: always()
+        run: docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}'
+
+      - name: Dzienniki przy niepowodzeniu
+        if: failure()
+        run: docker compose logs --tail 100
+
+      - name: Sprzątanie
+        if: always()
+        run: docker compose down -v
