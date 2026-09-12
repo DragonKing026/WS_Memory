@@ -616,3 +616,35 @@ by `(source_replica, source_drawer_id)` and by `content_hash` already handles it
 **What we are not doing:** synchronising in the other direction. Pulling team
 knowledge down into local palaces would mean two-way synchronisation with all
 its conflicts — already rejected in D-004, and that still stands.
+
+---
+
+## D-016 — A global administrator does not silently read other people's spaces
+
+**Date:** 2026-09-12 21:05 · **Status:** Accepted
+
+`ROLE_ADMIN` allows managing accounts, spaces and roles. It **grants no access
+to the content** of a space the administrator is not a member of — private user
+spaces included.
+
+**Why:** an administrator who needs access can grant it to themselves. The
+difference is that **granting a role is recorded in the audit log** while a
+silent read leaves no trace. The first is an act somebody can be held to
+account for; the second is invisible to the owner of the content.
+
+This matters practically, not just as policy: private spaces are where
+conversation transcripts land by default (D-014). If an administrator could
+read them without a trace, the promise "your working conversations are yours"
+would be empty, people would start switching the transfer off — and the base
+would lose the very thing it exists for.
+
+**Consequence in the code:** `SpaceAccessResolver` does not consult
+`isGlobalAdmin` when computing roles. The flag serves the administrative layer
+alone. Covered by the negative test
+`testGlobalAdminDoesNotSilentlyReadSpacesTheyAreNotMemberOf`.
+
+**Rejected:** *the administrator sees everything* — more convenient for user
+support ("I cannot see my document, please check"), but bought at the price of
+trust in the whole private-space mechanism. Support can work differently: the
+administrator grants themselves a role for the duration of the diagnosis, and
+that shows up in the audit trail.

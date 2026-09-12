@@ -601,3 +601,32 @@ Ponowna wysyłka jest bezpieczna, bo odsiew po parze
 **Czego nie robimy:** synchronizacji w drugą stronę. Ściąganie wiedzy zespołu
 do lokalnych pałaców oznaczałoby dwukierunkową synchronizację ze wszystkimi jej
 konfliktami — odrzucone już w D-004 i to pozostaje aktualne.
+
+---
+
+## D-016 — Administrator globalny nie czyta cudzych przestrzeni po cichu
+
+**Data:** 2026-09-12 21:05 · **Stan:** Przyjęta
+
+`ROLE_ADMIN` pozwala zarządzać kontami, przestrzeniami i rolami. **Nie daje
+dostępu do treści** przestrzeni, w której administrator nie jest członkiem —
+łącznie z prywatnymi przestrzeniami użytkowników.
+
+**Dlaczego:** administrator, który potrzebuje dostępu, może go sobie nadać.
+Różnica jest w tym, że **nadanie roli zostaje w dzienniku audytu**, a ciche
+czytanie nie zostawia śladu. Pierwsze jest czynnością, z której da się
+rozliczyć; drugie jest niewidoczne dla właściciela treści.
+
+To ma znaczenie praktyczne, nie tylko regulaminowe: do prywatnych przestrzeni
+trafiają domyślnie transkrypty rozmów z agentami (D-014). Gdyby administrator
+czytał je bez śladu, obietnica „twoje robocze rozmowy są twoje" byłaby pusta,
+a ludzie zaczęliby wyłączać wysyłkę — czyli baza straciłaby to, po co powstaje.
+
+**Konsekwencja w kodzie:** `SpaceAccessResolver` nie sprawdza `isGlobalAdmin`
+przy liczeniu ról. Flaga służy wyłącznie warstwie administracyjnej. Pokryte
+testem negatywnym `testGlobalAdminDoesNotSilentlyReadSpacesTheyAreNotMemberOf`.
+
+**Odrzucono:** *administrator widzi wszystko* — wygodniejsze przy wsparciu
+użytkowników („nie widzę swojego dokumentu, sprawdź"), ale kupione za cenę
+zaufania do całego mechanizmu prywatnych przestrzeni. Wsparcie da się zrobić
+inaczej: administrator nadaje sobie rolę na czas diagnozy, co widać w audycie.
