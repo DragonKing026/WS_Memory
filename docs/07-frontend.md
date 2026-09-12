@@ -130,6 +130,30 @@ awarii do zwykłego `install`: build, który po cichu rozwiązuje zależności i
 niż plik blokady, przestaje być powtarzalny — czyli traci jedyny powód, po który
 ten plik się trzyma.
 
+## Edytor: własne `node_modules` na hoście
+
+Kontener trzyma zależności w **anonimowym wolumenie** przysłaniającym
+`/app/node_modules`, więc katalog `frontend/node_modules` na hoście jest pustym
+punktem montowania. Aplikacja działa, testy przechodzą — ale edytor nie widzi
+żadnych typów i zgłasza „Nie można znaleźć pliku definicji typu dla elementu
+»vite/client«" oraz brak podpowiedzi w całym projekcie.
+
+Lekarstwo to jednorazowa instalacja **na hoście**:
+
+```bash
+cd frontend
+npx pnpm@10.20.0 install --frozen-lockfile   # wersja z pola packageManager
+```
+
+**To nie koliduje z kontenerem** i nie jest obejściem — na tym właśnie polega
+anonimowy wolumen. Kontener nigdy nie widzi katalogu z hosta, więc obie strony
+mają własne drzewo zależności, każde z binariami dla swojej biblioteki C
+(host: glibc, kontener: musl). Gdyby współdzieliły jeden katalog, `esbuild`
+z jednej strony wywracałby się po drugiej.
+
+Wersję Node bierz z `.nvmrc`. Prawdą o zależnościach pozostaje kontener:
+`typecheck`, `test` i `build` w CI biegną tam i to one rozstrzygają.
+
 ## Nadpisania zależności
 
 W `package.json` jest jedno `pnpm.overrides`: **`esbuild: ^0.28.2`**.

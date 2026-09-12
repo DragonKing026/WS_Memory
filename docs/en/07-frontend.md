@@ -117,6 +117,29 @@ Production: `pnpm build` → static `dist/` served by nginx. The production imag
 a plain `install`: a build that quietly resolves dependencies differently from the
 lockfile is no longer reproducible — which is the only reason to keep the file.
 
+## The editor: its own `node_modules` on the host
+
+The container keeps dependencies in an **anonymous volume** that shadows
+`/app/node_modules`, so `frontend/node_modules` on the host is an empty mount point.
+The application runs and the tests pass — but the editor sees no types at all and
+reports "Cannot find type definition file for 'vite/client'", with no completion
+anywhere in the project.
+
+The cure is a one-off install **on the host**:
+
+```bash
+cd frontend
+npx pnpm@10.20.0 install --frozen-lockfile   # the version from the packageManager field
+```
+
+**This does not clash with the container** and is not a workaround — it is the whole
+point of the anonymous volume. The container never sees the host directory, so each side
+has its own dependency tree with binaries for its own C library (host: glibc, container:
+musl). Sharing one directory would have `esbuild` from one side failing on the other.
+
+Take the Node version from `.nvmrc`. The container remains the source of truth about
+dependencies: `typecheck`, `test` and `build` run there in CI, and those are what count.
+
 ## Dependency overrides
 
 `package.json` carries a single `pnpm.overrides` entry: **`esbuild: ^0.28.2`**.

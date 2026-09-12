@@ -20,9 +20,10 @@
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
 
-    "baseUrl": ".",
+    // Bez `baseUrl`: jest wycofane i przestanie działać w TypeScripcie 7.
+    // Ścieżki w `paths` są wtedy liczone względem tego pliku, stąd `./`.
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.vue", "tests/**/*.ts", "*.ts", "*.mts"]

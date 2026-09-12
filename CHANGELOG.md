@@ -15,6 +15,27 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 00:11 — Edytor odzyskuje typy, `baseUrl` znika
+
+**Edytor nie widział żadnych typów.** Zgłaszał brak `vite/client`, a w praktyce
+nie podpowiadał niczego w całym projekcie. Przyczyna: kontener trzyma zależności
+w anonimowym wolumenie przysłaniającym `/app/node_modules`, więc
+`frontend/node_modules` na hoście był **pustym punktem montowania**. Testy
+i build przechodziły, bo biegną w kontenerze — problem widział tylko człowiek
+patrzący na kod.
+
+Lekarstwo: jednorazowe `npx pnpm@10.20.0 install --frozen-lockfile` w `frontend/`
+na hoście. To nie koliduje z kontenerem i nie jest obejściem — na tym polega
+anonimowy wolumen: każda strona ma własne drzewo z binariami dla swojej
+biblioteki C (host glibc, kontener musl). Opisane w `docs/07-frontend.md`, bo
+inaczej następna osoba straci na tym ten sam wieczór.
+
+**`baseUrl` usunięte z `tsconfig.json`** — jest wycofane i przestanie działać
+w TypeScripcie 7. Ścieżki w `paths` liczą się teraz względem pliku
+konfiguracyjnego (`./src/*`). Sprawdzone: typecheck, testy i build przechodzą
+zarówno w kontenerze, jak i na hoście.
+
+---
 ## 2026-09-13 00:00 — esbuild podbity do 0.28.2, zgłoszenie bezpieczeństwa zamknięte
 
 **Poprzedni wpis podawał złą przyczynę.** Napisałem tam, że zakres esbuilda
