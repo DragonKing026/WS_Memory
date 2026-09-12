@@ -56,6 +56,40 @@ Zadanie przeniesione do `TODO/DONE/` z pełnym zapisem weryfikacji.
 
 ---
 
+## 2026-09-12 19:05 — Pomiary modeli embeddingów i limity zasobów
+
+Domknięcie incydentu z TODO-000: serwer embeddingów zajął 21 GB i zdławił
+maszynę deweloperską. Zamiast zgadywać lżejszy model, zmierzono cztery
+kandydaty na trzech polskich parach zdań (`test/porownaj-modele.py`, każdy z
+twardym limitem pamięci, sprzątanie po każdym).
+
+**Wynik obalił dwie pozorne oczywistości:**
+
+- **`bge-m3` po dostrojeniu zajmuje 2,2 GB, nie 21 GB.** Te 19 GB to była
+  wyłącznie rezerwacja buforów TEI (`--max-batch-tokens 16384` i tyle wątków
+  tokenizacji, ile rdzeni) przy modelu z oknem 8192 tokenów. Model zostaje.
+- **Najlepszy margines miał `paraphrase-multilingual-MiniLM` (0,281) — i to
+  pułapka.** Ma okno **128 tokenów**, więc ucinałby każdą szufladę po ~90
+  słowach, cicho i bez błędu. Odrzucony.
+- Rodzina **E5 wypadła najgorzej** (margines 0,034–0,055) i potwierdziła
+  pierwotny argument D-003: wymuszony wspólny prefiks `query: ` po obu
+  stronach ściska podobieństwa w paśmie wokół 0,8 — para kontrolna dostaje
+  0,804, dokładnie tyle co trafna.
+
+**Prawdziwą przyczyną awarii był brak `mem_limit` w compose**, nie wybór
+modelu. Kontener bez limitu bierze całą pamięć maszyny, więc pomyłka w
+konfiguracji zamieniła się w zdławienie komputera. Limity są teraz na
+wszystkich usługach i zostają także na produkcji jako druga linia obrony.
+
+- Zmierzony stan pod limitami: embeddingi 2,12 GB z 4 GB, mempalace 66 MB,
+  Postgres 31 MB — cały stos poniżej 2,3 GB.
+- D-003 uzupełniona o tabelę pomiarów i wymóg strojenia buforów.
+- `docs/05-deployment.md`: realne liczby zamiast szacunków, uzasadnienie limitów.
+- Nowe narzędzie `test/porownaj-modele.py` — stanowisko do porównywania modeli
+  na polskich parach zdań, przydatne przy każdej przyszłej zmianie modelu.
+
+---
+
 ## 2026-09-12 18:10 — Lokalny pałac pierwotny, serwer trzyma kopię
 
 Doprecyzowanie kierunku: praca dzieje się lokalnie, serwer dostaje **kopię**.

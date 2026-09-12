@@ -21,6 +21,13 @@ Powstanie w zadaniu `TODO/000`.
 GPU nie jest potrzebne. Usługę `embeddings` można przenieść na maszynę z GPU
 bez zmiany czegokolwiek innego — to jedyny komponent liczący wektory.
 
+**Każda usługa ma twardy `mem_limit`** i nie jest to strojenie wydajności,
+tylko zabezpieczenie. Przy pierwszym uruchomieniu serwer embeddingów z
+domyślnymi buforami TEI zajął 21 GB i zdławił maszynę. Bufory są dostrojone
+(`--max-batch-tokens 2048`, `--tokenization-workers 2`, `--auto-truncate`),
+ale limit zostaje jako druga linia obrony: kontener ma zginąć sam, a nie
+zabrać ze sobą serwer.
+
 **Czynnik decydujący o jej mocy:** od D-014 wysyłka z lokalnych pałaców jest
 domyślna, więc serwer liczy wektory dla **całego** strumienia wiedzy wszystkich
 maszyn, a nie dla wybranych fragmentów. Przy kilkunastu osobach mielących

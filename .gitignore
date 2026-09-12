@@ -30,3 +30,7 @@ config/jwt/
 .vscode/
 .DS_Store
 .notebook/
+
+# Python
+__pycache__/
+*.pyc

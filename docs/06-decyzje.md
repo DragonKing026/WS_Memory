@@ -108,6 +108,37 @@ pierwszym zapisem, a nie po.
 > nie wektory** — serwer przelicza każdą publikowaną szufladę swoim modelem.
 > Wymóg jednego modelu w całym zespole zniknął.
 
+> **Uzupełnienie po pomiarach z 2026-09-12 (TODO-000):** model wymaga
+> **dostrojenia buforów i twardego limitu pamięci**. Przy domyślnych
+> ustawieniach TEI (`--max-batch-tokens 16384`, tyle wątków tokenizacji ile
+> rdzeni) `bge-m3` zajął **21 GB** i zdławił maszynę deweloperską. Po
+> ustawieniu `--max-batch-tokens 2048`, `--tokenization-workers 2` i
+> `--auto-truncate` zajmuje **2,2 GB** — te 19 GB było wyłącznie rezerwacją.
+> Każda usługa ma teraz `mem_limit`: kontener bez limitu bierze całą pamięć
+> maszyny, więc błąd konfiguracji zamienia się w awarię całego komputera.
+>
+> **Zmierzone alternatywy** (trzy polskie pary zdań, margines = różnica między
+> parą trafną a kontrolną):
+>
+> | Model | Okno | Pamięć | Odpowiedź | Margines |
+> |---|---|---|---|---|
+> | `bge-m3` (wybrany) | 8192 | 2174 MB | 291 ms | 0,130 |
+> | `paraphrase-multilingual-MiniLM` | **128** | 1113 MB | 21 ms | 0,281 |
+> | `multilingual-e5-base` | 512 | 1961 MB | 72 ms | 0,055 |
+> | `multilingual-e5-small` | 512 | 1204 MB | 24 ms | 0,034 |
+>
+> Rodzina **E5 wypadła najgorzej** i potwierdziła pierwotny argument tej
+> decyzji: skoro MemPalace nie odróżnia zapytania od dokumentu, oba muszą
+> dostać ten sam prefiks (`--default-prompt "query: "`), a wtedy podobieństwa
+> ściskają się w paśmie wokół 0,8 — para kontrolna dostaje 0,804, czyli tyle
+> samo co trafna.
+>
+> **MiniLM ma najlepszy margines, ale okno 128 tokenów** — każda szuflada
+> zostałaby ucięta po ~90 słowach, cicho i bez błędu. To ta sama klasa wady,
+> przed którą chroni test semantyki, więc został odrzucony.
+>
+> Odwrót, gdyby 291 ms okazało się wąskim gardłem: `multilingual-e5-base`.
+
 **Odrzucono:**
 - *`embeddinggemma` lokalnie na każdej maszynie* — 300 MB modelu na laptop i
   ryzyko rozjazdu wersji.
