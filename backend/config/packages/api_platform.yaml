@@ -1,0 +1,22 @@
+api_platform:
+    title: 'WS_Memory API'
+    description: 'Wspólna baza wiedzy Web Systems — API dla frontendu i logiki domenowej'
+    version: 0.1.0
+    # Dokumentacja wyłącznie jako kontrakt maszynowy: /api/docs.json.
+    # Swagger UI wymaga Twiga, a backend nie renderuje interfejsu (reguła 9,
+    # D-008). Frontend i tak konsumuje OpenAPI, nie stronę HTML.
+    enable_swagger_ui: false
+    enable_re_doc: false
+    enable_entrypoint: true
+    enable_docs: true
+    defaults:
+        stateless: true
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin']
+    formats:
+        jsonld: ['application/ld+json']
+        json: ['application/json']
+    docs_formats:
+        jsonld: ['application/ld+json']
+        json: ['application/json']
+        yaml: ['application/vnd.openapi+yaml']

@@ -1,0 +1,30 @@
+framework:
+    messenger:
+        failure_transport: failed
+
+        transports:
+            # Transport w bazie: jedna usługa mniej do postawienia i
+            # utrzymania, a przy naszej skali (kilkanaście osób) Postgres
+            # spokojnie to udźwignie. Kolejka mieszka w schemacie ws.
+            #
+            # auto_setup=0, bo tabelę tworzy migracja — nie chcemy, żeby
+            # aplikacja modyfikowała schemat w locie na produkcji.
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    table_name: ws.messenger_messages
+                    auto_setup: false
+                retry_strategy:
+                    max_retries: 3
+                    delay: 2000
+                    multiplier: 3
+            # Ta sama tabela, inna kolejka — nieudane zadania nie znikają,
+            # ale też nie potrzebują osobnego magazynu.
+            failed:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    table_name: ws.messenger_messages
+                    queue_name: failed
+                    auto_setup: false
+
+        routing: {}

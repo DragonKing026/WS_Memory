@@ -108,6 +108,22 @@ nie dotyka naszego kodu:
 Czego przy aktualizacji **nie wolno**: zmienić modelu embeddingów „przy okazji".
 To osobna operacja z przeliczeniem całej bazy.
 
+## Znane ograniczenie: narzędzia schematu Doctrine
+
+`doctrine:schema:validate` (pełny) i `doctrine:migrations:diff` **nie działają**
+w tym składzie pakietów: DoctrineBundle 3 wymaga API `Schema::edit()` z DBAL
+**^4.5**, a najnowszym stabilnym wydaniem jest 4.4.4. Nie jest to skutek naszej
+konfiguracji — sprawdzone, że błąd występuje także po usunięciu `schema_filter`.
+
+Do czasu wydania DBAL 4.5:
+
+- migracje **piszemy ręcznie** (i tak są przez to jawniejsze),
+- poprawność mapowania sprawdzamy przez `doctrine:schema:validate --skip-sync`,
+- `schema_filter` zostaje w konfiguracji, bo zadziała, gdy DBAL się ukaże.
+
+Filtr nie jest ozdobnikiem: rola `ws_app` **widzi** tabele w schemacie `palace`,
+więc bez niego generator różnic zaproponowałby kiedyś ich usunięcie.
+
 ## Monitorowanie
 
 | Co | Jak |

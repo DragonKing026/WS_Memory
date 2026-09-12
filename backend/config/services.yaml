@@ -1,0 +1,36 @@
+# Application service wiring.
+#
+# WS_Memory is a pure API (D-008) — nothing here renders a user interface.
+# The frontend is a separate application talking to /api.
+#
+# Layers: Presentation -> Application -> Domain, with Infrastructure
+# implementing ports declared in Domain. Dependencies point inwards only
+# (see AGENTS.md).
+
+parameters:
+    mempalace.base_url: '%env(MEMPALACE_URL)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Domain/**/{Entity,ValueObject}'
+            - '../src/Kernel.php'
+
+    # Health probes are collected by tag: monitoring another dependency means
+    # adding a class, not editing the controller.
+    _instanceof:
+        App\Domain\Health\HealthProbe:
+            tags: ['app.health_probe']
+
+    App\Domain\Health\HealthChecker:
+        arguments:
+            $probes: !tagged_iterator app.health_probe
+
+    App\Infrastructure\MemPalace\MemPalaceHealthProbe:
+        arguments:
+            $baseUrl: '%mempalace.base_url%'

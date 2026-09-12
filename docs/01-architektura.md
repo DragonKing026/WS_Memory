@@ -6,7 +6,8 @@ tags: [ws-memory, dokumentacja, architektura, docker, bezpieczenstwo, mempalace]
 
 # Architektura
 
-Stan: **projekt zatwierdzony, implementacja nierozpoczęta** (2026-09-12).
+Stan: **fundament działa** (2026-09-12). Stoją: `postgres`, `embeddings`,
+`mempalace`, `backend`, `worker`, `nginx`. Brakuje `frontend` (TODO-006).
 Ten dokument opisuje stan docelowy; rozbieżność z kodem = błąd w dokumentacji
 albo w kodzie, do naprawy w tym samym zadaniu.
 

@@ -56,6 +56,45 @@ Zadanie przeniesione do `TODO/DONE/` z pełnym zapisem weryfikacji.
 
 ---
 
+## 2026-09-12 19:45 — TODO-001: fundament backendu
+
+Symfony 8.0 na PHP 8.4 jako **czyste API** (D-008): API Platform 4.3, Doctrine
+ORM 3.6, Messenger z transportem w bazie, LexikJWT. Zero Twiga — Swagger UI
+wyłączone, kontrakt wystawiony maszynowo pod `/api/docs.json`. Doszły trzy
+usługi: `backend`, `worker` i `nginx`; wszystkie sześć jest `healthy`.
+
+**Warstwy i porty od pierwszej klasy**, nie „później, jak urośnie":
+`Domain/` → `Application/` → `Infrastructure/` → `Presentation/`. Endpoint
+zdrowia jest tego przykładem — `HealthProbe` to port, sondy bazy i pamięci to
+adaptery zbierane po tagu. Monitorowanie kolejnej zależności to dodanie klasy,
+nie edycja kontrolera.
+
+**Ustalenia językowe:** w kodzie wszystko po angielsku, łącznie z komentarzami
+(konwencja główna aplikacja Symfony zespołu); dokumentacja dwujęzyczna z polskim jako wersją wiodącą.
+Pierwsza wersja kontrolera miała polskie nazwy — przepisana, zanim urosło.
+Angielskie odpowiedniki dokumentacji to nowe `TODO-013`.
+
+**Zasady struktury dopisane do AGENTS.md:** warstwy, kierunek zależności oraz
+tabela wzorców z uzasadnieniem — każdy wzorzec przypisany do konkretnej
+przyszłej zmiany, nie dodany „na wszelki wypadek".
+
+**Pięć rzeczy, które wyszły dopiero w działaniu** (szczegóły w
+`TODO/DONE/001-backend-fundament.md`):
+
+- `doctrine:schema:validate` i `migrations:diff` **nie działają** — wymagają
+  DBAL ^4.5, a stabilne jest 4.4.4. Sprawdzone, że to nie nasza konfiguracja:
+  błąd występuje także bez `schema_filter`. Migracje piszemy ręcznie,
+  walidujemy `--skip-sync`.
+- `monolog-bundle` nie wspiera jeszcze Symfony 8 przy jawnym pinowaniu.
+- `localhost` w kontenerze rozwiązuje się najpierw na IPv6 — healthcheck
+  nginxa dostawał odmowę, bo `listen 80` wiąże tylko IPv4.
+- Symfony cache'uje skompilowany kontener w zamontowanym wolumenie: poprawka
+  konfiguracji nie działa, dopóki nie usunie się `backend/var/cache`.
+- Healthcheck workera nie może używać `pgrep` (brak `procps` w obrazie PHP) —
+  pytamy `/proc/1/cmdline`.
+
+---
+
 ## 2026-09-12 19:05 — Pomiary modeli embeddingów i limity zasobów
 
 Domknięcie incydentu z TODO-000: serwer embeddingów zajął 21 GB i zdławił

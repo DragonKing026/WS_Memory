@@ -216,6 +216,15 @@ Zmiana bez commita nie istnieje. Zasady:
   tygodnia pracy w jednym commicie.
 - Nie commitujemy: sekretów, tokenów, `.env` z realnymi danymi, dumpów bazy,
   katalogu `vendor/`, plików modeli embeddingów.
+- **Nie przepisujemy historii, która trafiła na `origin`.** Żadnego `--amend`,
+  `rebase` ani `push --force` na commicie, który jest już wypchnięty — nawet
+  dla literówki w opisie. Przed jakąkolwiek zmianą historii sprawdzamy
+  `git status -sb`; jeśli widnieje tam `origin`, poprawka idzie **nowym**
+  commitem. Zdarzyło się już inaczej (2026-09-12) i skutkiem były dwie wersje
+  tego samego commitu, rozjechane między maszyną a GitHubem.
+- **To repozytorium ma zdalne i bywa wypychane także spoza tej sesji.** Przed
+  zmianą historii i przed commitem warto zerknąć na `git log --oneline -3`,
+  żeby nie nadpisać cudzej pracy.
 
 ### Zanim zaczniesz zadanie
 
@@ -224,6 +233,66 @@ Zmiana bez commita nie istnieje. Zasady:
    bez nowego argumentu.
 3. Jeśli używasz MemPalace jako pamięci własnej sesji: szukaj **przed**
    odpowiedzią o przeszłych ustaleniach. Nie zgaduj.
+
+### Struktura kodu i wzorce projektowe
+
+Budujemy z myślą o rozbudowie, nie o dowiezieniu pierwszej wersji. Poniższe
+nie jest ozdobnikiem — każdy z tych wyborów odpowiada konkretnej zmianie,
+która na pewno nadejdzie.
+
+**Warstwy w `backend/src/`:**
+
+```
+Domain/          reguły biznesowe — BEZ Symfony, BEZ Doctrine, BEZ MemPalace
+Application/     przypadki użycia: komendy, handlery, zapytania
+Infrastructure/  Doctrine, HTTP, MemPalace, Messenger — implementacje portów
+Presentation/    wejścia: Api/ (REST), Mcp/ (gateway), Console/
+```
+
+Zależności idą **tylko do środka**: `Presentation` → `Application` → `Domain`.
+`Infrastructure` implementuje interfejsy z `Domain`, nigdy odwrotnie. Sprawdzian
+jest prosty: gdyby jutro trzeba było wymienić Doctrine albo MemPalace, ile
+plików w `Domain/` trzeba tknąć? Odpowiedź ma brzmieć „zero".
+
+**Wzorce, których używamy świadomie i po co:**
+
+| Wzorzec | Gdzie | Jaka przyszła zmiana to uzasadnia |
+|---|---|---|
+| **Port i adapter** | `Domain\Memory\MemoryStore` ← `Infrastructure\MemPalace\McpMemoryStore` | MemPalace to zależność zewnętrzna (D-001); jego aktualizacja albo podmiana nie może dotykać logiki |
+| **Dekorator** | łańcuch wokół narzędzi MCP: uprawnienia → audyt → limit tempa → narzędzie | każda z tych warstw dokłada się do **wszystkich** narzędzi; wpisana w każde z osobna rozjedzie się przy pierwszym nowym |
+| **Rejestr usług tagowanych** | narzędzia MCP i REST | dodanie narzędzia ma być dodaniem klasy, nie edycją pięciu miejsc |
+| **Komenda i handler** (Messenger) | każdy zapis zmieniający stan | publikacja i mielenie muszą dać się przenieść w tło bez przepisywania |
+| **Strategia** | reguła lądowania (D-014), filtr sekretów, źródła wiedzy | reguł będzie przybywać; `if`-y w jednej metodzie nie skalują się |
+| **Obiekty wartości** | `SpaceId`, `Actor`, `DrawerId` | tożsamość nie może być gołym stringiem, który da się pomylić z innym stringiem |
+| **Repozytorium za interfejsem** | `Domain\...\Repository` ← Doctrine | testy jednostkowe uprawnień bez bazy |
+
+**Czego nie robimy:** nie budujemy abstrakcji „na wszelki wypadek". Wzorzec
+wchodzi wtedy, gdy potrafimy nazwać zmianę, której ma służyć — a powyższe
+zmiany są w `TODO/`, nie w wyobraźni.
+
+### Język
+
+**W kodzie wszystko po angielsku** — nazwy klas, metod, zmiennych, tabel,
+kolumn, kluczy w JSON-ie **oraz komentarze i PHPDoc**. Taka jest konwencja
+główna aplikacja Symfony zespołu (`SendContractEndRemindersCommand`, `AuthEndpoint`) i nie wprowadzamy
+drugiej. Dotyczy też komentarzy w plikach konfiguracyjnych kodu
+(`services.yaml`, `doctrine.yaml`) oraz nazw testów.
+
+**Dokumentacja dwujęzycznie.** Polska wersja jest **wiodąca** — w niej
+zapadają decyzje i ona rozstrzyga spory. Angielskie odpowiedniki mieszkają
+w `docs/en/` i aktualizuje się je **w tym samym commicie** co polski oryginał,
+tak jak resztę dokumentacji (patrz zasada wyżej).
+
+Dlaczego polski jest wiodący, a nie odwrotnie: dwie wersje zawsze się
+rozjeżdżają, a rozjazd trzeba móc rozstrzygnąć jednym zdaniem zamiast
+dyskusją. Zespół pracuje po polsku, więc tam powstaje myśl — angielska wersja
+jest tłumaczeniem, nie równoległym źródłem.
+
+Poza kodem po polsku zostają: `CHANGELOG.md`, zadania w `TODO/`, komunikaty
+widoczne dla użytkownika w interfejsie oraz opisy commitów.
+
+Wyjątek techniczny: pliki dokumentacji i zadań mają polskie nazwy, bo są
+czytane, nie importowane.
 
 ### Kolejność implementacji
 
@@ -256,10 +325,15 @@ docs/                  ← dokumentacja działania
   05-deployment.md
   06-decyzje.md
   07-frontend.md
+  en/                  ← angielskie odpowiedniki (polski jest wiodący)
   superpowers/specs/   ← spec projektowy z etapu projektowania
 TODO/                  ← ponumerowane zadania
   DONE/                ← zadania ukończone
 backend/               ← Symfony 8: API + gateway MCP (samodzielne repo-w-repo)
+  src/Domain/          ← reguły biznesowe, bez frameworka
+  src/Application/     ← przypadki użycia
+  src/Infrastructure/  ← Doctrine, MemPalace, HTTP
+  src/Presentation/    ← Api/, Mcp/, Console/
 frontend/              ← Vue 3 + Vite (samodzielna aplikacja)
 plugin/                ← plugin WS_Memory
   shared/              ← JEDNO źródło treści: protokoły, opisy agentów, instrukcje

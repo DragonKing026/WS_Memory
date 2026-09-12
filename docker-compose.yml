@@ -106,6 +106,91 @@ services:
       retries: 30
       start_period: 120s
 
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: ${BACKEND_TARGET:-dev}
+    image: ws-memory/backend:${BACKEND_TARGET:-dev}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mempalace:
+        condition: service_started
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      APP_SECRET: ${APP_SECRET:?ustaw APP_SECRET w .env}
+      # Aplikacja łączy się rolą ws_app, która widzi swój schemat ws i CZYTA
+      # palace. Do pałaca nigdy nie pisze — każdy zapis idzie przez MemPalace.
+      DATABASE_URL: postgresql://ws_app:${WS_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-ws_memory}?serverVersion=18&charset=utf8
+      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
+      MEMPALACE_URL: http://mempalace:8765
+      # Token do MemPalace zna WYŁĄCZNIE backend. Agenci dostają własne
+      # tokeny wystawiane w aplikacji (reguła nienaruszalna nr 1).
+      MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
+    volumes:
+      - ./backend:/app
+    mem_limit: ${BACKEND_MEM_LIMIT:-1g}
+    healthcheck:
+      test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    # Ten sam obraz co backend, inny punkt wejścia — różni je tylko rola.
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: ${BACKEND_TARGET:-dev}
+    image: ws-memory/backend:${BACKEND_TARGET:-dev}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "--memory-limit=256M", "-v"]
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: postgresql://ws_app:${WS_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-ws_memory}?serverVersion=18&charset=utf8
+      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
+      MEMPALACE_URL: http://mempalace:8765
+      MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
+    volumes:
+      - ./backend:/app
+    mem_limit: ${WORKER_MEM_LIMIT:-512m}
+    healthcheck:
+      # Konsument jest procesem numer 1 kontenera, więc pytamy wprost o niego.
+      # pgrep wymagałby doinstalowania procps — po co pakiet, skoro /proc
+      # odpowiada na to samo pytanie dokładniej.
+      test: ["CMD-SHELL", "tr '\\0' ' ' < /proc/1/cmdline | grep -q messenger:consume"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  nginx:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./backend/public:/app/public:ro
+    ports:
+      # Jedyna usługa z portem na hoście (D-006). W dev tylko na pętli
+      # zwrotnej — do sieci lokalnej nic nie wychodzi.
+      - "${NGINX_BIND:-127.0.0.1}:${NGINX_PORT:-8080}:80"
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health | grep -q ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres-dane:
   embeddings-cache:
