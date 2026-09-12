@@ -139,6 +139,56 @@ jobs:
         env:
           DATABASE_URL: postgresql://ws_app:ci@127.0.0.1:5432/ws_memory?serverVersion=18&charset=utf8
 
+  frontend:
+    name: Testy frontendu
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: frontend/.nvmrc
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          # Wersja bierze się z pola "packageManager" w package.json — jedno
+          # miejsce zamiast dwóch, które kiedyś by się rozjechały.
+          run_install: false
+
+      - name: Cache zależności pnpm
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-
+
+      - name: Instalacja zależności
+        working-directory: frontend
+        # --frozen-lockfile: przebieg, który po cichu rozwiązuje zależności
+        # inaczej niż plik blokady, sprawdza inny kod niż ten, który pojedzie
+        # na produkcję.
+        run: pnpm install --frozen-lockfile
+
+      - name: Typy
+        working-directory: frontend
+        # Osobny krok od testów, bo odpowiada na inne pytanie: testy mówią, czy
+        # kod robi to, co ma, a vue-tsc — czy w ogóle da się go zbudować.
+        run: pnpm typecheck
+
+      - name: Testy jednostkowe
+        working-directory: frontend
+        run: pnpm test
+
+      - name: Budowanie produkcyjne
+        working-directory: frontend
+        # Build bywa jedynym miejscem, gdzie wychodzi błąd konfiguracji Vite
+        # albo brakujący import w komponencie ładowanym leniwie.
+        run: pnpm build
+
   porzadek:
     name: Dokumentacja i zadania
     runs-on: ubuntu-latest
