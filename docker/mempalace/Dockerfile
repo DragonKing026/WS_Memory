@@ -7,7 +7,7 @@
 # Wersja jest przypięta świadomie: aktualizacja MemPalace to osobna operacja
 # z backupem i testem semantyki (docs/05-deployment.md).
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 ARG MEMPALACE_VERSION=3.7.0
 
