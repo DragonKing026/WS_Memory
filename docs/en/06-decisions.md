@@ -648,3 +648,31 @@ support ("I cannot see my document, please check"), but bought at the price of
 trust in the whole private-space mechanism. Support can work differently: the
 administrator grants themselves a role for the duration of the diagnosis, and
 that shows up in the audit trail.
+
+---
+
+## D-017 — Token refresh deferred rather than hand-rolled
+
+**Date:** 2026-09-12 21:45 · **Status:** Accepted
+
+There is no token refresh endpoint. A token expires and one signs in again. We
+will return to this once `gesdinet/jwt-refresh-token-bundle` supports Symfony 8
+— today it requires `symfony/console ^7`.
+
+**Why not write our own:** refresh token rotation is security code with
+non-obvious traps — detecting reuse of a stolen token, invalidating the whole
+token family once reuse is detected, races when two browser tabs refresh at
+once. Writing that ourselves to save users one sign-in a day is a bad trade. A
+maintained bundle has solved those cases and will keep solving them; our
+implementation would stay with us forever.
+
+**What we do instead:** the access token's lifetime is set to **8 hours**, i.e.
+a working day. One sign-in in the morning and that is that.
+
+**Why this weakens security less than it might seem:** the worst scenario with
+a long-lived token is "a dismissed person still has access". That scenario is
+closed separately and more firmly — `ActiveAccountChecker` verifies the account
+is active **on every request**, not only at sign-in, and permissions are
+computed from the database every time anyway (no cache in
+`SpaceAccessResolver`). Deactivating an account and revoking a role both take
+effect immediately, however long the token would otherwise live.

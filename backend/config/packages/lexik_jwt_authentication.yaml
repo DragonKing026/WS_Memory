@@ -2,3 +2,8 @@ lexik_jwt_authentication:
     secret_key: '%env(resolve:JWT_SECRET_KEY)%'
     public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
     pass_phrase: '%env(JWT_PASSPHRASE)%'
+    # A working day. There is no refresh endpoint yet (D-017), so a shorter
+    # lifetime would mean signing in repeatedly during one day's work. The
+    # risk this would normally carry — a dismissed person keeping access —
+    # is closed by ActiveAccountChecker, which runs on every request.
+    token_ttl: 28800

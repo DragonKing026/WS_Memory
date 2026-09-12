@@ -19,6 +19,7 @@ security:
         login:
             pattern: ^/api/login$
             stateless: true
+            user_checker: App\Infrastructure\Security\ActiveAccountChecker
             json_login:
                 check_path: /api/login
                 username_path: email
@@ -30,6 +31,10 @@ security:
             pattern: ^/(api|mcp)
             stateless: true
             provider: app_users
+            # Runs on every authenticated request, not only at sign-in: a JWT
+            # stays valid until it expires, so a deactivated account would keep
+            # its access without this.
+            user_checker: App\Infrastructure\Security\ActiveAccountChecker
             jwt: ~
 
     access_control:

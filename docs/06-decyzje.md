@@ -630,3 +630,32 @@ testem negatywnym `testGlobalAdminDoesNotSilentlyReadSpacesTheyAreNotMemberOf`.
 użytkowników („nie widzę swojego dokumentu, sprawdź"), ale kupione za cenę
 zaufania do całego mechanizmu prywatnych przestrzeni. Wsparcie da się zrobić
 inaczej: administrator nadaje sobie rolę na czas diagnozy, co widać w audycie.
+
+---
+
+## D-017 — Odświeżanie tokenów odłożone, nie pisane własnoręcznie
+
+**Data:** 2026-09-12 21:45 · **Stan:** Przyjęta
+
+Nie ma endpointu odświeżania tokena. Token wygasa i trzeba zalogować się
+ponownie. Wrócimy do tego, gdy `gesdinet/jwt-refresh-token-bundle` obsłuży
+Symfony 8 — dziś wymaga `symfony/console ^7`.
+
+**Dlaczego nie napisać własnego:** rotacja tokenów odświeżających to kod
+bezpieczeństwa z nieoczywistymi pułapkami — wykrywanie ponownego użycia
+skradzionego tokena, unieważnianie całej rodziny tokenów po takim wykryciu,
+wyścigi przy równoległych odświeżeniach z dwóch kart przeglądarki. Napisanie
+tego samemu, żeby zaoszczędzić użytkownikom jednego logowania dziennie, to zła
+wymiana. Utrzymywany bundle rozwiązał te przypadki i będzie je rozwiązywał
+dalej; nasza implementacja zostałaby z nami na zawsze.
+
+**Co robimy zamiast:** czas życia tokena dostępowego ustawiony na **8 godzin**,
+czyli dzień pracy. Rano jedno logowanie i spokój.
+
+**Dlaczego to nie osłabia bezpieczeństwa tak, jak mogłoby się wydawać:**
+najgroźniejszy scenariusz przy długim tokenie to „zwolniona osoba nadal ma
+dostęp". Ten scenariusz jest zamknięty osobno i mocniej — `ActiveAccountChecker`
+sprawdza aktywność konta **przy każdym żądaniu**, nie tylko przy logowaniu,
+a uprawnienia i tak są liczone z bazy za każdym razem (brak cache w
+`SpaceAccessResolver`). Dezaktywacja konta i odebranie roli działają
+natychmiast, niezależnie od tego, ile jeszcze token by żył.

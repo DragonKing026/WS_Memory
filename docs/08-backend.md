@@ -65,6 +65,7 @@ mieszkają w `Domain/`.
 | `Doctrine/DoctrineAuditTrail.php` | Zapisuje wpisy audytu. IP i przeglądarkę bierze z bieżącego żądania, nie z parametrów — gdyby były parametrem, część wywołań by o nich zapomniała, a wpis bez pochodzenia odpowiada na połowę pytania, po co istnieje. |
 | `Doctrine/DatabaseHealthProbe.php` | Sonda: czy baza odpowiada. |
 | `MemPalace/MemPalaceHealthProbe.php` | Sonda: czy pamięć odpowiada. Pyta `/healthz` z krótkim limitem czasu — zawieszony healthcheck jest gorszy od negatywnego. |
+| `Security/ActiveAccountChecker.php` | Odrzuca konta nieaktywne — przy logowaniu **i przy każdym kolejnym żądaniu**. JWT jest ważny kryptograficznie aż do wygaśnięcia, więc bez tego zwolniona osoba czytałaby bazę jeszcze przez cały czas życia ostatniego tokena. |
 | `Security/LoginAuditSubscriber.php` | Audyt logowań. Wisi na zdarzeniach bezpieczeństwa, bo kontroler logowania **nigdy się nie wykonuje** — firewall odpowiada pierwszy. |
 
 ### `Presentation/` — wejścia
@@ -199,5 +200,4 @@ Tylko schemat `ws` — do `palace` nie piszemy nigdy (D-004).
 - **Brak odświeżania tokenów.** `gesdinet/jwt-refresh-token-bundle` nie
   obsługuje jeszcze Symfony 8 (wymaga `symfony/console ^7`). Do czasu wydania
   zgodnej wersji token wygasa i trzeba zalogować się ponownie.
-- **Dezaktywacja konta nie odcina istniejącego tokena** — patrz `TODO/`.
 - **Brak wysyłki maili z zaproszeniami** — link trzeba przekazać ręcznie.

@@ -109,6 +109,48 @@ final class AuthenticationTest extends WebTestCase
         self::assertNotEmpty($actions, 'every sign-in must leave a trace');
     }
 
+    public function testDeactivatedAccountLosesAccessImmediately(): void
+    {
+        $token = $this->signIn();
+
+        $this->client->request('GET', '/api/me', server: [
+            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+        ]);
+        self::assertResponseIsSuccessful();
+
+        // Deactivation must bite at once. A token issued a minute ago is still
+        // cryptographically valid, so without an explicit check a dismissed
+        // employee keeps reading the knowledge base until it expires.
+        $this->em->getConnection()->executeStatement(
+            "UPDATE ws.users SET is_active = false WHERE email = 'pracownik@web-systems.pl'"
+        );
+        $this->em->clear();
+
+        $this->client->request('GET', '/api/me', server: [
+            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+        ]);
+        self::assertResponseStatusCodeSame(401, 'a valid token must not outlive an active account');
+    }
+
+    public function testDeactivatedAccountCannotSignInAgain(): void
+    {
+        $this->em->getConnection()->executeStatement(
+            "UPDATE ws.users SET is_active = false WHERE email = 'pracownik@web-systems.pl'"
+        );
+        // The client shares this kernel, so the entity from setUp is still in
+        // the identity map and would be handed to the firewall as active.
+        // Clearing it makes the test observe the database, not the test's own
+        // leftovers.
+        $this->em->clear();
+
+        $this->postJson('/api/login', [
+            'email' => 'pracownik@web-systems.pl',
+            'password' => self::PASSWORD,
+        ]);
+
+        self::assertResponseStatusCodeSame(401);
+    }
+
     private function signIn(): string
     {
         $this->postJson('/api/login', [

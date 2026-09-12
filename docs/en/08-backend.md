@@ -69,6 +69,7 @@ the **persistence model**, and the rules live in `Domain/`.
 | `Doctrine/DoctrineAuditTrail.php` | Writes audit entries. Takes the IP and user agent from the current request rather than from parameters — as parameters, some call sites would forget them, and an entry without provenance answers half the question it exists for. |
 | `Doctrine/DatabaseHealthProbe.php` | Probe: does the database respond. |
 | `MemPalace/MemPalaceHealthProbe.php` | Probe: does memory respond. Queries `/healthz` with a short timeout — a hanging health check is worse than a negative one. |
+| `Security/ActiveAccountChecker.php` | Refuses inactive accounts — at sign-in **and on every subsequent request**. A JWT stays cryptographically valid until it expires, so without this a dismissed person would keep reading the base for the lifetime of their last token. |
 | `Security/LoginAuditSubscriber.php` | Sign-in auditing. Hung off security events because the login controller **never executes** — the firewall answers first. |
 
 ### `Presentation/` — entry points
@@ -208,5 +209,4 @@ The `ws` schema only — we never write to `palace` (D-004).
 - **No token refresh.** `gesdinet/jwt-refresh-token-bundle` does not support
   Symfony 8 yet (it requires `symfony/console ^7`). Until a compatible release
   appears, a token expires and one has to sign in again.
-- **Deactivating an account does not cut off an existing token** — see `TODO/`.
 - **No invitation e-mails** — the link has to be passed on by hand.
