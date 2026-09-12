@@ -11,6 +11,23 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 
 ---
 
+## 2026-09-12 16:12 — Spec projektowy i dwanaście zadań wdrożeniowych
+
+- `docs/superpowers/specs/2026-09-12-ws-memory-design.md` — spec utrwalający
+  decyzje, kryteria ukończenia projektu i ryzyka wraz z ich obsługą.
+- `TODO/000` … `TODO/011` — **dwanaście** zadań, każde z sekcjami Powód,
+  Analiza, Rozwiązanie i sprawdzalnymi Kryteriami ukończenia.
+- `TODO/README.md` — zasady prowadzenia zadań, przenoszenia do `DONE/`
+  i graf zależności między zadaniami.
+- `.gitignore` — wykluczenia dla Symfony, Node, Dockera i sekretów.
+
+Kolejność wynika z jednej zasady: zadanie `000` nie zawiera ani linii Symfony,
+bo najpierw trzeba udowodnić, że polskie zapytanie znajduje polską treść przez
+centralny serwer embeddingów. Budowanie interfejsu nad nieudowodnionym
+fundamentem byłoby marnotrawstwem.
+
+---
+
 ## 2026-09-12 16:02 — Rozdzielenie backendu i frontendu
 
 Na wniosek zmieniono warstwę prezentacji: zamiast monolitu z Twigiem — czyste
@@ -66,7 +83,4 @@ Etap projektowania zakończony. Kodu jeszcze nie ma.
 - `AGENTS.md` — kontrakt projektu: reguły nienaruszalne, stack, workflow, git
 - `README.md` — opis projektu i spis dokumentacji
 - `CHANGELOG.md` — ten plik
-- `docs/01-architektura.md` … `docs/07-frontend.md` — dokumentacja działania
-- `docs/superpowers/specs/2026-09-12-ws-memory-design.md` — spec projektowy
-- `TODO/000` … `TODO/007` — osiem ponumerowanych zadań wdrożeniowych
-- `TODO/README.md` — zasady prowadzenia zadań
+- `docs/01-architektura.md` … `docs/06-decyzje.md` — dokumentacja działania

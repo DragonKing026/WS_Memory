@@ -1,3 +1,9 @@
+---
+noteId: "ac1d9e71aeb211f1997d030a3cd38ca7"
+tags: []
+
+---
+
 # 011 — Dopieszczenie: jakość bazy wiedzy
 
 **Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 010

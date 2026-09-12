@@ -1,0 +1,32 @@
+# Sekrety i środowisko
+.env
+.env.local
+.env.*.local
+!.env.example
+*.pem
+*.key
+config/jwt/
+
+# Symfony
+/backend/var/
+/backend/vendor/
+/backend/public/bundles/
+/backend/.phpunit.result.cache
+
+# Node / Vue
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+/frontend/coverage/
+*.tsbuildinfo
+
+# Docker i dane lokalne
+/docker/data/
+*.dump
+*.sql
+
+# Narzędzia i edytory
+.idea/
+.vscode/
+.DS_Store
+.notebook/

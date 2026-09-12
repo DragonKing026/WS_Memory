@@ -166,7 +166,7 @@ Zmiana bez commita nie istnieje. Zasady:
   <co przetestowano>
   ```
 
-  Obszary: `docs`, `infra`, `app`, `mcp`, `wiki`, `plugin`, `db`, `test`, `todo`.
+  Obszary: `docs`, `infra`, `backend`, `frontend`, `mcp`, `wiki`, `plugin`, `db`, `test`, `todo`.
   Przykład: `mcp: dodaj ws_search z twardym filtrem przestrzeni`.
 - **Przeniesienie zadania do `DONE/` robimy przez `git mv`**, żeby historia
   pliku została zachowana.
