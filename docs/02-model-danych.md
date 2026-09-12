@@ -116,14 +116,10 @@ podgląd — lustro nie działa, dopóki człowiek nie potwierdzi), `paused_at`,
 
 ### Operacje
 
-**`mining_jobs`** — `id`, `source_type` (`transcript` / `repository` /
-`documents`), `source_ref`, `space_id`, `requested_by`, `status`
-(`queued` / `running` / `done` / `failed`), `stats` (`JSONB`), `error`,
-`created_at`, `finished_at`.
-
-**`session_uploads`** — `id`, `session_id`, `user_id`, `agent_token_id`,
-`byte_offset` (dokąd doszliśmy), `file_path` (na wolumenie),
-`last_upload_at`. Klucz unikalny `(session_id, user_id)`.
+> Tabel `mining_jobs` i `session_uploads` **nie ma** — serwer nie mieli niczego
+> i nie przyjmuje surowych transkryptów (D-012). Mielenie dzieje się na
+> maszynie użytkownika, a jedynym śladem po stronie serwera jest partia
+> publikacji (`publish_batches`).
 
 **`audit_log`** — `id`, `actor_user_id`, `actor_agent_token_id`, `action`
 (`search` / `doc_read` / `doc_write` / `remember` / `login` / `token_create` …),

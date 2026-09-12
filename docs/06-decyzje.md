@@ -181,10 +181,13 @@ z całą wiedzą firmy na publicznym porcie to zła wymiana za wygodę.
 **Korzyść uboczna, znacząca:** deweloper nie musi mieć zainstalowanego
 MemPalace, Pythona ani modelu embeddingów. Wystarczy plugin i token.
 
-> **Uzupełnienie po D-010:** to pozostaje drogą domyślną, ale nie jedyną.
-> Deweloper z lokalnym pałacem mieli transkrypty u siebie i publikuje wybrane
-> — wtedy hook nie wysyła surowej rozmowy nigdzie. Plugin rozpoznaje, który
-> tryb zachodzi.
+> **Uzupełnienie po D-010:** deweloper z lokalnym pałacem mieli transkrypty
+> u siebie i publikuje wybrane.
+>
+> **Zmienione przez D-012:** wysyłki surowych transkryptów na serwer **nie ma
+> w ogóle**. Każdy ma lokalny pałac (wtyczka wymaga go jako zależności), więc
+> rozmowy mielą się wyłącznie lokalnie. Pozostała część decyzji — zamknięta
+> sieć, jedno wejście przez nginx — obowiązuje bez zmian.
 
 **Odrzucono:** *dostęp do Postgresa przez VPN/WireGuard* — możliwy do dodania
 później, jeśli pojawi się potrzeba lokalnego minowania repozytoriów bez
@@ -353,3 +356,56 @@ w polskich tekstach byłyby rozpoznawane słabiej, bez żadnego komunikatu o bł
 stosie, a dodanie jej to kolejny kontener i kilka GB RAM dla funkcji, która
 tylko **dopracowuje** heurystyki. Startujemy bez niej; jeśli jakość wykrywania
 okaże się za słaba, to osobna decyzja z własnym numerem.
+
+---
+
+## D-012 — Jedna droga wnoszenia wiedzy: mielenie wyłącznie lokalne
+
+**Data:** 2026-09-12 17:08 · **Stan:** Przyjęta
+· **Zmienia D-006, anuluje TODO-010**
+
+**Serwer nie mieli niczego.** Wtyczka WS_Memory deklaruje wtyczkę MemPalace
+jako **zależność**, więc każdy użytkownik ma lokalny pałac. Mielenie —
+projektów, dokumentów, transkryptów rozmów — dzieje się wyłącznie na maszynie
+użytkownika. Do wspólnej bazy trafia tylko to, co ktoś opublikuje (D-010).
+
+**Co to potwierdza w mechanice Claude Code** (sprawdzone w dokumentacji, nie
+założone):
+
+- `plugin.json` ma pole **`dependencies`**: `["mempalace"]`, opcjonalnie z
+  ograniczeniem wersji semver. Wpis w marketplace ma odpowiednik `requires`.
+- Marketplace obsługuje **`source: {"type": "command"}`** — polecenie
+  uruchamiane przed instalacją, czyli miejsce na instalację pakietu
+  `mempalace` i pierwsze `mempalace init`.
+- **`userConfig`** pozwala zapytać użytkownika o adres i token przy włączeniu
+  wtyczki (`sensitive: true`), a wartości są dostępne jako
+  `${user_config.KEY}` w konfiguracji MCP i `CLAUDE_PLUGIN_OPTION_*` w hookach.
+  Zastępuje zmienne środowiskowe ustawiane ręcznie.
+
+**Dlaczego jedna droga zamiast dwóch:**
+
+1. **Dwie drogi to dwa razy więcej kodu i dwa razy więcej miejsc na błąd** —
+   przy identycznym efekcie końcowym.
+2. **Kod i rozmowy nie opuszczają laptopa.** Nie ma już żadnej ścieżki, którą
+   surowe źródła trafiają na serwer — nie trzeba jej zabezpieczać, bo jej nie ma.
+3. **Serwer przestaje potrzebować dostępu do repozytoriów.** Znikają klucze do
+   gita, konfiguracja źródeł i harmonogram — razem z klasą błędów „nocne
+   mielenie zawiesiło wyszukiwanie".
+4. **Mielenie obciąża maszynę tego, kto je zlecił**, więc nie ma potrzeby
+   limitów, kolejek ani ochrony przed zajechaniem wspólnego serwera.
+5. Pytanie „kto może zlecać mielenie" **przestaje istnieć** — każdy u siebie.
+
+**Co znika z projektu:** `TODO-010` w całości, tabele `mining_jobs` i
+`session_uploads`, wolumen na transkrypty, wariant `extract` w obrazie serwera,
+endpoint przyjmujący transkrypty oraz hook wysyłający je na serwer.
+
+**Co zostaje na serwerze:** kontener `mempalace` (wyszukiwanie semantyczne i
+zapis publikowanych szuflad) oraz `embeddings` (wektory dla zapytań i dla
+publikowanych treści). Obie usługi są nadal niezbędne — nie mielą, tylko
+obsługują wspólną bazę.
+
+**Znane ograniczenie:** osoba bez Claude Code nie ma jak wnieść pliku PDF czy
+DOCX do bazy — zostaje jej pisanie w wiki. Obejście: ktoś z lokalnym pałacem
+mieli katalog dokumentów (`mempalace mine ~/dokumenty --mode extract`,
+wymaga wariantu `mempalace[extract]`) i publikuje wynik. Uznano za akceptowalne
+w pierwszej wersji; przywrócenie ścieżki serwerowej byłoby osobną decyzją.

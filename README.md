@@ -29,10 +29,11 @@ Projekt zatwierdzony 2026-09-12. Zadania czekają w `TODO/`.
 - **Dla agentów AI** — serwer MCP z firmowymi narzędziami: szukanie w bazie,
   zapisywanie ustaleń, pisanie dokumentacji, graf wiedzy. Plus plugin do
   Claude Code z hookami, skillami i podagentami.
-- **Dla dewelopera, który woli u siebie** — własny lokalny MemPalace: sam
-  mielisz swoje projekty (`mempalace init`, `mempalace mine`), kod nie opuszcza
-  laptopa, a do wspólnej bazy publikujesz tylko to, co wybierzesz — ręcznie
-  albo lustrem wskazanego skrzydła.
+- **Prywatność z założenia** — wtyczka pociąga MemPalace jako zależność, więc
+  każdy ma lokalny pałac i mieli u siebie (`mempalace init`, `mempalace mine`).
+  Kod i rozmowy nie opuszczają laptopa; do wspólnej bazy trafia tylko to, co
+  opublikujesz — ręcznie albo lustrem wskazanego skrzydła. Serwer nie mieli
+  niczego.
 - **Dla administratora** — jeden `docker compose up`, jeden `pg_dump` jako
   pełny backup, audyt każdego zapisu i odczytu.
 

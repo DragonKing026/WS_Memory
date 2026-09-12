@@ -6,7 +6,30 @@ tags: [ws-memory, todo, mielenie, mempalace, worker, dokumenty]
 
 # TODO-010 — Mielenie po stronie serwera: transkrypty, repozytoria, dokumenty
 
-**Utworzono:** 2026-09-12 16:05 · **Stan:** do zrobienia · **Zależności:** 009
+**Utworzono:** 2026-09-12 16:05 · **Stan:** ❌ **ANULOWANE 2026-09-12 17:08**
+· **Powód:** decyzja D-012
+
+> ## Dlaczego anulowane
+>
+> Serwer nie mieli niczego. Wtyczka WS_Memory wymaga wtyczki MemPalace jako
+> zależności (`plugin.json` → `dependencies`), więc **każdy użytkownik ma
+> lokalny pałac** i mieli u siebie: projekty, dokumenty i transkrypty rozmów.
+> Do wspólnej bazy trafia tylko to, co ktoś opublikuje — `TODO-012`.
+>
+> Utrzymywanie drugiej, serwerowej drogi wnoszenia wiedzy oznaczałoby dwa razy
+> więcej kodu przy identycznym efekcie, a do tego dostęp serwera do
+> repozytoriów, klucze do gita, harmonogram i limity chroniące wspólny serwer
+> przed zajechaniem. Wszystko to znika razem z tym zadaniem.
+>
+> **Co przejęło jego zakres:** `TODO-009` (hooki mielące lokalnie) i
+> `TODO-012` (publikacja oraz lustro). Filtr sekretów, zaprojektowany tutaj,
+> przeniósł się do `TODO-012` i działa tam po obu stronach mostka.
+>
+> **Znane ograniczenie tej zmiany:** osoba bez Claude Code nie wrzuci PDF-a do
+> bazy. Obejście opisane w D-012.
+>
+> Treść poniżej zostaje jako zapis analizy — gdyby ścieżka serwerowa kiedyś
+> wróciła, ustalenia o blokadzie pisarza i trybach minera są nadal aktualne.
 
 ## Powód
 

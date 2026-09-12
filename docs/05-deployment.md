@@ -74,8 +74,8 @@ Obejmuje: dokumenty, wszystkie rewizje, konta, uprawnienia, audyt **i pałac**
 docker compose exec -T postgres pg_restore -U ws -d ws_memory --clean < backup.dump
 ```
 
-Poza bazą do skopiowania zostaje tylko wolumen z surowymi transkryptami sesji
-(materiał źródłowy do ponownego zmielenia) i klucze JWT.
+Poza bazą do skopiowania zostają tylko klucze JWT — serwer nie trzyma żadnych
+surowych materiałów źródłowych.
 
 **Harmonogram:** dzienny `pg_dump` z retencją 30 dni, tygodniowy z retencją
 roczną. Odtworzenie z backupu należy przetestować — backup nieprzetestowany to
@@ -101,7 +101,7 @@ To osobna operacja z przeliczeniem całej bazy.
 |---|---|
 | żywotność mempalace | `GET /healthz` (bez uwierzytelnienia) |
 | żywotność backendu | `GET /api/health` |
-| zaległości kolejki | `ws.mining_jobs` ze statusem `queued` starsze niż godzina |
+| zaległości kolejki | zadania Messenger starsze niż godzina |
 | rozjazd pałaca z rejestrem | zadanie nocne: `memory_entries` bez szuflady w pałacu |
 | wzrost bazy | rozmiar schematów `ws` i `palace` w raporcie tygodniowym |
 
@@ -114,5 +114,7 @@ który go powoduje.
 |---|---|
 | rewizje dokumentów | bezterminowo (historia się nie skraca) |
 | `audit_log` | 24 miesiące, potem agregacja do statystyk |
-| surowe transkrypty sesji | 12 miesięcy (zmielona wiedza zostaje w pałacu) |
-| `mining_jobs` zakończone | 90 dni |
+| partie publikacji | bezterminowo (jednostka wycofania i ślad audytowy) |
+
+Surowych transkryptów sesji serwer **nie przechowuje** — mielą się lokalnie
+i nigdy tu nie trafiają (D-012).

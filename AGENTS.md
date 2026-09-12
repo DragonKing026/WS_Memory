@@ -84,29 +84,32 @@ systemu.
 
 Pełny opis: `docs/01-architektura.md`.
 
-### Dwa tryby pracy dewelopera (D-010)
+### Jak wiedza wchodzi do systemu (D-010 + D-012)
 
-**Tryb serwerowy** (domyślny) — deweloper instaluje tylko plugin. Transkrypty
-sesji lecą na serwer, mielenie dzieje się tam. Nie potrzebuje MemPalace,
-Pythona ani modelu embeddingów.
+**Serwer nie mieli niczego.** Wtyczka WS_Memory wymaga wtyczki MemPalace jako
+zależności, więc **każdy użytkownik ma lokalny pałac**. Mielenie projektów,
+dokumentów i transkryptów rozmów dzieje się wyłącznie na jego maszynie —
+**kod i rozmowy nie opuszczają laptopa**.
 
-**Tryb hybrydowy** — deweloper ma **własny lokalny MemPalace**: sam robi
-`mempalace init` i `mempalace mine` na swoich projektach, **kod nie opuszcza
-laptopa**. Agent ma wtedy dwa serwery MCP (`mempalace` lokalny + `ws_memory`
-wspólny), a wybraną wiedzę publikuje do wspólnej bazy **przez API** — nigdy
-wprost do bazy danych, bo to ominęłoby uprawnienia i audyt.
+Agent ma dwa serwery MCP naraz: `mempalace` (lokalny, prywatny) i `ws_memory`
+(wspólny). Do wspólnej bazy wiedza trafia dwiema drogami:
 
-Publikacja działa selektywnie (`/ws-publish`) albo przez **lustro**: mapowanie
-skrzydła lokalnego pałaca na przestrzeń, działające cyklicznie. Lustro nie
-startuje bez potwierdzenia pierwszego podglądu przez człowieka.
+1. **Pisanie w wiki** — człowiek albo agent, przez `/api` lub `ws_doc_write`.
+2. **Publikacja z lokalnego pałaca** — selektywnie (`/ws-publish`) albo przez
+   **lustro**: mapowanie skrzydła na przestrzeń, działające cyklicznie. Lustro
+   nie startuje bez potwierdzenia pierwszego podglądu przez człowieka.
+
+Publikacja idzie **zawsze przez API**, nigdy wprost do bazy — inaczej ominęłaby
+token, role i audyt.
 
 ## 4. Trzy klasy wiedzy
 
 Rozróżnienie kluczowe — pomylenie ich prowadzi do złych decyzji projektowych.
 
 1. **Pamięć surowa** (główny wolumen, automatyczna): transkrypty sesji,
-   dziennik, graf wiedzy, mining repozytoriów. Agent zapisuje swobodnie, bez
-   recenzji. Nie wersjonujemy tego — to surowiec.
+   dziennik, graf wiedzy, mining repozytoriów. Powstaje **w lokalnym pałacu**;
+   do wspólnej bazy trafia to, co ktoś opublikuje. Nie wersjonujemy tego — to
+   surowiec.
 2. **Ustalenia i notatki**: agent zapisuje wprost przez `ws_remember`.
    Widoczne w aplikacji, oznaczone jako zapisane przez AI. Bez bramki.
 3. **Dokumentacja kanoniczna (wiki)**: dokumenty z pełnymi rewizjami.

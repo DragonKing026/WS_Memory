@@ -37,7 +37,7 @@ Siedem kontenerów w jednym `docker-compose.yml`:
 | `frontend` | prod: statyczne `dist/` w nginx · dev: Node 22 + pnpm + Vite (HMR) | interfejs Vue 3 | brak |
 | `backend` | własny (php-fpm 8.4) | API, wiki, konta, uprawnienia, gateway MCP | brak |
 | `worker` | ten sam obraz co `backend` | Messenger: publikacja do pałaca, mielenie | brak |
-| `mempalace` | własny, na bazie upstream `Dockerfile` | `mempalace serve` — wyszukiwanie semantyczne i mining | brak |
+| `mempalace` | własny, na bazie upstream `Dockerfile` | `mempalace serve` — wyszukiwanie semantyczne i zapis publikowanych szuflad; **nie mieli** | brak |
 | `embeddings` | HF TEI albo Infinity | `/v1/embeddings`, model `BAAI/bge-m3` | brak |
 | `postgres` | `pgvector/pgvector:pg18` | pałac + dane aplikacji | brak |
 
@@ -89,14 +89,16 @@ wspólnymi serwisami domenowymi. Zero szablonów interfejsu.
 przeglądanie przestrzeni, edytor Markdown z podglądem, porównywanie rewizji,
 administracja. Rozmawia wyłącznie z `/api`. Konwencje: `docs/07-frontend.md`.
 
-**`mempalace`** — jedyny komponent, który umie szukać semantycznie i minować.
+**`mempalace`** — jedyny komponent, który umie szukać semantycznie i zapisywać
+szuflady w formacie pałaca. **Nie mieli** — mielenie dzieje się wyłącznie na
+maszynach użytkowników (D-012).
 Nie zna pojęcia użytkownika ani uprawnień; przyjmuje zapytania z już
 nałożonym filtrem `wing`. Traktowany jako czarna skrzynka za granicą HTTP MCP,
 żeby jego aktualizacja nie dotykała naszego kodu.
 
 **`worker`** — wszystko, co nie może blokować odpowiedzi HTTP: wypchnięcie
-opublikowanego dokumentu do pałaca, zlecenie mielenia transkryptu, mining
-repozytorium, zadania nocne.
+opublikowanego dokumentu do pałaca, przetworzenie partii publikacji z lokalnych
+pałaców, zadania kontrolne.
 
 **`embeddings`** — liczy wektory. Wydzielony, żeby cały system miał jeden
 model (D-003) i żeby laptopy nie musiały go pobierać.
@@ -135,25 +137,23 @@ backup systemu: wiki, rewizje, konta, uprawnienia, audyt **i pałac**.
 4. Zapis: `backend` woła `mempalace` i rejestruje wpis w `ws.memory_entries`
    z autorem z tokena. Każde wywołanie ląduje w `ws.audit_log`.
 
-### D. Automatyczne mielenie transkryptów sesji
+### D. Automatyczne mielenie transkryptów sesji — **lokalnie**
 
-1. Hook `SessionEnd` na maszynie dewelopera wysyła **tylko nowe linie**
-   transkryptu (offset trzymany lokalnie) do `backend`.
-2. `backend` dopisuje je do pliku sesji na wolumenie i tworzy `ws.mining_jobs`.
-3. `worker` zleca `mempalace` mielenie tego pliku (`mempalace_mine`,
-   tryb `convos`).
-4. Wynik trafia do prywatnej przestrzeni dewelopera, chyba że hook wskazał
-   przestrzeń projektu.
+1. Hooki MemPalace na maszynie użytkownika mielą transkrypt **do lokalnego
+   pałaca**, po każdej sesji. Rozmowa nie opuszcza laptopa.
+2. Wiedza warta zespołu trafia do wspólnej bazy dopiero przez publikację
+   (przepływ E) — ręcznie albo lustrem.
 
-Deweloper nie potrzebuje ani MemPalace, ani Pythona, ani modelu embeddingów
-— tylko pluginu i tokena.
+Serwer nie przyjmuje transkryptów i nie mieli niczego (D-012). Nie ma tu
+endpointu do zabezpieczania, bo nie ma takiej ścieżki.
 
-### E. Deweloper z własnym lokalnym pałacem (hybryda, D-010)
+### E. Publikacja z lokalnego pałaca do wspólnej bazy (D-010)
 
-Droga alternatywna do A–D, dla kogoś, kto chce mielić u siebie:
+Jedyna droga, którą wiedza wchodzi do wspólnej bazy poza pisaniem w wiki:
 
-1. Deweloper ma lokalny MemPalace: własne `mempalace init` i `mempalace mine`
-   na swoich projektach. **Kod nie opuszcza laptopa.**
+1. Użytkownik ma lokalny MemPalace — wtyczka WS_Memory wymaga wtyczki
+   MemPalace jako zależności, więc ma go **każdy**. Własne `mempalace init`
+   i `mempalace mine` na swoich projektach. **Kod nie opuszcza laptopa.**
 2. Agent ma **dwa serwery MCP**: `mempalace` (lokalny, prywatny) i `ws_memory`
    (wspólny). Skill narzuca kolejność szukania: najpierw wspólna baza, potem
    lokalna.

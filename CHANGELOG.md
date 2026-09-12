@@ -11,6 +11,39 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 
 ---
 
+## 2026-09-12 17:15 — Jedna droga: mielenie wyłącznie lokalne
+
+Konsekwencja hybrydy, doprowadzona do końca. Skoro każdy może mielić u siebie,
+druga — serwerowa — droga wnoszenia wiedzy jest zbędna.
+
+Zweryfikowano w dokumentacji Claude Code, że da się to zrobić czysto:
+
+- **`plugin.json` ma pole `dependencies`** — wtyczka WS_Memory deklaruje
+  wymaganie wtyczki `mempalace`, więc każdy użytkownik dostaje lokalny pałac,
+  instalując jedną rzecz.
+- **Marketplace obsługuje `source: {"type": "command"}`** — polecenie przed
+  instalacją, czyli miejsce na `mempalace[extract]` i pierwsze `init`.
+- **`userConfig`** — adres i token pytane przy włączeniu wtyczki, token
+  `sensitive`, dostępny jako `${user_config.KEY}` w MCP i
+  `CLAUDE_PLUGIN_OPTION_*` w hookach. Zastępuje ręczne zmienne środowiskowe.
+
+**D-012** — serwer nie mieli niczego. Znika: klonowanie repozytoriów, klucze
+do gita, harmonogram nocny, wariant `extract` w obrazie serwera, endpoint
+przyjmujący transkrypty, tabele `mining_jobs` i `session_uploads`, wolumen na
+transkrypty oraz cała wysyłka surowych rozmów z D-006. Prywatność przestaje
+być ustawieniem, a staje się właściwością architektury: **nie ma ścieżki,
+którą surowa rozmowa wychodzi na serwer**.
+
+- `TODO-010` **anulowane**; plik zostaje na miejscu ze statusem i wyjaśnieniem,
+  żeby numeracja się nie przesunęła, a analiza pozostała dostępna. Jego zakres
+  przejęły `TODO-009` i `TODO-012`.
+- Na serwerze zostają `mempalace` (wyszukiwanie i zapis publikowanych szuflad)
+  oraz `embeddings` — obie usługi nadal niezbędne, żadna nie mieli.
+- **Znane ograniczenie:** osoba bez Claude Code nie wniesie PDF-a do bazy;
+  zostaje jej wiki. Obejście opisane w D-012.
+
+---
+
 ## 2026-09-12 16:52 — Hybryda: lokalny pałac plus wspólna baza
 
 Na pytanie „czy ktoś może mieć MemPalace lokalnie i zapisywać do wspólnego"

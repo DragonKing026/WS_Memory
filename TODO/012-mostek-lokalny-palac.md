@@ -6,17 +6,17 @@ tags: [ws-memory, todo, hybryda, mempalace, publikacja, lustro]
 
 # TODO-012 — Mostek: lokalny pałac → wspólna baza (hybryda)
 
-**Utworzono:** 2026-09-12 16:45 · **Stan:** do zrobienia · **Zależności:** 004, 009
+**Utworzono:** 2026-09-12 16:45 · **Stan:** do zrobienia · **Zależności:** 004, 009 · **Przejmuje zakres anulowanego** TODO-010
 
 ## Powód
 
-Deweloper, który chce mielić własne projekty, nie powinien wysyłać kodu na
-serwer ani czekać na administratora. Ma mieć **własny lokalny MemPalace** —
-z własnym `mempalace init` i `mempalace mine` — i móc **publikować wybraną
-wiedzę** do wspólnej bazy (D-010).
+To jest **jedyna droga**, którą wiedza wchodzi do wspólnej bazy poza pisaniem
+w wiki (D-010 + D-012). Serwer nie mieli niczego; każdy użytkownik ma lokalny
+pałac (wtyczka wymaga MemPalace jako zależności), mieli u siebie i publikuje
+to, co warte zespołu.
 
-Dodatkowa korzyść: rozmowy i notatki robocze zostają lokalnie, dopóki ktoś ich
-świadomie nie skieruje do zespołu.
+Dzięki temu kod i rozmowy nie opuszczają laptopa, a nikt nie czeka na
+administratora, żeby dodać źródło.
 
 ## Analiza
 

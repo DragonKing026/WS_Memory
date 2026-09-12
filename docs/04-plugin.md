@@ -8,13 +8,13 @@ tags: [ws-memory, dokumentacja, plugin, claude-code, hooki, agenci-ai, hybryda]
 
 Stan: **projekt**, nieimplementowany (2026-09-12).
 
-Plugin jest jedyną rzeczą, którą deweloper **musi** zainstalować.
-**Nie wymaga MemPalace, Pythona ani modelu embeddingów** — cała praca może
-dziać się po stronie serwera (D-006).
+Plugin jest jedyną rzeczą, którą użytkownik instaluje — i **pociąga za sobą
+wtyczkę MemPalace jako zależność**, więc każdy dostaje lokalny pałac (D-012).
 
-Kto chce, może dodatkowo postawić **własny lokalny MemPalace** i publikować z
-niego wybraną wiedzę do wspólnej bazy (D-010). Plugin obsługuje oba tryby i
-sam rozpoznaje, który zachodzi.
+Podział pracy jest przez to prosty: **mielenie dzieje się wyłącznie lokalnie**
+(projekty, dokumenty, transkrypty rozmów), a do wspólnej bazy trafia tylko to,
+co użytkownik opublikuje. Serwer nie mieli niczego i nie przyjmuje surowych
+źródeł.
 
 ## Struktura
 
@@ -43,23 +43,52 @@ plugin/
     ws-recall.md
 ```
 
-## Konfiguracja MCP
+## Konfiguracja: zależność, MCP i `userConfig`
 
-`plugin.json` wskazuje serwer po HTTP, z tokenem ze zmiennej środowiskowej —
-token **nie trafia do repozytorium pluginu**:
+Trzy mechanizmy Claude Code, na których to stoi:
+
+**`dependencies`** — wtyczka deklaruje, że wymaga wtyczki MemPalace. Dzięki
+temu użytkownik nie musi wiedzieć, że pod spodem jest MemPalace; instaluje
+jedną rzecz.
+
+**`userConfig`** — adres instancji i token są pytane **przy włączeniu wtyczki**,
+a token oznaczony jako `sensitive`. Wartości trafiają do konfiguracji MCP jako
+`${user_config.KEY}` i do hooków jako `CLAUDE_PLUGIN_OPTION_*`. Nikt nie
+ustawia zmiennych środowiskowych ręcznie i **token nie trafia do repozytorium**.
+
+**`source: {"type": "command"}`** we wpisie marketplace — polecenie uruchamiane
+przed instalacją. Tu instalujemy pakiet `mempalace` (z wariantem `extract`, żeby
+dało się mielić PDF-y i DOCX-y) i wykonujemy pierwsze `mempalace init`.
 
 ```json
 {
   "name": "ws-memory",
+  "dependencies": ["mempalace"],
+  "userConfig": {
+    "url": {
+      "type": "string",
+      "title": "Adres WS_Memory",
+      "description": "np. https://wsmemory.twoja-domena.pl"
+    },
+    "token": {
+      "type": "string",
+      "title": "Token agenta",
+      "description": "Wystawisz go w WS_Memory → Ustawienia → Tokeny",
+      "sensitive": true
+    }
+  },
   "mcpServers": {
     "ws_memory": {
       "type": "http",
-      "url": "${WS_MEMORY_URL}/mcp",
-      "headers": { "Authorization": "Bearer ${WS_MEMORY_TOKEN}" }
+      "url": "${user_config.url}/mcp",
+      "headers": { "Authorization": "Bearer ${user_config.token}" }
     }
   }
 }
 ```
+
+Serwer MCP `mempalace` (lokalny, stdio) przychodzi z wtyczki MemPalace — nie
+konfigurujemy go u siebie. Agent widzi oba naraz.
 
 ## Hooki
 
@@ -71,11 +100,10 @@ użytkownik, jakie ma przestrzenie, co się ostatnio zmieniło w projekcie, nad
 którym pracuje. Cel: agent zaczyna sesję wiedząc, gdzie jest wiedza, zamiast
 zgadywać.
 
-**`session-end`** — wysyła **tylko nowe linie** transkryptu na
-`POST /api/sessions/{id}/transcript`. Offset trzymany lokalnie w
-`~/.ws-memory/offsets/`. Serwer dopisuje je do pliku sesji i tworzy zadanie
-mielenia. Przyrostowość jest istotna: transkrypt długiej sesji to megabajty,
-a wysyłany jest po każdym zakończeniu.
+**`session-end`** — mielenie transkryptu **do lokalnego pałaca** (robi to hook
+MemPalace, którego nie duplikujemy) plus, jeśli użytkownik ma ustawione lustro,
+publikacja przyrostowa nowych szuflad do wspólnej bazy. Surowa rozmowa nigdy
+nie opuszcza maszyny.
 
 **`pre-compact`** — przed kompaktowaniem kontekstu zapisuje przez
 `ws_diary_write` podsumowanie tego, co ustalono. Ratuje wnioski, które
@@ -83,10 +111,10 @@ inaczej wyparowałyby razem z kontekstem.
 
 ### Prywatność
 
-Transkrypty trafiają domyślnie do **prywatnej przestrzeni dewelopera**, nie do
-wspólnej. Do przestrzeni zespołowej wędruje tylko to, co ktoś świadomie tam
-umieści. Hook ma wyłącznik (`WS_MEMORY_TRANSCRIPTS=0`) dla sesji, których nie
-chce się archiwizować.
+Transkrypty rozmów zostają **na maszynie użytkownika**, w jego lokalnym pałacu.
+Do wspólnej bazy trafia wyłącznie to, co ktoś opublikuje — ręcznie albo lustrem,
+którego pierwszy przebieg wymaga potwierdzenia. Nie ma ścieżki, którą surowa
+rozmowa wychodzi na serwer, więc nie ma czego zabezpieczać.
 
 ## Skille
 
@@ -118,9 +146,7 @@ ogólnej.** Jeśli baza nie zawiera odpowiedzi, ma to powiedzieć i zgłosić lu
 w dokumentacji — inaczej nowa osoba nie wiedziałaby, czy dostała firmową
 praktykę, czy domysł modelu.
 
-## Tryb hybrydowy: lokalny pałac obok wspólnej bazy
-
-Dla dewelopera, który chce mielić własne projekty u siebie (D-010).
+## Jak to działa u użytkownika
 
 **Konfiguracja:** dwa serwery MCP naraz — `mempalace` (lokalny, stdio) i
 `ws_memory` (wspólny, HTTP). Agent czyta z obu. Skill `ws-memory-recall`
@@ -156,8 +182,10 @@ To dwa indeksy, więc agent pyta dwa razy.
 ## Instalacja u dewelopera
 
 ```bash
-export WS_MEMORY_URL=https://wsmemory.twoja-domena.pl
-export WS_MEMORY_TOKEN=<token z /settings/tokens>
 claude plugin marketplace add https://git.twoja-domena.pl/ws-memory-plugin
 claude plugin install ws-memory
 ```
+
+Instalator pociągnie wtyczkę MemPalace, zainstaluje pakiet i zapyta o adres
+oraz token (`userConfig`). Żadnych zmiennych środowiskowych do ustawiania
+ręcznie.

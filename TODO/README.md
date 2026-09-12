@@ -53,5 +53,7 @@ Zadanie bez sekcji **Co zostało zrobione** nie trafia do `DONE/`.
 
 Zadania 000-002 są ściśle sekwencyjne. Dalej backend (003-005) i frontend
 (006-008) mogą iść równolegle, bo stykają się tylko przez kontrakt OpenAPI.
-`TODO-010` (mielenie serwerowe) i `TODO-012` (mostek z lokalnego pałaca) to
-dwie niezależne drogi wnoszenia wiedzy — kolejność między nimi jest dowolna.
+`TODO-010` zostało **anulowane** decyzją D-012: serwer nie mieli niczego,
+więc jedyną drogą wnoszenia wiedzy jest `TODO-012` — publikacja z lokalnego
+pałaca. Plik zostaje na miejscu ze statusem anulowania, żeby numeracja się nie
+przesunęła, a analiza pozostała dostępna.
