@@ -23,13 +23,15 @@ REST `/api` dla ludzi i MCP `/mcp` dla agentów.
 ukończone `TODO-000` (baza, embeddingi, pamięć + dowód polskiej semantyki),
 `TODO-001` (backend jako czyste API), `TODO-002` (konta, zaproszenia,
 przestrzenie i role), `TODO-003` (dostęp do pamięci z twardym filtrem
-przestrzeni), `TODO-004` (gateway MCP i tokeny agentów), `TODO-013`
-(dokumentacja dwujęzyczna) i `TODO-014` (CI).
+przestrzeni), `TODO-004` (gateway MCP i tokeny agentów), `TODO-005`
+(wiki z rewizjami i kolejką propozycji), `TODO-013` (dokumentacja dwujęzyczna)
+i `TODO-014` (CI).
 
 **Agent AI może się już podłączyć**: `ws:agent:token` wypisuje gotowe
-`claude mcp add`, a siedem narzędzi `ws_*` czyta i zapisuje wspólną bazę
-z twardym filtrem przestrzeni. Brakuje wiki i frontendu. Kolejne zadania
-w `TODO/`.
+`claude mcp add`, a **jedenaście** narzędzi `ws_*` czyta i zapisuje wspólną bazę
+z twardym filtrem przestrzeni — łącznie z wiki, która ma pełną historię rewizji
+i cofanie. Brakuje **frontendu**: na razie wszystko dzieje się przez API
+i wiersz poleceń. Kolejne zadania w `TODO/`.
 
 ## Co to daje
 

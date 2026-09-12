@@ -46,7 +46,7 @@ A task without a **Co zostało zrobione** section does not go to `DONE/`.
                                                       │
                                   ┌───────────────────┼───────────────────┐
                                   ▼                   ▼                   ▼
-                        ✅ 003 palace client    005 wiki backend    006 frontend base
+                        ✅ 003 palace client ✅ 005 wiki backend    006 frontend base
                                   │                   │                   │
                                   ▼                   │                   ▼
                         ✅ 004 MCP gateway ◄──────────┘            007 search (UI)

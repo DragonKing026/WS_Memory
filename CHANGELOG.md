@@ -15,6 +15,64 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-12 22:52 — TODO-005 ukończone: wiki z rewizjami, cofaniem i kolejką
+
+Dokumentacja kanoniczna działa. Dokument, pełna historia rewizji, różnica między
+dowolnymi dwiema, cofnięcie i kolejka propozycji dla przestrzeni, które jej
+chcą. Zestaw narzędzi MCP jest kompletny: **jedenaście**.
+
+**Rewizje trzymają pełne treści, nie diffy.** Łańcuch diffów jest tak
+wiarygodny jak jego najsłabsze ogniwo — jedno uszkodzone unieważnia całą historię
+od tego miejsca. Różnicę liczymy na żądanie (własny LCS po wierszach).
+
+**Cofnięcie idzie do przodu.** Przywrócenie rewizji 1 tworzy rewizję 4 o jej
+treści; rewizje 2 i 3 zostają. Historia, która może się skrócić, nie jest
+historią.
+
+**Nowa rewizja czyści weryfikację.** „Anna to sprawdziła" przestaje być prawdą
+w chwili zmiany tekstu, a nieaktualna odznaka jest gorsza niż jej brak. To
+czyszczenie siedzi w `Document::addRevision()` razem z numerem i tytułem — bo
+rozniesione po serwisie jest tym, o czym ktoś zapomni.
+
+**`verify()` przyjmuje `User`, nie `Actor`.** Agenta nie da się przekazać, więc
+„agent potwierdza własny wpis" jest niewyrażalne, a nie tylko zabronione (D-005).
+
+**Trzy rzeczy, które zmieniły projekt zadania:**
+
+1. **`mempalace_update_drawer` istnieje.** Zadanie zakładało wypychanie nowej
+   szuflady przy każdej rewizji — a to zostawiłoby każdą starą wersję
+   wyszukiwalną, przy czym wynik wyszukiwania niesie treść, nie numer rewizji.
+   Agent nie miałby jak poznać aktualnej. Jedna szuflada na dokument,
+   aktualizowana w miejscu (D-025). Sprawdzone, nie założone: test potwierdza,
+   że po aktualizacji **stara treść przestaje być znajdowalna**.
+2. **Klucz obcy złożony zamiast `CHECK`.** Model danych obiecywał `CHECK`
+   pilnujący, że bieżąca rewizja należy do tego dokumentu — `CHECK` nie sięga do
+   innej tabeli. Klucz na `(current_revision_id, id)` robi to deklaratywnie
+   i czyni błąd niewyrażalnym.
+3. **„Dokładnie jeden autor" ma konsekwencję**, której nie było w analizie:
+   rewizja agenta nie zapisuje właściciela tokena, a rejestr wymaga człowieka.
+   Dołożone `ownerOf()`, odpowiadające także dla tokenów unieważnionych — kto coś
+   napisał, nie zmienia się, gdy jego poświadczenie zostaje wycofane.
+
+**Strażnik kolejności:** zlecenie publikacji niesie numer rewizji i jest
+porzucane, jeśli dokument ma nowszą. Test opróżnia kolejkę **od najnowszego
+zlecenia**, bo tylko w tej kolejności strażnik jest sprawdzany — przy dostarczaniu
+FIFO nie dowiódłby niczego.
+
+**Decyzje:** D-025 (szuflada aktualizowana w miejscu, zlecenia nieaktualne
+porzucane), D-026 (propozycję składa czytający, autorem przyjętej rewizji jest
+recenzent).
+
+**Testy:** 215 (było 153), 889 asercji. `WikiTest` (25) nie potrzebuje pałaca
+i chodzi przy każdym commicie; wyłączenie czyszczenia weryfikacji przewraca
+jeden test, a odpowiadanie 403 zamiast 404 — cztery.
+`WikiOnLivePalaceTest` (6) sprawdza zastępowanie treści w pałacu i wyścig.
+
+**Przy okazji:** testy integracyjne spędzały 2,5 minuty na decyzji o pominięciu,
+bo Docker nie odrzuca nazwy zatrzymanego kontenera, tylko przekracza limit czasu.
+Sprawdzenie jest teraz jedno na uruchomienie — zestaw skrócił się do 42 sekund.
+
+---
 ## 2026-09-12 22:12 — TODO-004 ukończone: agent AI może się podłączyć
 
 Gateway MCP działa. Agent dostaje siedem narzędzi `ws_*`, własny token
