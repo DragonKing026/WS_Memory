@@ -57,7 +57,10 @@ function signOut(): void {
         />
       </div>
 
-      <div class="flex items-center gap-2 shrink-0">
+      <!-- ml-auto, a nie samo flex-1 na wyszukiwarce: pole ma ograniczoną szerokość
+           (max-w-2xl), więc na szerokim ekranie zostaje wolne miejsce, którego nikt
+           nie zagospodarowuje — i cały nagłówek zbija się do lewej. -->
+      <div class="ml-auto flex items-center gap-2 shrink-0">
         <UButton
           :to="{ name: 'tokens' }"
           icon="i-lucide-key-round"
