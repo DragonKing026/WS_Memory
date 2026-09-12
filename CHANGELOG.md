@@ -56,6 +56,32 @@ Zadanie przeniesione do `TODO/DONE/` z pełnym zapisem weryfikacji.
 
 ---
 
+## 2026-09-13 00:20 — Ochrona gałęzi, Dependabot i pierwsze zielone przebiegi
+
+- **Ruleset na `main`**: zakaz usunięcia i przepisania historii, wymagane
+  przejście dwóch sprawdzeń, wymagany pull request z zerem akceptacji.
+  Administrator omija — przy jednej osobie wymuszanie PR-ów na literówkę
+  byłoby ceremonią bez treści; wyjątek znika, gdy dojdą kolejne osoby.
+- **Dependabot** dla PHP, akcji i obrazów, z aktualizacjami grupowanymi.
+  Włączone alerty i automatyczne poprawki bezpieczeństwa.
+- **CodeQL w trybie domyślnym** z AI findings (D-018) — pierwszy przebieg
+  zielony w minutę.
+
+**Pięć własnych usterek w CI, wyłapanych przez samo CI:** kontrola YAML
+przewracała się na znacznikach Symfony; PHPStan wymagał skompilowanego
+kontenera; nocny startował workera przed migracjami; brakowało `composer
+install`, bo obraz deweloperski celowo nie zawiera zależności; brakowało
+kluczy JWT, bo są w `.gitignore`. Wszystkie poprawione, wszystkie przebiegi
+zielone.
+
+**Dependabot od razu udowodnił sens nocnego przebiegu:** zaproponował podbicie
+Pythona w obrazie pamięci z 3.12 na 3.14. Nocny uruchomił na tej gałęzi test
+polskiej semantyki i dopiero jego wynik uzasadnił scalenie — bez tej bramki
+byłby to skok w ciemno, a awaria objawiłaby się cicho, jako gorsze wyniki
+wyszukiwania.
+
+---
+
 ## 2026-09-12 23:30 — TODO-014: ciągła integracja i skanowanie kodu
 
 - **Szybki przebieg** na każdym pushu i pull requeście: testy backendu
