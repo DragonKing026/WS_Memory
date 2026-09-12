@@ -9,8 +9,9 @@ tags: [ws-memory, documentation, data-model, postgres, doctrine, pgvector]
 
 Status: **partly implemented** (2026-09-12). Present in the database: `users`,
 `invitations`, `spaces`, `space_members`, `audit_log` (migration
-`Version20260912000002`), `memory_entries` (`Version20260912000003`) and
-`agent_tokens` (`Version20260912000004`). The
+`Version20260912000002`), `memory_entries` (`Version20260912000003`),
+`agent_tokens` (`Version20260912000004`) and `documents`, `document_revisions`
+and `proposals` (`Version20260912000005`). The
 remaining tables described below are design — each arrives with the task that
 needs it.
 
@@ -74,13 +75,28 @@ an invitation is accepted.
 
 ### Wiki
 
-**`documents`** — the canonical document.
+**`documents`** — the canonical document. **Exists**
+(`Version20260912000005`).
 `id`, `space_id`, `slug` (unique within the space), `title`, `status`
 (`draft` / `published`), `current_revision_id`, `authored_by_ai` (bool),
 `verified_by` (user, `null` = unverified), `verified_at`, `created_at`,
 `updated_at`, `archived_at`.
 
-**`document_revisions`** — full history, nothing overwritten.
+> `current_revision_id` carries a **composite** foreign key on
+> `(current_revision_id, id)` referencing `document_revisions (id, document_id)`.
+> Pointing a document at **another** document's revision is therefore
+> unrepresentable rather than merely wrong — a plain foreign key would allow it and
+> nothing would notice until a reader saw somebody else's text. The constraint is
+> `DEFERRABLE`, because a document and its first revision reference each other
+> inside one transaction.
+>
+> `authored_by_ai` and `verified_by` answer **different** questions: who wrote it,
+> and whether anybody vouches for it. A new revision clears the verification,
+> because "Anna checked this" stops being true the moment the text changes. That
+> clearing is the whole value of the flag.
+
+**`document_revisions`** — full history, nothing overwritten. **Exists**
+(`Version20260912000005`).
 `id`, `document_id`, `number` (increasing within the document), `content`
 (Markdown, **the full text**, not a diff), `title_at_revision`,
 `author_user_id`, `author_agent_token_id`, `change_note`, `created_at`.
@@ -93,6 +109,9 @@ an invitation is accepted.
 > constraint). There is no revision without an author.
 
 **`proposals`** — the queue, active only where `spaces.requires_proposal`.
+**Exists** (`Version20260912000005`). Submitting needs the **reader** role,
+accepting the writer one, and the resulting revision is authored by the reviewer
+(D-026).
 `id`, `space_id`, `title`, `content`, `author_agent_token_id`, `status`
 (`pending` / `accepted` / `rejected`), `reviewed_by`, `reviewed_at`,
 `resulting_document_id`, `created_at`.
@@ -196,7 +215,7 @@ Indexed by `created_at` and by actor. Retention: see
 | space (`spaces`) | wing |
 | knowledge class (`kind`) | room: `documentation`, `diary`, `technical`, … |
 | sensitive space | a separate pgvector **namespace** (separate tables) |
-| wiki document | a drawer in the `documentation` room + a `memory_entries` row |
+| wiki document | **one** drawer in the `documentation` room, updated in place on every revision (D-025) + a `memory_entries` row |
 
 The two isolation levels are not redundant: `wing` is a filter in a query
 (cheap, for most spaces), a `namespace` means separate tables (for spaces where

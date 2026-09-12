@@ -8,8 +8,9 @@ tags: [ws-memory, dokumentacja, model-danych, postgres, doctrine, pgvector]
 
 Stan: **częściowo wdrożony** (2026-09-12). Istnieją w bazie: `users`,
 `invitations`, `spaces`, `space_members`, `audit_log` (migracja
-`Version20260912000002`), `memory_entries` (`Version20260912000003`) oraz
-`agent_tokens` (`Version20260912000004`).
+`Version20260912000002`), `memory_entries` (`Version20260912000003`),
+`agent_tokens` (`Version20260912000004`) oraz `documents`,
+`document_revisions` i `proposals` (`Version20260912000005`).
 Reszta tabel opisanych niżej to projekt — powstaną wraz z zadaniami, które ich
 potrzebują.
 
@@ -72,13 +73,27 @@ przy akceptacji zaproszenia.
 
 ### Wiki
 
-**`documents`** — dokument kanoniczny.
+**`documents`** — dokument kanoniczny. **Istnieje**
+(`Version20260912000005`).
 `id`, `space_id`, `slug` (unikalny w przestrzeni), `title`, `status`
 (`draft` / `published`), `current_revision_id`, `authored_by_ai` (bool),
 `verified_by` (user, `null` = niezweryfikowany), `verified_at`,
 `created_at`, `updated_at`, `archived_at`.
 
-**`document_revisions`** — pełna historia, bez nadpisywania.
+> `current_revision_id` ma klucz obcy **złożony** na `(current_revision_id, id)`
+> wskazujący `document_revisions (id, document_id)`. Dzięki temu wskazanie
+> rewizji **innego** dokumentu jest niewyrażalne, a nie tylko niepoprawne —
+> zwykły klucz obcy by to dopuścił i nikt by nie zauważył, dopóki czytelnik nie
+> zobaczyłby cudzego tekstu. Ograniczenie jest `DEFERRABLE`, bo dokument i jego
+> pierwsza rewizja wskazują na siebie wzajemnie w jednej transakcji.
+>
+> `authored_by_ai` i `verified_by` odpowiadają na **różne** pytania: kto napisał
+> i czy ktoś za to ręczy. Nowa rewizja czyści weryfikację, bo „Anna to
+> sprawdziła" przestaje być prawdą w chwili zmiany tekstu. To czyszczenie jest
+> całą wartością tej flagi.
+
+**`document_revisions`** — pełna historia, bez nadpisywania. **Istnieje**
+(`Version20260912000005`).
 `id`, `document_id`, `number` (rosnący w dokumencie), `content` (Markdown,
 **pełna treść**, nie diff), `title_at_revision`, `author_user_id`,
 `author_agent_token_id`, `change_note`, `created_at`.
@@ -89,11 +104,25 @@ przy akceptacji zaproszenia.
 >
 > Dokładnie jedno z `author_user_id` / `author_agent_token_id` jest wypełnione
 > (ograniczenie `CHECK`). Nie ma rewizji bez autora.
+>
+> Konsekwencja, którą trzeba znać: rewizja agenta **nie** zapisuje właściciela
+> tokena. Kto za nią odpowiada, ustala się przez token (`agent_tokens.user_id`)
+> — dlatego `AgentTokenDirectory::ownerOf()` odpowiada także dla tokenów
+> unieważnionych: kto coś napisał, nie zmienia się, gdy jego poświadczenie
+> zostaje wycofane.
+>
+> `(document_id, number)` jest **unikalne**, więc numery rewizji nie powtarzają
+> się w dokumencie. To dlatego „rewizja 3" jest odnośnikiem, którego można użyć.
 
 **`proposals`** — kolejka, aktywna tylko gdy `spaces.requires_proposal`.
-`id`, `space_id`, `title`, `content`, `author_agent_token_id`, `status`
+**Istnieje** (`Version20260912000005`).
+`id`, `space_id`, `slug` (proponowany adres, opcjonalny), `title`, `content`,
+`author_agent_token_id`, `author_user_id`, `status`
 (`pending` / `accepted` / `rejected`), `reviewed_by`, `reviewed_at`,
-`resulting_document_id`, `created_at`.
+`review_note`, `resulting_document_id`, `created_at`.
+
+> Złożenie wymaga roli **czytającego**, przyjęcie — piszącego, a autorem
+> powstałej rewizji jest recenzent (D-026).
 
 ### Most do pałaca
 
@@ -195,7 +224,7 @@ Indeks po `created_at` i po aktorze. Retencja: patrz `docs/05-deployment.md`.
 | przestrzeń (`spaces`) | skrzydło (`wing`) |
 | klasa wiedzy (`kind`) | pokój (`room`): `documentation`, `diary`, `technical`, … |
 | przestrzeń wrażliwa | osobny **namespace** pgvector (osobne tabele) |
-| dokument wiki | szuflada w pokoju `documentation` + wiersz w `memory_entries` |
+| dokument wiki | **jedna** szuflada w pokoju `documentation`, aktualizowana w miejscu przy każdej rewizji (D-025) + wiersz w `memory_entries` |
 
 Dwa poziomy izolacji nie są redundancją: `wing` to filtr w zapytaniu (tani,
 dla większości przestrzeni), `namespace` to osobne tabele (dla przestrzeni,

@@ -75,6 +75,12 @@ The administrator account arrives together with user management (TODO-002).
 | `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — entity detection; defaults to `en`, see D-011 |
 | `MEMPALACE_TIMEOUT` | timeout for one palace tool call, in seconds (15 by default, set in `backend/.env`) |
 | `MCP_CALLS_PER_MINUTE` | calls per minute one agent token may make (120 by default, `backend/.env`) |
+
+> **The `worker` service is required from `TODO-005` on, not optional.** Publishing
+> documents to the palace goes through the queue; a stopped worker does not break
+> writing to the wiki, but documents stop being findable semantically and nobody
+> notices beyond the absence of hits. Jobs wait in `ws.messenger_messages` and run
+> once it is started again — they are idempotent (D-025).
 | `MAILER_DSN` | invitations and notifications |
 
 The three MemPalace embedding variables (`MEMPALACE_EMBEDDING_*`) are

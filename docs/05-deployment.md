@@ -74,6 +74,12 @@ Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
 | `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — wykrywanie encji; domyślnie `en`, patrz D-011 |
 | `MEMPALACE_TIMEOUT` | limit czasu na jedno wywołanie narzędzia pałaca, w sekundach (domyślnie 15, ustawiany w `backend/.env`) |
 | `MCP_CALLS_PER_MINUTE` | ile wywołań na minutę może wykonać jeden token agenta (domyślnie 120, `backend/.env`) |
+
+> **Usługa `worker` jest od `TODO-005` niezbędna, nie opcjonalna.** Publikacja
+> dokumentów do pałaca idzie przez kolejkę; zatrzymany worker nie psuje zapisu
+> w wiki, ale dokumenty przestają być wyszukiwalne semantycznie i nikt tego nie
+> zauważy poza brakiem trafień. Zlecenia czekają w `ws.messenger_messages`
+> i zostaną wykonane po uruchomieniu — są idempotentne (D-025).
 | `MAILER_DSN` | zaproszenia i powiadomienia |
 
 Trzy zmienne embeddingów (`MEMPALACE_EMBEDDING_*`) są **nierozdzielne** — patrz
