@@ -950,3 +950,78 @@ connection means its own configuration, its own connection limit and its own
 failure mode, and the gain applies to a case where the decorator already leaves a
 second entry. Worth revisiting when the audit trail is used for accountability
 rather than diagnosis.
+
+---
+
+## D-025 — One drawer per document, updated in place; stale jobs are dropped
+
+**Date:** 2026-09-12 23:05 · **Status:** Accepted
+
+Publishing a document to the palace **updates the existing drawer**
+(`mempalace_update_drawer`) rather than filing a new one. The publish job carries a
+revision number and is **dropped** when the document already has a newer one.
+
+**Why not a new drawer per revision:** the palace has no notion of versions, so every
+revision would leave a searchable copy. An agent asking "what is the rent" would get
+three answers from three months and **no way to tell which is current** — a search
+result carries content, not a revision number. The wiki would then be worse than
+nothing: it would look like a source of truth while giving untruths.
+
+**Why not "add the new one, delete the old":** two network operations instead of one,
+with a state between them in which both or neither exist. Updating in place is a
+single call and keeps the identifier, so the row in `memory_entries` stays valid.
+
+**Verified empirically, not assumed:** `mempalace_update_drawer` recomputes the
+vector. The integration test writes a revision using different words and asserts the
+**old content stops being findable** — had the update changed only the text, search
+would still match the previous version.
+
+**The ordering guard.** Three quick saves queue three jobs, and the queue promises no
+order. A job whose revision number is behind the current one is dropped, with a log
+line — without that, a late older job would overwrite the newest text with a
+withdrawn version, and the wiki and the search results would diverge for no visible
+reason. The test drains the queue **newest job first**, because that is the only order
+in which the guard is exercised.
+
+**When the drawer is gone** (an older backup restored, a manual deletion): the adapter
+files a fresh one and returns its identifier, and the service repoints the registry
+row. The alternative — failing the publication — would leave the document invisible to
+search for a reason nobody can act on.
+
+**Rejected:** *keeping history in the palace and filtering by revision number* — it
+would require search results to carry a revision number and every caller to remember
+it. Postgres is the source of truth for versions (D-004); the palace holds a copy of
+the current text and nothing else.
+
+---
+
+## D-026 — A reader may propose; the reviewer authors the accepted revision
+
+**Date:** 2026-09-12 23:10 · **Status:** Accepted
+
+Submitting a proposal (`ws_propose`) requires the **reader** role, not the writer
+one. Accepting is a write and requires the writer role; the resulting revision is
+authored by the **reviewer**, and the fact that an agent wrote the text stays in the
+change note.
+
+**Why reader is enough:** the queue exists so that something can be offered **where
+writing directly is not allowed**. Requiring the writer role would leave it reachable
+only by those who do not need it — they could write directly. The exposure is small: a
+proposal is not in the wiki, is not searchable, and `ws_propose` answers
+`in_wiki: false` so an agent does not report a publication that did not happen.
+
+**Why the reviewer is the author:** somebody has to be answerable for what was
+accepted. Recording the agent as the author would mean a document nobody knowingly
+approved even though it passed review — a queue with no effect. Hiding where the text
+came from would equally be misleading, which is why the change note says outright
+that the content came from an AI agent.
+
+**Why a person writes directly in such a space:** somebody writing in a space with a
+queue **is** the reviewer. Putting them in their own queue would leave nobody to empty
+it.
+
+**There is no MCP tool to accept or reject.** Review is a human act in the interface
+(D-005); an agent approving its own proposal would make the queue decorative.
+
+**Rejected:** *automatic acceptance after a delay* — a queue that empties itself is
+not a review, only a delay.

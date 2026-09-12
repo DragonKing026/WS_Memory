@@ -937,3 +937,81 @@ transakcji, co jest poprawniejsze. Odrzucone na teraz: drugie połączenie to
 własna konfiguracja, własny limit połączeń i własny tryb awarii, a zysk dotyczy
 przypadku, w którym i tak mamy drugi wpis od dekoratora. Do rozważenia, gdy
 audyt zacznie być używany do rozliczeń, nie do diagnozy.
+
+---
+
+## D-025 — Jedna szuflada na dokument, aktualizowana w miejscu; zlecenia nieaktualne porzucamy
+
+**Data:** 2026-09-12 23:05 · **Stan:** Przyjęta
+
+Publikacja dokumentu do pałaca **aktualizuje istniejącą szufladę**
+(`mempalace_update_drawer`), a nie zakłada nowej. Zlecenie publikacji niesie
+numer rewizji i jest **porzucane**, jeśli dokument ma już nowszą.
+
+**Dlaczego nie nowa szuflada na rewizję:** pałac nie ma pojęcia wersji, więc
+każda rewizja zostawiałaby wyszukiwalną kopię. Agent szukający „ile wynosi
+czynsz" dostałby trzy odpowiedzi z trzech miesięcy i **nie miałby jak poznać,
+która jest aktualna** — bo w wyniku wyszukiwania nie ma numeru rewizji, jest
+tylko treść. Wiki byłaby wtedy gorsza niż jej brak: wyglądałaby na źródło
+prawdy, podając nieprawdę.
+
+**Dlaczego nie „dodaj nową, usuń starą":** dwie operacje sieciowe zamiast
+jednej, a między nimi stan, w którym istnieją obie albo żadna. Aktualizacja
+w miejscu jest jednym wywołaniem i zachowuje identyfikator, więc wiersz
+w `memory_entries` pozostaje ważny.
+
+**Sprawdzone empirycznie, nie założone:** `mempalace_update_drawer`
+przelicza wektor. Test integracyjny zapisuje rewizję o innych słowach i sprawdza,
+że **stara treść przestaje być znajdowalna** — gdyby aktualizacja zmieniała tylko
+tekst bez wektora, wyszukiwanie nadal trafiałoby w poprzednią wersję.
+
+**Strażnik kolejności.** Trzy szybkie zapisy wstawiają trzy zlecenia, a kolejka
+nie obiecuje kolejności. Zlecenie, którego numer rewizji jest niższy niż bieżący,
+jest porzucane z wpisem w dzienniku — bez tego spóźnione starsze zlecenie
+nadpisałoby najnowszy tekst wersją wycofaną, a wiki i wyniki wyszukiwania
+rozeszłyby się bez żadnego widocznego powodu. Test opróżnia kolejkę **od
+najnowszego zlecenia**, bo tylko w tej kolejności strażnik jest sprawdzany.
+
+**Gdy szuflada zniknęła** (przywrócona starsza kopia, ręczne usunięcie): adapter
+zakłada nową i zwraca jej identyfikator, a serwis przestawia wiersz rejestru.
+Alternatywa — awaria publikacji — zostawiłaby dokument niewidoczny dla
+wyszukiwania z powodu, na który nikt nie ma wpływu.
+
+**Odrzucono:** *trzymanie historii w pałacu i filtrowanie po numerze rewizji* —
+wymagałoby, żeby wynik wyszukiwania niósł numer rewizji i żeby każdy wołający
+o tym pamiętał. Źródłem prawdy dla wersji jest Postgres (D-004); pałac trzyma
+kopię bieżącej treści i nic więcej.
+
+---
+
+## D-026 — Propozycję składa czytający, autorem przyjętej rewizji jest recenzent
+
+**Data:** 2026-09-12 23:10 · **Stan:** Przyjęta
+
+Złożenie propozycji (`ws_propose`) wymaga roli **czytającego**, nie piszącego.
+Przyjęcie jest zapisem i wymaga roli piszącego; autorem powstałej rewizji jest
+**recenzent**, a informacja, że treść napisał agent, zostaje w opisie zmiany.
+
+**Dlaczego czytający wystarcza:** kolejka istnieje po to, żeby dało się coś
+zaproponować tam, gdzie **nie wolno pisać wprost**. Wymaganie roli piszącego
+udostępniłoby ją wyłącznie tym, którzy jej nie potrzebują — mogliby napisać
+bezpośrednio. Ryzyko jest ograniczone: propozycja nie jest w wiki, nie jest
+wyszukiwalna, a `ws_propose` zwraca `in_wiki: false`, żeby agent nie zameldował
+publikacji, której nie było.
+
+**Dlaczego recenzent jest autorem:** ktoś musi odpowiadać za to, co zostało
+przyjęte. Zapisanie agenta jako autora rewizji oznaczałoby dokument, którego
+nikt nie zatwierdził świadomie, choć przeszedł przez przegląd — czyli kolejkę
+bez skutku. Jednocześnie ukrycie pochodzenia treści byłoby wprowadzaniem
+w błąd, dlatego opis zmiany mówi wprost „treść od agenta AI".
+
+**Dlaczego człowiek pisze w takiej przestrzeni wprost:** osoba pisząca
+w przestrzeni z kolejką **jest** recenzentem. Wstawienie jej do własnej kolejki
+oznaczałoby, że nie ma jej komu opróżnić.
+
+**Nie ma narzędzia MCP do przyjmowania ani odrzucania.** Przegląd jest czynnością
+człowieka w interfejsie (D-005); agent zatwierdzający własną propozycję czyniłby
+kolejkę ozdobą.
+
+**Odrzucono:** *automatyczne przyjmowanie po czasie* — kolejka, która sama się
+opróżnia, nie jest przeglądem, tylko opóźnieniem.
