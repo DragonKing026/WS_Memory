@@ -56,6 +56,23 @@ Zadanie przeniesione do `TODO/DONE/` z pełnym zapisem weryfikacji.
 
 ---
 
+## 2026-09-13 00:50 — Wiki generowana z dokumentacji
+
+Wiki GitHuba jako **renderowane lustro** katalogu `docs/`: 23 strony plus pasek
+boczny, obie wersje językowe, publikowane po każdym scaleniu do `main`, które
+dotknęło dokumentacji.
+
+Świadomie **nie** jest drugim źródłem prawdy. Ręczna edycja zostaje nadpisana,
+o czym informuje nagłówek każdej strony. Powód jest ten sam, dla którego
+powstał `make sprawdz-dokumentacje`: dwa miejsca z tą samą treścią rozjeżdżają
+się zawsze, a nieaktualny opis bywa traktowany jako fakt — także przez modele
+AI, które go czytają.
+
+Generator przepisuje odnośniki ze ścieżek plików na nazwy stron wiki; bez tego
+nawigacja prowadziłaby donikąd. Podgląd lokalny przez `make wiki`.
+
+---
+
 ## 2026-09-13 00:20 — Ochrona gałęzi, Dependabot i pierwsze zielone przebiegi
 
 - **Ruleset na `main`**: zakaz usunięcia i przepisania historii, wymagane
