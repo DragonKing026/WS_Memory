@@ -9,6 +9,10 @@
 
 parameters:
     mempalace.base_url: '%env(MEMPALACE_URL)%'
+    # Public address used in invitation links. In development it is the local
+    # nginx; in production the real domain.
+    app.public_base_url: '%env(default:app_default_base_url:WS_PUBLIC_URL)%'
+    app_default_base_url: 'http://127.0.0.1:8080'
 
 services:
     _defaults:
@@ -34,6 +38,10 @@ services:
     App\Infrastructure\MemPalace\MemPalaceHealthProbe:
         arguments:
             $baseUrl: '%mempalace.base_url%'
+
+    App\Presentation\Console\InviteUserCommand:
+        arguments:
+            $publicBaseUrl: '%app.public_base_url%'
 
 when@test:
     services:
