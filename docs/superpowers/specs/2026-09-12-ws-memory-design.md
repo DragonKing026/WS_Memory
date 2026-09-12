@@ -11,6 +11,12 @@ Ten dokument utrwala **decyzje i ich uzasadnienia** z etapu projektowania.
 Bieżący opis działania systemu żyje w `docs/01`–`docs/07`; gdy się rozejdą,
 to `docs/` jest aktualne, a ten plik zostaje jako zapis, dlaczego tak wyszło.
 
+> **Zapis historyczny — nie aktualizujemy go.** Spec zamyka się na decyzji
+> D-009. Po nim zapadły D-010…D-015, które zmieniły trzy rzeczy opisane niżej:
+> mielenie odbywa się **wyłącznie lokalnie** (D-012), a nie na serwerze;
+> wysyłka na serwer jest **domyślna** (D-014); lokalny pałac jest **pierwotny**,
+> serwer trzyma kopię (D-015). Aktualny stan: `docs/06-decyzje.md`.
+
 ## 1. Problem
 
 Web Systems nie ma wspólnej bazy wiedzy. Wiedza żyje w głowach, w kodzie, w

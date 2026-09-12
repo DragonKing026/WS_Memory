@@ -1,5 +1,12 @@
 ---
-tags: [ws-memory, project-contract, architecture, conventions, ai-agents]
+noteId: "664e67f0aec911f1835b4b4fc1577c80"
+tags:
+  - "ws-memory"
+  - "project-contract"
+  - "architecture"
+  - "conventions"
+  - "ai-agents"
+
 ---
 
 > Translated from [`AGENTS.md`](AGENTS.md) (synced 2026-09-12).
