@@ -94,7 +94,7 @@ final class McpMemoryStoreTest extends TestCase
             'content' => 'pełna treść szuflady',
             'wing' => 'wing_alfa',
             'room' => 'technical',
-            'metadata' => ['added_by' => 'ws:user-1', 'filed_at' => '2026-09-12T20:48:46'],
+            'metadata' => ['added_by' => 'ws_user-1', 'filed_at' => '2026-09-12T20:48:46'],
         ])]);
 
         $fragment = $store->fetch(new DrawerId('drawer_alfa_technical_abc'));
@@ -102,7 +102,7 @@ final class McpMemoryStoreTest extends TestCase
         self::assertNotNull($fragment);
         self::assertSame('pełna treść szuflady', $fragment->content);
         self::assertSame('wing_alfa', $fragment->wing->value);
-        self::assertSame('ws:user-1', $fragment->addedBy);
+        self::assertSame('ws_user-1', $fragment->addedBy);
     }
 
     public function testFetchAnswersNullForADrawerThatIsNotThere(): void
@@ -120,7 +120,7 @@ final class McpMemoryStoreTest extends TestCase
             new PalaceWing('wing_alfa'),
             MemoryKind::Note,
             'ustalenie',
-            'ws:user-1/token-1',
+            'ws_user-1__token-1',
         );
 
         self::assertSame('drawer_alfa_technical_new', $drawer->value);
@@ -128,7 +128,7 @@ final class McpMemoryStoreTest extends TestCase
             'wing' => 'wing_alfa',
             'room' => 'technical',
             'content' => 'ustalenie',
-            'added_by' => 'ws:user-1/token-1',
+            'added_by' => 'ws_user-1__token-1',
         ], $this->sent[0]['arguments']);
     }
 
@@ -140,7 +140,7 @@ final class McpMemoryStoreTest extends TestCase
         $store = $this->storeAnswering([$this->envelope(['status' => 'filed'])]);
 
         $this->expectException(MemPalaceUnavailable::class);
-        $store->store(new PalaceWing('wing_alfa'), MemoryKind::Note, 'ustalenie', 'ws:user-1');
+        $store->store(new PalaceWing('wing_alfa'), MemoryKind::Note, 'ustalenie', 'ws_user-1');
     }
 
     public function testDiaryEntryIsFiledIntoTheGivenWing(): void
@@ -149,11 +149,27 @@ final class McpMemoryStoreTest extends TestCase
         // wing_{agent_name}, outside every space mapping we have.
         $store = $this->storeAnswering([$this->envelope(['drawer_id' => 'drawer_alfa_diary_1'])]);
 
-        $store->writeDiary(new PalaceWing('wing_alfa'), 'ws:user-1', 'SESSION:2026-09-12|TODO-003', 'todo');
+        $store->writeDiary(new PalaceWing('wing_alfa'), 'ws_user-1', 'SESSION:2026-09-12|TODO-003', 'todo');
 
         self::assertSame('wing_alfa', $this->sent[0]['arguments']['wing'] ?? null);
-        self::assertSame('ws:user-1', $this->sent[0]['arguments']['agent_name'] ?? null);
+        self::assertSame('ws_user-1', $this->sent[0]['arguments']['agent_name'] ?? null);
         self::assertSame('todo', $this->sent[0]['arguments']['topic'] ?? null);
+    }
+
+    public function testDiaryEntryIdentifierIsReadFromItsOwnField(): void
+    {
+        // A live palace answers diary_write with `entry_id`, not `drawer_id`.
+        // Without this the entry would be filed and then never booked, and an
+        // unbooked drawer is one the second filtering layer always drops.
+        $store = $this->storeAnswering([$this->envelope([
+            'success' => true,
+            'entry_id' => 'diary_wing_alfa_20260912_191727_abc',
+            'agent' => 'ws_user-1',
+        ])]);
+
+        $drawer = $store->writeDiary(new PalaceWing('wing_alfa'), 'ws_user-1', 'SESSION:2026-09-12');
+
+        self::assertSame('diary_wing_alfa_20260912_191727_abc', $drawer->value);
     }
 
     public function testFactsAreMappedAndHalfFactsSkipped(): void

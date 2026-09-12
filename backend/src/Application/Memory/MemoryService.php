@@ -381,11 +381,22 @@ final readonly class MemoryService
      * by local palaces; "who filed this" has to stay answerable after the fact.
      * Never taken from a request parameter — there is no author argument
      * anywhere in this class, which is what inviolable rule 2 asks for.
+     *
+     * Restricted to letters, digits, underscores and hyphens, and that is not
+     * cosmetic: MemPalace uses this same label as a path segment when filing a
+     * diary entry and rejects `ws:user/token` outright. One label for every tool
+     * beats a label per tool, so the safest form wins everywhere. A live palace
+     * taught us this — no double could have.
      */
     private function palaceAuthor(Actor $actor): string
     {
         return $actor->isAgent()
-            ? \sprintf('ws:%s/%s', $actor->userId, (string) $actor->agentTokenId)
-            : \sprintf('ws:%s', $actor->userId);
+            ? \sprintf('ws_%s__%s', $this->safeLabel($actor->userId), $this->safeLabel((string) $actor->agentTokenId))
+            : \sprintf('ws_%s', $this->safeLabel($actor->userId));
+    }
+
+    private function safeLabel(string $value): string
+    {
+        return preg_replace('/[^A-Za-z0-9_-]/', '-', $value) ?? $value;
     }
 }

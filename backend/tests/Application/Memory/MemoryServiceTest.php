@@ -264,6 +264,20 @@ final class MemoryServiceTest extends TestCase
         }
     }
 
+    public function testTheAuthorLabelSentToThePalaceIsSafeAsAPathSegment(): void
+    {
+        // MemPalace files a diary entry under this label as a path segment and
+        // refuses anything with a colon or a slash. A live palace found that;
+        // this test is what stops it coming back.
+        $service = $this->serviceFor([self::OWNER => ['alfa' => SpaceRole::Writer]]);
+
+        $service->remember(Actor::agent(self::OWNER, 'token-1'), 'treść', new SpaceId('alfa'));
+
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]+$/', $this->palace->writes[0]['addedBy']);
+        self::assertStringContainsString(self::OWNER, $this->palace->writes[0]['addedBy']);
+        self::assertStringContainsString('token-1', $this->palace->writes[0]['addedBy']);
+    }
+
     public function testEveryWriteIsRegistered(): void
     {
         $service = $this->serviceFor([self::OWNER => ['alfa' => SpaceRole::Writer]]);

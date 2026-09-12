@@ -232,7 +232,10 @@ final readonly class McpMemoryStore implements MemoryStore
             lexicalScore: $this->floatOrNull($row['bm25_score'] ?? null),
             filedAt: $this->dateOrNull($row['created_at'] ?? null)
                 ?? $this->dateOrNull($metadata['filed_at'] ?? null),
-            addedBy: $this->stringOrNull($metadata['added_by'] ?? null),
+            // Drawers record `added_by`; diary entries record `agent`. Same
+            // question, two spellings, one place that knows it.
+            addedBy: $this->stringOrNull($metadata['added_by'] ?? null)
+                ?? $this->stringOrNull($metadata['agent'] ?? null),
         );
     }
 
@@ -248,6 +251,11 @@ final readonly class McpMemoryStore implements MemoryStore
 
         $candidates = [
             $payload['drawer_id'] ?? null,
+            // A diary entry answers with `entry_id` and an identifier prefixed
+            // `diary_` instead of `drawer_`. It is a drawer all the same —
+            // get_drawer fetches it by that id, in room `diary` — so the name is
+            // the only thing that differs, and only here.
+            $payload['entry_id'] ?? null,
             $payload['id'] ?? null,
             \is_array($nested) ? ($nested['drawer_id'] ?? null) : null,
             \is_array($nested) ? ($nested['id'] ?? null) : null,
