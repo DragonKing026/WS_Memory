@@ -30,7 +30,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: nocne
+  # Gałąź w nazwie grupy: bez niej przebieg dla pull requesta Dependabota
+  # kasuje przebieg dla main i odwrotnie, a wtedy nie wiadomo, która zmiana
+  # tak naprawdę przeszła.
+  group: nocne-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -78,6 +81,10 @@ jobs:
           # są montowane wolumenem, żeby zmiana pliku na hoście była widoczna
           # od razu. Na czystym runnerze nie ma więc katalogu vendor.
           docker compose exec -T backend composer install --no-interaction --no-progress
+          # Klucze JWT są w .gitignore — i słusznie, bo to sekret. Na czystym
+          # runnerze trzeba je wygenerować, inaczej logowanie zwraca 500,
+          # a testy uwierzytelniania sypią się na etapie tokena.
+          docker compose exec -T backend php bin/console lexik:jwt:generate-keypair --skip-if-exists
           docker compose exec -T backend php bin/console doctrine:migrations:migrate --no-interaction
           docker compose up -d --wait --wait-timeout 120 worker
           # Tutaj — inaczej niż w szybkim przebiegu — oczekujemy 200:
