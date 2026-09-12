@@ -11,6 +11,34 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 
 ---
 
+## 2026-09-12 18:10 — Lokalny pałac pierwotny, serwer trzyma kopię
+
+Doprecyzowanie kierunku: praca dzieje się lokalnie, serwer dostaje **kopię**.
+Wtyczka WS_Memory istnieje właśnie po to, żeby ta kopia powstawała — kto chce
+pracować wyłącznie lokalnie, instaluje samo MemPalace i nie zakłada konta.
+Przełącznik `auto_publish` schodzi do roli hamulca awaryjnego.
+
+**D-015** dokłada wymaganie, którego wcześniej nie było i które wynika wprost
+z tego ujęcia:
+
+> Zapis lokalny nigdy nie czeka na serwer i nigdy nie zawodzi z jego powodu.
+
+- **Lokalna kolejka wyjściowa** (`~/.ws-memory/outbox/`): brak sieci, padnięty
+  serwer czy jego aktualizacja nie przerywają pracy; szuflady czekają i
+  dopinają się przy następnej okazji. Ponowna wysyłka jest bezpieczna dzięki
+  odsiewowi, który już mamy.
+- Znacznik przesuwa się **dopiero po potwierdzeniu przez serwer**, więc
+  przerwanie w połowie partii niczego nie gubi.
+- Skutek szerszy: baza wiedzy przestaje być pojedynczym punktem awarii dla
+  codziennej pracy, a aktualizacja serwera nie wymaga okna serwisowego.
+- Bez zmian: **nie ma synchronizacji w drugą stronę.** Wiedzę zespołu agent
+  czyta na żywo przez `ws_search`; ściąganie jej do lokalnych pałaców
+  oznaczałoby dwukierunkową synchronizację, odrzuconą w D-004.
+- Reguła nienaruszalna nr 11 (numeracja przesunięta): zapis lokalny nigdy nie
+  czeka na serwer.
+
+---
+
 ## 2026-09-12 17:52 — Wysyłka na serwer domyślna, tryb ręczny jako wyłącznik
 
 Odwrócone domyślne zachowanie. Wcześniej publikacja była czynnością, którą

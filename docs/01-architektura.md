@@ -174,6 +174,12 @@ Jedyna droga, którą wiedza wchodzi do wspólnej bazy poza pisaniem w wiki:
 6. Kto woli decydować sam, wyłącza `auto_publish` w ustawieniach wtyczki
    i wraca do ręcznego `/ws-publish`.
 
+**Kierunek jest jednokierunkowy i lokalny pałac jest pierwotny** (D-015):
+zapis lokalny nigdy nie czeka na serwer. Gdy serwer jest niedostępny, szuflady
+czekają w lokalnej kolejce wyjściowej i dopinają się przy następnej okazji —
+praca bez sieci działa w pełni, a awaria serwera nie blokuje nikogo. Ponowna
+wysyłka jest bezpieczna dzięki odsiewowi po parze źródłowej i `content_hash`.
+
 Wszystko jest więc na serwerze zawsze — kopia zapasowa, wyszukiwanie, dostęp
 z drugiej maszyny — ale nic nie staje się widoczne dla zespołu bez mapowania.
 Konsekwencja nazwana wprost w D-014: **tekst zmielonego kodu trafia na serwer**

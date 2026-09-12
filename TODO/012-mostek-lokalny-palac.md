@@ -49,7 +49,12 @@ Trzy pułapki, które trzeba obsłużyć:
    wysyła, serwer i tak sprawdza. Zaufanie do klienta byłoby tu błędem.
    Od D-014 filtr leży na **każdej** ścieżce, nie tylko na świadomie
    uruchomionej — jego testy są krytyczne.
-4. **Powtórzenia między osobami.** Trzy osoby mielące to samo repozytorium
+4. **Serwer bywa niedostępny.** Lokalny pałac jest pierwotny (D-015), więc
+   zapis nie może na niego czekać ani zawodzić z jego powodu. Potrzebna
+   **lokalna kolejka wyjściowa**: niewysłane szuflady czekają ze znacznikiem i
+   dopinają się przy następnej okazji. Ponowna wysyłka jest bezpieczna dzięki
+   odsiewowi, który i tak budujemy.
+5. **Powtórzenia między osobami.** Trzy osoby mielące to samo repozytorium
    przyślą tę samą treść trzy razy. Odsiew po `content_hash` w obrębie
    przestrzeni docelowej plus propozycja mapowania na przestrzeń zespołową,
    gdy nazwa skrzydła jej odpowiada.
@@ -77,17 +82,20 @@ audyt — odrzucone w D-010.
 5. **Wysyłka automatyczna** (domyślna): po sesji i po lokalnym mieleniu
    zbiera szuflady nowsze niż znacznik, ustala przestrzeń docelową regułą
    lądowania (mapowanie → zespołowa, brak → prywatna) i wysyła partią.
-6. Komenda `/ws-publish` — dla trybu ręcznego: filtr (skrzydło / temat /
+6. **Kolejka wyjściowa** w `~/.ws-memory/outbox/`: nieudana wysyłka nie gubi
+   niczego i nie przerywa pracy; ponowienie z narastającym odstępem, znacznik
+   przesuwa się dopiero po potwierdzeniu przez serwer.
+7. Komenda `/ws-publish` — dla trybu ręcznego: filtr (skrzydło / temat /
    zakres daty), podgląd, potwierdzenie, wysyłka z widocznym postępem.
-7. Propozycja mapowania, gdy nazwa lokalnego skrzydła odpowiada istniejącej
+8. Propozycja mapowania, gdy nazwa lokalnego skrzydła odpowiada istniejącej
    przestrzeni zespołowej użytkownika.
-8. Lustra: CRUD w `/api`, ekran w interfejsie (mapowanie skrzydło → przestrzeń,
+9. Lustra: CRUD w `/api`, ekran w interfejsie (mapowanie skrzydło → przestrzeń,
    wykluczenia pokoi, pauza, wyłącznik), pierwszy przebieg jako podgląd.
-9. Lokalny agent wysyłki w pluginie: uruchamiany hookiem `SessionEnd` albo
+10. Lokalny agent wysyłki w pluginie: uruchamiany hookiem `SessionEnd` albo
    ręcznie, publikuje przyrostowo szuflady nowsze niż `last_drawer_filed_at`.
-10. Skill `ws-memory-recall` uzupełniony o kolejność dwóch źródeł: najpierw
+11. Skill `ws-memory-recall` uzupełniony o kolejność dwóch źródeł: najpierw
    `ws_search` (wspólna baza), potem lokalny `mempalace_search`.
-11. Dokumentacja dla dewelopera: jak postawić lokalny pałac i podłączyć oba
+12. Dokumentacja dla dewelopera: jak postawić lokalny pałac i podłączyć oba
    serwery MCP naraz.
 
 ## Kryteria ukończenia
@@ -107,6 +115,12 @@ audyt — odrzucone w D-010.
 - Wyłączenie `auto_publish` zatrzymuje wysyłkę całkowicie.
 - Ta sama treść wysłana dwukrotnie do jednej przestrzeni jest zapisana raz
   (odsiew po `content_hash`).
+- **Przy wyłączonym serwerze** mielenie i zapis lokalny działają normalnie,
+  a szuflady czekają w kolejce; po włączeniu serwera dopinają się bez
+  duplikatów i bez działania użytkownika (test: zatrzymanie kontenera,
+  praca, uruchomienie).
+- Przerwanie wysyłki w połowie partii nie gubi szuflad ani nie przesuwa
+  znacznika przed potwierdzeniem.
 - Wykluczony pokój nie trafia do przestrzeni, choć jest w skrzydle źródłowym.
 - Wycofanie partii usuwa szuflady i zostawia partię ze statusem `reverted`.
 - Agent z dwoma serwerami MCP znajduje treść i we wspólnej bazie, i w lokalnym

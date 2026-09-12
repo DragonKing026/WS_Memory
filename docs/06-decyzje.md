@@ -529,3 +529,44 @@ poleci trzy razy. Dlatego:
   świadomie uruchomił. Jego testy stają się krytyczne.
 - Użytkownik musi w każdej chwili widzieć, **co i gdzie** poleciało: dziennik
   partii z filtrem po przestrzeni, oraz wycofanie partii jednym działaniem.
+
+---
+
+## D-015 — Lokalny pałac jest pierwotny, serwer trzyma kopię
+
+**Data:** 2026-09-12 18:10 · **Stan:** Przyjęta · **Doprecyzowuje D-014**
+
+Praca dzieje się w **lokalnym pałacu**; serwer dostaje **kopię**. Kierunek jest
+jednokierunkowy: lokalny → serwer. Nie ma ściągania w dół — wiedzę zespołu
+agent czyta na żywo przez `ws_search`, a nie przez lustrzaną kopię u siebie.
+
+**Wtyczka WS_Memory istnieje właśnie po to, żeby ta kopia powstawała.** Kto chce
+pracować wyłącznie lokalnie, **instaluje samo MemPalace** i nie zakłada konta.
+To jest właściwa droga rezygnacji — nie ustawienie, tylko wybór narzędzia.
+Przełącznik `auto_publish` zostaje jako **hamulec awaryjny** (na przykład na
+czas pracy nad czymś, czego świadomie nie chce się kopiować), a nie jako
+główny sposób korzystania.
+
+**Konsekwencja, która z tego wynika i jest wymaganiem, nie życzeniem:**
+
+> **Zapis lokalny nigdy nie czeka na serwer i nigdy nie zawodzi z jego powodu.**
+
+Brak sieci, padnięty serwer, praca w pociągu — mielenie i zapis do lokalnego
+pałaca działają w pełni. Niewysłane szuflady czekają w **lokalnej kolejce
+wyjściowej** ze znacznikiem czasu i dopinają się przy następnej okazji.
+Ponowna wysyłka jest bezpieczna, bo odsiew po parze
+`(source_replica, source_drawer_id)` i po `content_hash` już to obsługuje
+(D-010, D-014).
+
+**Co to daje poza wygodą:**
+
+- **Awaria serwera nikogo nie blokuje.** Zespół pracuje dalej, kopie dopinają
+  się po powrocie. Baza wiedzy przestaje być pojedynczym punktem awarii dla
+  codziennej pracy.
+- **Każdy ma pełną kopię swojej wiedzy u siebie**, niezależnie od losów
+  serwera. Serwer jest miejscem spotkania, nie jedynym magazynem.
+- **Aktualizacja serwera nie wymaga okna serwisowego** ogłaszanego zespołowi.
+
+**Czego nie robimy:** synchronizacji w drugą stronę. Ściąganie wiedzy zespołu
+do lokalnych pałaców oznaczałoby dwukierunkową synchronizację ze wszystkimi jej
+konfliktami — odrzucone już w D-004 i to pozostaje aktualne.

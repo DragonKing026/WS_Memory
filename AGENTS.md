@@ -61,7 +61,10 @@ ma, a czego potrzebuje zespół:
 10. **Lokalny pałac nigdy nie pisze wprost do centralnej bazy.** Publikacja
     idzie przez API, bo tylko tam działają token, role i audyt. Dawanie
     `MEMPALACE_PGVECTOR_DSN` na zewnątrz unieważniłoby całą warstwę uprawnień.
-11. **Nic wartościowego nie mieszka we wtyczce.** Narzędzia, uprawnienia i
+11. **Zapis lokalny nigdy nie czeka na serwer.** Niedostępny serwer nie może
+    przerwać ani opóźnić pracy — szuflady czekają w kolejce wyjściowej.
+    Baza wiedzy nie jest pojedynczym punktem awarii dla codziennej pracy.
+12. **Nic wartościowego nie mieszka we wtyczce.** Narzędzia, uprawnienia i
     instrukcje żyją na serwerze; wtyczka je tylko podłącza. Reguła nie jest
     estetyczna — decyduje o tym, czy port na inny klient AI to godziny czy
     tygodnie (D-013).
@@ -112,6 +115,11 @@ bazy — inaczej ominęłaby token, role i audyt.
 Konsekwencja nazwana wprost: **tekst zmielonego kodu trafia na serwer** (jako
 szuflady). Mielenie pozostaje lokalne, więc serwer nie potrzebuje dostępu do
 repozytoriów ani kluczy do gita.
+
+**Lokalny pałac jest pierwotny, serwer trzyma kopię** (D-015). Zapis lokalny
+nigdy nie czeka na serwer i nigdy nie zawodzi z jego powodu — niewysłane
+szuflady czekają w lokalnej kolejce. Wtyczka istnieje po to, żeby ta kopia
+powstawała; kto chce pracować wyłącznie lokalnie, instaluje samo MemPalace.
 
 ## 4. Trzy klasy wiedzy
 

@@ -11,6 +11,10 @@ Stan: **projekt**, nieimplementowany (2026-09-12).
 Plugin jest jedyną rzeczą, którą użytkownik instaluje — i **pociąga za sobą
 wtyczkę MemPalace jako zależność**, więc każdy dostaje lokalny pałac (D-012).
 
+**Wtyczka istnieje po to, żeby kopia Twojej wiedzy trafiała na serwer.** Kto
+chce pracować wyłącznie lokalnie, instaluje samo MemPalace i nie zakłada konta
+— to jest właściwa droga rezygnacji, nie ustawienie (D-015).
+
 Podział pracy jest przez to prosty: **mielenie dzieje się wyłącznie lokalnie**
 (projekty, dokumenty, transkrypty rozmów), a **wynik domyślnie jedzie na
 serwer** — bez klikania i bez pamiętania (D-014). Serwer nie mieli niczego i
@@ -183,9 +187,17 @@ wtyczka **zaproponuje mapowanie**. Warto się zgodzić: wtedy odsiew po skrócie
 treści działa i to samo repozytorium zmielone przez trzy osoby nie leży w bazie
 w trzech kopiach.
 
-**Tryb ręczny** — wyłącznik `auto_publish` w ustawieniach wtyczki. Wtedy nic nie
-wychodzi samo, a publikujesz komendą `/ws-publish`: wybierasz skrzydło, temat
-albo zakres dat, widzisz podgląd, potwierdzasz.
+**Praca bez sieci działa w pełni.** Lokalny pałac jest pierwotny, serwer dostaje
+kopię — więc zapis nigdy nie czeka na serwer i nigdy nie zawodzi z jego powodu.
+W pociągu, przy padniętym serwerze, w trakcie aktualizacji: mielisz i zapisujesz
+normalnie, a niewysłane szuflady czekają w kolejce i dopinają się same, gdy
+łączność wróci (D-015).
+
+**Tryb ręczny** — hamulec awaryjny, nie główny sposób pracy. Wyłącznik
+`auto_publish` w ustawieniach wtyczki; wtedy nic nie wychodzi samo, a
+publikujesz komendą `/ws-publish`: wybierasz skrzydło, temat albo zakres dat,
+widzisz podgląd, potwierdzasz. Przydatne, gdy świadomie nie chcesz kopiować
+konkretnej pracy.
 
 **Zabezpieczenia**, skoro wysyłka dzieje się bez nadzoru:
 
