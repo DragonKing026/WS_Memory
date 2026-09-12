@@ -8,9 +8,10 @@ tags: [ws-memory, documentation, backend, symfony, layers, api]
 # The backend — what each part is for
 
 Status: **working** (2026-09-12). Implemented: health, invitations, accounts,
-sign-in, spaces and roles, auditing, **access to memory** (search, writing, the
-knowledge graph, the diary). Missing: the MCP gateway (TODO-004), the wiki
-(TODO-005), publishing from local palaces (TODO-012).
+sign-in, spaces and roles, auditing, access to memory (search, writing, the
+knowledge graph, the diary) and **the MCP gateway with agent tokens**. Missing: the
+wiki (TODO-005), the frontend (TODO-006…008), publishing from local palaces
+(TODO-012).
 
 This document describes **every part of the backend and why it exists**. If you
 do not know where a new thing belongs, start here.
@@ -62,6 +63,9 @@ the **persistence model**, and the rules live in `Domain/`.
 | `Memory/MemoryRegistry.php` | **Port**: our own register of content in the palace. It also draws the transaction boundary — a write is real once it is booked (D-020). |
 | `Memory/MemoryWrite.php` | The row to be booked. A parameter object, because the list will grow when publishing from local palaces lands (TODO-012). Derives the title and the content digest in one place. |
 | `Memory/MemoryUnavailable.php` | "I could not look", kept separate from "I found nothing". An agent told "there is nothing" writes the knowledge again, next to the copy it could not see. |
+| `Memory/StoredMemory.php` | Where a write ended up: drawer, space, kind. A write returns this rather than a bare identifier, because a caller that named no space cannot otherwise learn where its content went (rule 6). |
+| `Identity/AgentIdentity.php` | Who a presented token turns out to be: the actor plus a label. Both at once, because an MCP request needs both and one query is cheaper than two on the path of every call. |
+| `Identity/AgentTokenDirectory.php` | **Port**: turning a secret into an identity and recording its use. In the domain, because both halves are rules: a revoked token must stop working at the **next** call, and every call must leave a trace. |
 | `Memory/MemoryAccessDenied.php` | A refused **write**. A read outside one's permissions answers empty, because "you have no access to HR" is itself a disclosure. |
 | `Audit/AuditTrail.php` | **Port**: recording who did what. In the domain, because auditing is a rule of this system rather than an infrastructure convenience (D-016). |
 | `Health/*` | The `HealthProbe` port plus `HealthChecker` assembling a report. Monitoring another dependency means adding a class, not editing a controller. |
@@ -73,6 +77,9 @@ the **persistence model**, and the rules live in `Domain/`.
 | `Invitation/IssueInvitation.php` | Issues an invitation. The token is random and the database holds **only its hash**; the plain value is returned once and never stored. |
 | `Invitation/AcceptInvitation.php` | Turns an invitation into an account **together with its private space, in one transaction**. A write naming no space lands there (rule 6), so an account without one would break an agent's very first write. |
 | `Invitation/IssuedInvitation.php` | The result object carrying the plain token. **Not a service** — excluded from the container. |
+| `AgentToken/IssueAgentToken.php` | Issues an agent credential. Random secret, hashed in the database, plain value once. Checks the requested scope against the owner's **current** permissions — not because that enforces rule 4 (the resolver intersects on every request), but so a mistake is reported now, to a person who can fix it, rather than becoming a token that reads nothing and cannot be debugged from the agent's side. |
+| `AgentToken/RevokeAgentToken.php` | Revokes — immediately, and only one's own, global administrators included. Somebody else's token answers identically to one that does not exist, or credentials could be enumerated. |
+| `AgentToken/IssuedAgentToken.php` | The result carrying the plain token and a ready `claude mcp add`. **Not a service.** |
 | `Memory/MemoryService.php` | **The only way into memory.** REST and MCP call this class and nothing below it, so choosing a different door cannot get you a different answer (D-008). This is where the fan-out across wings lives, the re-ranking, the second filtering layer (D-019), the private-space default (rule 6) and the author label. Nothing above this layer may hold a `MemoryStore`. |
 
 ### `Infrastructure/` — port adapters
@@ -88,6 +95,9 @@ the **persistence model**, and the rules live in `Domain/`.
 | `MemPalace/CallOutcome.php` | The result of one tool call. It exists because MemPalace reports failure **inside** the payload: HTTP 200, no error in the envelope, and the cause next to an empty result list. It also separates "no such drawer" from an outage. |
 | `MemPalace/McpMemoryStore.php` | The memory port's adapter — **the only place that knows MemPalace tool names** and the shape of their answers. Upgrading the palace (D-001) touches this file and no other. |
 | `MemPalace/MemPalaceUnavailable.php` | One failure for many causes: a refused connection, a timeout, an HTTP 500, a malformed envelope, a tool error. The caller's options are the same in every case. |
+| `Doctrine/DoctrineAgentTokenDirectory.php` | Tokens on DBAL. Revocation, expiry **and the owner still being active** checked in ONE statement — no window in which three separate checks could disagree, and no path on which somebody adds a caller that forgets the third. |
+| `Doctrine/DoctrineAuditTrail.php` | Writes **immediately**, through DBAL. It used to `persist()` and wait for somebody else's `flush` — and an MCP call changes no entities, so every agent action went unrecorded (D-024). |
+| `Security/AgentTokenAuthenticator.php` | Authenticates `/mcp` with an agent token. Puts the resolved identity on the request as an attribute: the Symfony token carries the owner, and the owner is not the whole answer — an agent is its owner **narrowed**, and the narrowing lives on the credential. |
 | `MemPalace/MemPalaceHealthProbe.php` | Probe: does memory respond. Queries `/healthz` with a short timeout — a hanging health check is worse than a negative one. |
 | `Security/ActiveAccountChecker.php` | Refuses inactive accounts — at sign-in **and on every subsequent request**. A JWT stays cryptographically valid until it expires, so without this a dismissed person would keep reading the base for the lifetime of their last token. |
 | `Security/LoginAuditSubscriber.php` | Sign-in auditing. Hung off security events because the login controller **never executes** — the firewall answers first. |
@@ -102,7 +112,28 @@ the **persistence model**, and the rules live in `Domain/`.
 | `GET /api/spaces`, `GET /api/spaces/{slug}` | `Api/SpaceController.php` | A space outside your permissions answers **byte for byte** like one that does not exist. |
 | `POST /api/spaces`, `POST /api/spaces/{slug}/members` | `Api/SpaceAdministrationController.php` | Creating spaces and granting roles. The creator becomes its administrator at once; the `priv_` prefix is reserved; a private space cannot be shared. |
 | `POST /api/invitations/accept` | `Api/AcceptInvitationController.php` | Public by necessity — the caller has no account yet. The password policy is enforced here, not in the browser. |
+| `GET/POST /api/agent-tokens`, `DELETE /api/agent-tokens/{id}` | `Api/AgentTokenController.php` | One's **own** tokens only, global administrators included (D-016). The plain value appears in one response — the one that created it. |
+| `ws:agent:token` | `Console/IssueAgentTokenCommand.php` | The only route to connecting an agent until the screens exist (TODO-008). Prints a ready `claude mcp add`, because the alternative is everybody reconstructing it from the documentation and getting the header wrong. |
 | `ws:user:invite` | `Console/InviteUserCommand.php` | The only route to the first account. It prints the link, because the first invitation is usually issued before the mailer is configured. |
+
+### `Presentation/Mcp/` — the gateway for agents
+
+| File | Role |
+|---|---|
+| `McpController.php` | `POST /mcp`. HTTP only: the body, the status code, recording the token's use and **the rate limit**. The limit is here rather than in the decorator chain because it is per token and per request — a decorator would have to be told the same thing seven times. |
+| `McpServer.php` | The JSON-RPC side: `initialize`, `tools/list`, `tools/call`, `ping`, notifications. Translates every failure into a code from `docs/03`. Testable by handing it an array. |
+| `McpTool.php` | **The tool port.** The set of tools IS the permission boundary (D-007). Adding a tool is adding a class — the tag collects it into the registry. **None has an author parameter**, and a test walks every schema to keep it that way. |
+| `McpToolRegistry.php` | Collects tools by tag and wraps each in auditing **on the way in**. The whole chain around a call is visible in one class instead of scattered across container decorators. Refuses two identical names and any name without the `ws_` prefix. |
+| `AuditedTool.php` + `AuditedToolFactory.php` | Decorator: every call leaves a trace, successful or not. It deliberately overlaps with `MemoryService`'s entry — this one says which **tool** a given **token** invoked, and it exists for calls that never reach memory or that fail before it. |
+| `ToolArguments.php` | Typed access to whatever an agent sent. The method that matters is `rejectUnknown()`: an unknown parameter is an **error**, because the parameter an agent is most likely to invent is `wing` — and ignoring it would let the agent believe it had narrowed its search. |
+| `McpError.php` | JSON-RPC codes, ours above `-32000`. What is **not** here: a "space forbidden" code — a read outside one's permissions returns an empty result (rule 7). |
+| `Tool/StatusTool.php` | `ws_status` — what the token is, what it sees, **where an unaddressed write will land**. Counts from our registry, never from the palace: an agent orienting itself must not cost a semantic query. |
+| `Tool/SearchTool.php` | `ws_search`. The schema offers no way to name a wing; `spaces` can only narrow. |
+| `Tool/GetTool.php` | `ws_get`. `found: false` for forbidden **and** missing content alike. |
+| `Tool/KgQueryTool.php` | `ws_kg_query`. Entity names are wing-qualified in storage and bare here (D-021). |
+| `Tool/RememberTool.php` | `ws_remember`. No author parameter **and no `kind`** — see `docs/03`. |
+| `Tool/KgAddTool.php` | `ws_kg_add`. A fact belongs to one space and is invisible from others; the description says so outright, so an agent does not write it twice. |
+| `Tool/DiaryWriteTool.php` | `ws_diary_write`. Private by default — session notes are the content people most expect to be theirs. |
 
 ### `Entity/` — the persistence model
 
@@ -183,12 +214,30 @@ an `invitation.accepted` entry.
    deliberately chosen direction of failure (D-020), because a drawer with no row
    is invisible, while a row with no drawer would be a result nobody can open.
 
+### An MCP tool call
+
+1. The `mcp` firewall reads `Authorization: Bearer`, resolves the token in **one
+   statement** (revocation, expiry, the owner being active) and puts the identity on
+   the request. Every failure answers the same `401` — the difference helps only
+   somebody guessing tokens.
+2. The controller records the use and gets back the number of calls in the window.
+   Over the limit → `429` and `-32005`, without touching the tool.
+3. `McpServer` validates the JSON-RPC envelope and picks the method. A batch request
+   is refused: it would count as one call while doing twenty.
+4. `McpToolRegistry` hands over the tool **already wrapped in auditing**.
+5. The tool validates its arguments (`ToolArguments`) and calls `MemoryService` —
+   never the palace directly. Going around the service would skip both filters
+   (D-019) and the bookkeeping (D-020).
+6. The result travels as an MCP text part with JSON inside. A failure travels as a
+   **JSON-RPC error**, not a success with an error in its payload (D-023).
+
 ## Permissions end to end
 
-Five layers, each covered by a negative test:
+Six layers, each covered by a negative test:
 
 1. **The firewall** — without a valid JWT there is no access to `/api` beyond
-   health, sign-in, invitation acceptance and the contract documentation.
+   health, sign-in, invitation acceptance and the contract documentation. `/mcp`
+   has a firewall of its own for agent tokens, declared before the JWT one.
 2. **`SpaceAccessResolver`** — the single place computing roles. An agent
    token's scope **narrows and never widens** its owner's permissions.
 3. **The controller** — checks permission before existence and returns `404`
@@ -198,6 +247,9 @@ Five layers, each covered by a negative test:
 5. **Memory — two filters, not one.** The wing narrows the question put to the
    palace, the registry checks the answer (D-019). The first guards against a
    mistake in our query, the second against drift between two stores.
+6. **The MCP tool set** — what is not in `tools/list` an agent cannot do. No tool
+   accepts an author or a wing, so impersonation and bypassing the filter are
+   **inexpressible**, not merely forbidden.
 
 A global administrator **does not silently read other people's spaces** (D-016).
 They may grant themselves a role — and that stays in the log.
@@ -213,6 +265,7 @@ with `doctrine:schema:validate --skip-sync`.
 | `Version20260912000001` | The Messenger queue in `ws`, with a `LISTEN/NOTIFY` trigger. |
 | `Version20260912000002` | Accounts, invitations, spaces, roles, the audit log. |
 | `Version20260912000003` | The register of content in the palace (`ws.memory_entries`). |
+| `Version20260912000004` | AI agent tokens (`ws.agent_tokens`) with the rate-limit counter. |
 
 **The `schema_filter` trap** — described in `docs/en/05-deployment.md`. In short:
 a `~^ws\.~` filter rejects our own tables, because with `search_path = ws` DBAL
@@ -232,6 +285,8 @@ returns them unqualified. The correct pattern **excludes** `palace`.
 | `Infrastructure/MemPalace/McpMemoryStoreTest.php` | The translation into MemPalace's dialect, asserted against the fields a live 3.7.0 palace **actually** returns. |
 | `Infrastructure/Doctrine/DoctrineMemoryRegistryTest.php` | What a double cannot check: the unique index, the foreign key, the transaction rollback, `tags` round-tripping. |
 | `Infrastructure/Doctrine/DoctrineSpaceCatalogTest.php` | A wing differing from its slug, the private space created on accepting an invitation, a `priv_*` impostor without the flag. |
+| `Api/McpGatewayTest.php` | The gateway as an agent meets it: the protocol, version negotiation, no batch requests, `401` for a revoked token, an expired one and one whose owner was deactivated, **a foreign space as an empty result rather than an error**, a refused write, an unknown parameter, the per-token rate limit, auditing of successful and failed calls. Deliberately **needs no palace** — all of it happens before memory, so it runs on every commit. |
+| `Integration/McpOnLivePalaceTest.php` | The full round trip through `/mcp` against a live palace: `ws_remember` → `ws_search` in Polish by different words → `ws_get`, a write with no space landing in the private one, the counts in `ws_status`, a fact round trip, the diary. |
 | `Integration/MemoryOnLivePalaceTest.php` | **The whole chain against a live palace**: a Polish query in different words, a refusal for a stranger, a drawer filed past the registry, the room filter, a fact round-tripping through the graph. Skipped when the palace does not answer, so the fast CI run stays fast and the nightly run covers it. |
 
 Running them: `make test` (prepares the test database and runs PHPUnit).
@@ -255,6 +310,11 @@ A second way of computing permissions is a second way of getting them wrong.
 **A new migration:** by hand in `migrations/`, named `VersionYYYYMMDDNNNNNN`.
 The `ws` schema only — we never write to `palace` (D-004).
 
+**A new MCP tool:** a class implementing `Presentation\Mcp\McpTool` with a `ws_`
+prefix in its name. The tag adds it to the registry — you touch neither the
+controller nor any list. The schema **must** set `additionalProperties: false` and
+must not carry an author or a wing field; `McpGatewayTest` checks both.
+
 **A new memory operation:** a method on `MemoryService`, never a new caller of
 `MemoryStore`. The service is the permission boundary; going around it skips both
 filters (D-019) and the bookkeeping (D-020). If you need a new MemPalace tool,
@@ -267,9 +327,9 @@ travel further up.
 
 | File | What it sets |
 |---|---|
-| `config/services.yaml` | Autowiring, the health probe tag, the MemPalace URL, **the palace token and timeout**, explicit port-to-adapter bindings, the public URL. A `when@test` block exposes a few services to the tests by name. |
+| `config/services.yaml` | Autowiring, the health probe and **MCP tool** tags, the rate limit, the MemPalace URL, **the palace token and timeout**, explicit port-to-adapter bindings, the public URL. A `when@test` block exposes a few services to the tests by name. |
 | `config/packages/doctrine.yaml` | The connection, the `schema_filter` hiding `palace`, entity mapping. |
-| `config/packages/security.yaml` | Firewalls: health unsecured, `json_login`, JWT for `/api` and `/mcp`. Lowered hashing cost in tests. |
+| `config/packages/security.yaml` | Firewalls: health unsecured, `json_login`, **a separate `/mcp` firewall for agent tokens**, JWT for `/api`. Lowered hashing cost in tests. |
 | `config/packages/messenger.yaml` | The queue in the database, `auto_setup: false` — the table comes from a migration. |
 | `config/packages/api_platform.yaml` | The contract at `/api/docs.json`, **Swagger UI disabled** (it needs Twig, and the backend renders no interface). |
 
@@ -286,6 +346,9 @@ travel further up.
 - **`tags` never reach the palace** — MemPalace 3.7 has no tag field on
   `add_drawer`. We keep them in `ws.memory_entries`, so they are searchable in
   SQL but have no effect on semantic search.
+- **The rate limit uses a fixed window, not a sliding one** — an agent can make
+  twice the limit across a window boundary (D-022). The limit exists so a loop
+  cannot swamp the palace, not to bill anybody.
 - **There is no compensation for orphans in the palace** — a drawer with no
   registry row is reported by a periodic task; nothing deletes it automatically
   (D-020).
