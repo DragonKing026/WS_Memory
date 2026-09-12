@@ -27,11 +27,13 @@ same logic: REST `/api` for people and MCP `/mcp` for agents.
 
 ## Status
 
-**The foundation works.** The design was approved on 2026-09-12; `TODO-000`
-(database, embeddings, memory + proof of Polish semantics) and `TODO-001`
-(Symfony backend as a pure API) are complete. Six services start and respond;
-the frontend, user accounts and the MCP gateway are still missing. Remaining
-tasks live in `TODO/`.
+**The backend reads and writes memory.** The design was approved on 2026-09-12;
+complete: `TODO-000` (database, embeddings, memory + proof of Polish semantics),
+`TODO-001` (backend as a pure API), `TODO-002` (accounts, invitations, spaces and
+roles), `TODO-003` (memory access with a hard space filter), `TODO-013`
+(bilingual documentation) and `TODO-014` (CI). Six services start and respond;
+the frontend and the MCP gateway are still missing. Remaining tasks live in
+`TODO/`.
 
 ## What it gives you
 

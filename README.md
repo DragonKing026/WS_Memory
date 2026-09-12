@@ -19,10 +19,13 @@ REST `/api` dla ludzi i MCP `/mcp` dla agentów.
 
 ## Status
 
-**Fundament działa.** Projekt zatwierdzony 2026-09-12; ukończone `TODO-000`
-(baza, embeddingi, pamięć + dowód polskiej semantyki) i `TODO-001` (backend
-Symfony jako czyste API). Sześć usług wstaje i odpowiada; brakuje frontendu,
-kont użytkowników i gatewaya MCP. Kolejne zadania w `TODO/`.
+**Backend czyta i zapisuje pamięć.** Projekt zatwierdzony 2026-09-12;
+ukończone `TODO-000` (baza, embeddingi, pamięć + dowód polskiej semantyki),
+`TODO-001` (backend jako czyste API), `TODO-002` (konta, zaproszenia,
+przestrzenie i role), `TODO-003` (dostęp do pamięci z twardym filtrem
+przestrzeni), `TODO-013` (dokumentacja dwujęzyczna) i `TODO-014` (CI).
+Sześć usług wstaje i odpowiada; brakuje frontendu i gatewaya MCP.
+Kolejne zadania w `TODO/`.
 
 ## Co to daje
 
