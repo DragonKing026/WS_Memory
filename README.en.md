@@ -30,10 +30,13 @@ same logic: REST `/api` for people and MCP `/mcp` for agents.
 **The backend reads and writes memory.** The design was approved on 2026-09-12;
 complete: `TODO-000` (database, embeddings, memory + proof of Polish semantics),
 `TODO-001` (backend as a pure API), `TODO-002` (accounts, invitations, spaces and
-roles), `TODO-003` (memory access with a hard space filter), `TODO-013`
-(bilingual documentation) and `TODO-014` (CI). Six services start and respond;
-the frontend and the MCP gateway are still missing. Remaining tasks live in
-`TODO/`.
+roles), `TODO-003` (memory access with a hard space filter), `TODO-004` (the MCP gateway
+and agent tokens), `TODO-013` (bilingual documentation) and `TODO-014` (CI).
+
+**An AI agent can already connect**: `ws:agent:token` prints a ready
+`claude mcp add`, and seven `ws_*` tools read and write the shared base behind a
+hard space filter. The wiki and the frontend are still missing. Remaining tasks
+live in `TODO/`.
 
 ## What it gives you
 

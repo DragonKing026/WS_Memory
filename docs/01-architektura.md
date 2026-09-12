@@ -130,8 +130,10 @@ backup systemu: wiki, rewizje, konta, uprawnienia, audyt **i pałac**.
 ### C. Agent czyta i zapisuje
 
 1. Claude Code → `nginx` → `backend` `/mcp`, nagłówek `Authorization: Bearer`.
-2. `backend` rozwiązuje token na właściciela i jego uprawnienia; token
-   **nigdy** nie daje więcej niż właściciel.
+2. `backend` rozwiązuje token na właściciela i jego uprawnienia — jednym
+   zapytaniem, razem ze sprawdzeniem unieważnienia, wygaśnięcia i aktywności
+   konta. Token **nigdy** nie daje więcej niż właściciel. Przy okazji tego samego
+   zapisu nalicza się limit tempa (D-022).
 3. `tools/call` trafia do jednego z narzędzi `ws_*` (`docs/03-mcp-gateway.md`),
    które woła **te same serwisy domenowe co REST** — reguły uprawnień są
    jedne, nie dwie.
