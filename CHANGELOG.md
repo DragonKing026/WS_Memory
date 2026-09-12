@@ -56,6 +56,35 @@ Zadanie przeniesione do `TODO/DONE/` z pełnym zapisem weryfikacji.
 
 ---
 
+## 2026-09-12 20:40 — TODO-013: dokumentacja dwujęzyczna
+
+Wykonane poza kolejnością, na wniosek: każde kolejne zadanie dokłada treści do
+przetłumaczenia, więc zwlekanie kosztuje liniowo.
+
+- `AGENTS.en.md`, `README.en.md`, `TODO/README.en.md` oraz `docs/en/` z sześcioma
+  dokumentami i specem — około 1700 wierszy. Polska wersja pozostaje wiodąca;
+  każdy plik angielski nosi w nagłówku wskazanie oryginału i datę synchronizacji.
+- **Definicja ukończenia** w `AGENTS.md`: siedmiopunktowa lista przechodzona
+  przed commitem. Reguła „aktualizuj dokumentację" była opisowa i przez to
+  niesprawdzalna.
+- `make sprawdz-dokumentacje` — wychwytuje brak odpowiednika, rozjazd numerów
+  decyzji, brak nagłówka i plik bez wpisu w mapie. Sprawdzony przeciwko obu
+  rodzajom usterki, bo skrypt zawsze przechodzący jest gorszy od jego braku.
+- Zasada commitowania **natychmiast po zamknięciu zmiany**, nie na koniec
+  zadania — historia gita ma pokazywać przebieg pracy, nie tylko wynik.
+
+**Tłumaczenie okazało się przeglądem dokumentacji** i ujawniło pięć rozjazdów,
+wszystkie poprawione: `README` twierdził, że implementacja jest nierozpoczęta;
+`docs/05` że nie ma `docker-compose.yml` i używał nieistniejącej roli `ws`
+w poleceniu backupu; `AGENTS.md` pisał, że mempalace mieli (wbrew D-012), miał
+nieaktualną datę i mówił o siedmiu działających usługach zamiast sześciu; graf
+zadań nie znał `TODO-012` ani `TODO-013`.
+
+Spec projektowy przetłumaczono, ale oznaczono jako **zapis historyczny** —
+zamyka się na D-009, a późniejsze decyzje zmieniły trzy opisane w nim rzeczy.
+
+---
+
 ## 2026-09-12 19:45 — TODO-001: fundament backendu
 
 Symfony 8.0 na PHP 8.4 jako **czyste API** (D-008): API Platform 4.3, Doctrine
