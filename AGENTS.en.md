@@ -385,6 +385,7 @@ docs/                  ← how the system works
   06-decyzje.md
   07-frontend.md
   08-backend.md
+  09-ci.md
   en/                  ← English counterparts (Polish is authoritative)
   superpowers/specs/   ← the design spec from the design phase
 TODO/                  ← numbered tasks

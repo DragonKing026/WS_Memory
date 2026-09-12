@@ -371,6 +371,7 @@ docs/                  ← dokumentacja działania
   06-decyzje.md
   07-frontend.md
   08-backend.md
+  09-ci.md
   en/                  ← angielskie odpowiedniki (polski jest wiodący)
   superpowers/specs/   ← spec projektowy z etapu projektowania
 TODO/                  ← ponumerowane zadania
