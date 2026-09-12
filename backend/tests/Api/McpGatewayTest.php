@@ -80,8 +80,16 @@ final class McpGatewayTest extends WebTestCase
         $result = $this->rpc('initialize', ['protocolVersion' => '2025-06-18'])['result'];
 
         self::assertSame('2025-06-18', $result['protocolVersion']);
-        self::assertSame(['tools' => []], $result['capabilities']);
         self::assertSame('ws_memory', $result['serverInfo']['name']);
+
+        // Asserted on the raw body: decoded, an empty JSON object and an empty
+        // array are the same PHP value, and only one of the two is a valid
+        // handshake.
+        self::assertStringContainsString(
+            '"tools":{}',
+            (string) $this->client->getResponse()->getContent(),
+            'capabilities.tools musi być obiektem, nie tablicą',
+        );
     }
 
     public function testUnknownProtocolVersionGetsOursRatherThanARefusal(): void
@@ -129,6 +137,17 @@ final class McpGatewayTest extends WebTestCase
             // the whole permission model rests on the server choosing it.
             self::assertNotContains('wing', $properties, $tool['name'] . ' pozwala wskazać skrzydło pałaca');
         }
+    }
+
+    public function testSchemaOfAToolWithoutArgumentsIsStillAnObject(): void
+    {
+        $this->rpc('tools/list');
+
+        self::assertStringNotContainsString(
+            '"properties":[]',
+            (string) $this->client->getResponse()->getContent(),
+            'puste „properties" musi być obiektem — inaczej to nie jest poprawny JSON Schema',
+        );
     }
 
     public function testEveryToolDeclaresItsSchemaStrictly(): void

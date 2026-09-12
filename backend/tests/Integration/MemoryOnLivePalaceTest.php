@@ -99,12 +99,12 @@ final class MemoryOnLivePalaceTest extends KernelTestCase
     {
         // The assumption the entire project rests on (D-003), asserted through
         // our own permission layer rather than straight against the palace.
-        $drawer = $this->memory->remember($this->member, self::CONTENT, new SpaceId('integracja'));
+        $stored = $this->memory->remember($this->member, self::CONTENT, new SpaceId('integracja'));
 
         $found = $this->memory->search($this->member, new MemoryQuery(self::UNRELATED_WORDS, limit: 20));
 
         self::assertContains(
-            $drawer->value,
+            $stored->drawer->value,
             array_map(static fn (MemoryFragment $f): string => $f->id->value, $found),
             'a Polish query sharing no words with the content must still find it',
         );
@@ -112,9 +112,9 @@ final class MemoryOnLivePalaceTest extends KernelTestCase
 
     public function testWrittenContentComesBackWholeThroughGet(): void
     {
-        $drawer = $this->memory->remember($this->member, self::CONTENT, new SpaceId('integracja'));
+        $stored = $this->memory->remember($this->member, self::CONTENT, new SpaceId('integracja'));
 
-        $fragment = $this->memory->get($this->member, $drawer);
+        $fragment = $this->memory->get($this->member, $stored->drawer);
 
         self::assertNotNull($fragment);
         self::assertSame(self::CONTENT, $fragment->content);
@@ -124,10 +124,10 @@ final class MemoryOnLivePalaceTest extends KernelTestCase
 
     public function testStrangerFindsNothingAndCanFetchNothing(): void
     {
-        $drawer = $this->memory->remember($this->member, self::CONTENT, new SpaceId('integracja'));
+        $stored = $this->memory->remember($this->member, self::CONTENT, new SpaceId('integracja'));
 
         self::assertSame([], $this->memory->search($this->stranger, new MemoryQuery(self::UNRELATED_WORDS)));
-        self::assertNull($this->memory->get($this->stranger, $drawer));
+        self::assertNull($this->memory->get($this->stranger, $stored->drawer));
     }
 
     public function testDrawerFiledStraightIntoOurWingIsNotReturned(): void
@@ -168,8 +168,8 @@ final class MemoryOnLivePalaceTest extends KernelTestCase
         );
         $ids = array_map(static fn (MemoryFragment $f): string => $f->id->value, $documents);
 
-        self::assertContains($document->value, $ids);
-        self::assertNotContains($note->value, $ids, 'a kind filter must reach the palace as a room filter');
+        self::assertContains($document->drawer->value, $ids);
+        self::assertNotContains($note->drawer->value, $ids, 'a kind filter must reach the palace as a room filter');
     }
 
     public function testFactRoundTripsThroughTheKnowledgeGraph(): void
@@ -195,9 +195,9 @@ final class MemoryOnLivePalaceTest extends KernelTestCase
         // the registry is where an invented one stops being merely untidy.
         $agent = Actor::agent($this->member->userId, Uuid::v7()->toRfc4122(), [new SpaceId('integracja')]);
 
-        $drawer = $this->memory->diaryWrite($agent, 'SESSION:2026-09-12|TODO-003|integracja', new SpaceId('integracja'));
+        $stored = $this->memory->diaryWrite($agent, 'SESSION:2026-09-12|TODO-003|integracja', new SpaceId('integracja'));
 
-        $fragment = $this->memory->get($agent, $drawer);
+        $fragment = $this->memory->get($agent, $stored->drawer);
         self::assertNotNull($fragment, 'a diary entry filed outside our wings would be unreadable for ever');
         self::assertTrue($fragment->wing->equals(new PalaceWing($this->wing)));
         self::assertSame('diary', $fragment->room);

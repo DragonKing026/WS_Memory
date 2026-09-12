@@ -16,6 +16,7 @@ use App\Domain\Memory\MemoryRegistry;
 use App\Domain\Memory\MemoryStore;
 use App\Domain\Memory\MemoryWrite;
 use App\Domain\Memory\PalaceWing;
+use App\Domain\Memory\StoredMemory;
 use App\Domain\Space\SpaceAccessResolver;
 use App\Domain\Space\SpaceCatalog;
 use App\Domain\Space\SpaceId;
@@ -145,6 +146,9 @@ final readonly class MemoryService
     /**
      * Files content into the palace and books it in the registry.
      *
+     * Answers with the space it landed in, not only an identifier: a caller that
+     * named no space cannot otherwise tell where its own write went (rule 6).
+     *
      * @param list<string> $tags
      */
     public function remember(
@@ -153,7 +157,7 @@ final readonly class MemoryService
         ?SpaceId $space = null,
         MemoryKind $kind = MemoryKind::Note,
         array $tags = [],
-    ): DrawerId {
+    ): StoredMemory {
         if ('' === trim($content)) {
             throw new \InvalidArgumentException('Nie zapisujemy pustej treści.');
         }
@@ -165,7 +169,7 @@ final readonly class MemoryService
         // call that should never have been made.
         $room = $kind->room();
 
-        return $this->registry->transactional(function () use ($actor, $content, $target, $wing, $kind, $room, $tags): DrawerId {
+        return $this->registry->transactional(function () use ($actor, $content, $target, $wing, $kind, $room, $tags): StoredMemory {
             $drawer = $this->store->store($wing, $kind, $content, $this->palaceAuthor($actor));
 
             $this->registry->register(MemoryWrite::ofContent($drawer, $target, $kind, $actor, $content, $tags));
@@ -176,7 +180,7 @@ final readonly class MemoryService
                 'room' => $room,
             ]);
 
-            return $drawer;
+            return new StoredMemory($drawer, $target, $kind);
         });
     }
 
@@ -188,7 +192,7 @@ final readonly class MemoryService
         string $entry,
         ?SpaceId $space = null,
         ?string $topic = null,
-    ): DrawerId {
+    ): StoredMemory {
         if ('' === trim($entry)) {
             throw new \InvalidArgumentException('Nie zapisujemy pustego wpisu w dzienniku.');
         }
@@ -197,7 +201,7 @@ final readonly class MemoryService
         $wing = $this->wingOf($target);
         $author = $this->palaceAuthor($actor);
 
-        return $this->registry->transactional(function () use ($actor, $entry, $target, $wing, $author, $topic): DrawerId {
+        return $this->registry->transactional(function () use ($actor, $entry, $target, $wing, $author, $topic): StoredMemory {
             $drawer = $this->store->writeDiary($wing, $author, $entry, $topic);
 
             $this->registry->register(
@@ -206,7 +210,7 @@ final readonly class MemoryService
 
             $this->audit->record('memory.diary_write', $actor, $target->value, ['drawer' => $drawer->value]);
 
-            return $drawer;
+            return new StoredMemory($drawer, $target, MemoryKind::Diary);
         });
     }
 

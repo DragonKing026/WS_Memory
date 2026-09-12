@@ -222,10 +222,13 @@ final class MemoryServiceTest extends TestCase
             privateSpaceSlug: 'priv_user-1',
         );
 
-        $drawer = $service->remember(Actor::human(self::OWNER), 'ustalenie bez wskazanej przestrzeni');
+        $stored = $service->remember(Actor::human(self::OWNER), 'ustalenie bez wskazanej przestrzeni');
 
         self::assertSame('wing_priv_user-1', $this->palace->writes[0]['wing']);
-        self::assertSame('priv_user-1', $this->registry->rows[$drawer->value]->space->value);
+        self::assertSame('priv_user-1', $this->registry->rows[$stored->drawer->value]->space->value);
+        // Reported back, not only recorded: a caller that named no space has no
+        // other way to learn where its own write went.
+        self::assertSame('priv_user-1', $stored->space->value);
     }
 
     public function testAgentWriteWithoutASpaceLandsInTheOwnersPrivateSpace(): void
@@ -237,10 +240,10 @@ final class MemoryServiceTest extends TestCase
         );
 
         $agent = Actor::agent(self::OWNER, 'token-1');
-        $drawer = $service->remember($agent, 'ustalenie agenta');
+        $stored = $service->remember($agent, 'ustalenie agenta');
 
-        self::assertSame('priv_user-1', $this->registry->rows[$drawer->value]->space->value);
-        self::assertSame('token-1', $this->registry->rows[$drawer->value]->author->agentTokenId);
+        self::assertSame('priv_user-1', $stored->space->value);
+        self::assertSame('token-1', $this->registry->rows[$stored->drawer->value]->author->agentTokenId);
     }
 
     public function testReaderCannotWrite(): void
@@ -282,10 +285,10 @@ final class MemoryServiceTest extends TestCase
     {
         $service = $this->serviceFor([self::OWNER => ['alfa' => SpaceRole::Writer]]);
 
-        $drawer = $service->remember(Actor::human(self::OWNER), "Tytuł ustalenia\nreszta treści", new SpaceId('alfa'));
+        $stored = $service->remember(Actor::human(self::OWNER), "Tytuł ustalenia\nreszta treści", new SpaceId('alfa'));
 
-        self::assertArrayHasKey($drawer->value, $this->registry->rows);
-        $row = $this->registry->rows[$drawer->value];
+        self::assertArrayHasKey($stored->drawer->value, $this->registry->rows);
+        $row = $this->registry->rows[$stored->drawer->value];
         self::assertSame('alfa', $row->space->value);
         self::assertSame(MemoryKind::Note, $row->kind);
         self::assertSame('Tytuł ustalenia', $row->title);
@@ -322,9 +325,10 @@ final class MemoryServiceTest extends TestCase
             privateSpaceSlug: 'priv_user-1',
         );
 
-        $drawer = $service->diaryWrite(Actor::agent(self::OWNER, 'token-1'), 'SESSION:2026-09-12|TODO-003');
+        $stored = $service->diaryWrite(Actor::agent(self::OWNER, 'token-1'), 'SESSION:2026-09-12|TODO-003');
 
-        self::assertSame(MemoryKind::Diary, $this->registry->rows[$drawer->value]->kind);
+        self::assertSame(MemoryKind::Diary, $this->registry->rows[$stored->drawer->value]->kind);
+        self::assertSame('priv_user-1', $stored->space->value);
         self::assertSame('wing_priv_user-1', $this->palace->writes[0]['wing']);
     }
 

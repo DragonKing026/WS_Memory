@@ -116,7 +116,10 @@ final readonly class McpServer
             'protocolVersion' => \is_string($asked) && \in_array($asked, self::SUPPORTED_PROTOCOLS, true)
                 ? $asked
                 : self::PROTOCOL_VERSION,
-            'capabilities' => ['tools' => []],
+            // stdClass, not an empty array: PHP would serialise [] as `[]`, and
+            // `capabilities.tools` has to be an object. Clients that validate the
+            // handshake reject the array form.
+            'capabilities' => ['tools' => new \stdClass()],
             'serverInfo' => ['name' => 'ws_memory', 'version' => self::SERVER_VERSION],
         ];
     }

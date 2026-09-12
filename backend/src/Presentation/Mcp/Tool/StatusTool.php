@@ -48,7 +48,10 @@ final readonly class StatusTool implements McpTool
 
     public function inputSchema(): array
     {
-        return ['type' => 'object', 'properties' => [], 'additionalProperties' => false];
+        // stdClass for the same reason as the handshake: `"properties": []` is not
+        // valid JSON Schema, and a tool with no arguments is the only place where
+        // PHP's array-versus-object ambiguity actually shows.
+        return ['type' => 'object', 'properties' => new \stdClass(), 'additionalProperties' => false];
     }
 
     public function call(Actor $actor, array $arguments): array

@@ -75,7 +75,7 @@ final readonly class RememberTool implements McpTool
 
         $space = $args->optionalString('space', 100);
 
-        $drawer = $this->memory->remember(
+        $stored = $this->memory->remember(
             actor: $actor,
             content: $args->requiredString('text'),
             space: null === $space ? null : new SpaceId($space),
@@ -83,6 +83,13 @@ final readonly class RememberTool implements McpTool
             tags: $args->optionalStringList('tags') ?? [],
         );
 
-        return ['id' => $drawer->value, 'space' => $space, 'kind' => MemoryKind::Note->value];
+        // The space that was actually written to, not the one that was asked for.
+        // With no space named the two differ, and an agent told `null` cannot say
+        // where the content went — nor notice that it went somewhere unintended.
+        return [
+            'id' => $stored->drawer->value,
+            'space' => $stored->space->value,
+            'kind' => $stored->kind->value,
+        ];
     }
 }

@@ -60,13 +60,13 @@ final readonly class DiaryWriteTool implements McpTool
 
         $space = $args->optionalString('space', 100);
 
-        $drawer = $this->memory->diaryWrite(
+        $stored = $this->memory->diaryWrite(
             actor: $actor,
             entry: $args->requiredString('text'),
             space: null === $space ? null : new SpaceId($space),
             topic: $args->optionalString('topic', 120),
         );
 
-        return ['id' => $drawer->value, 'space' => $space];
+        return ['id' => $stored->drawer->value, 'space' => $stored->space->value];
     }
 }
