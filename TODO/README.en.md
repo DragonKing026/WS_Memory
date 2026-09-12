@@ -40,11 +40,11 @@ A task without a **Co zostało zrobione** section does not go to `DONE/`.
 ## Order and dependencies
 
 ```
-✅ 000 skeleton ──► ✅ 001 backend foundation ──► 002 accounts and spaces
+✅ 000 skeleton ──► ✅ 001 backend foundation ──► ✅ 002 accounts and spaces
                                                       │
                                   ┌───────────────────┼───────────────────┐
                                   ▼                   ▼                   ▼
-                           003 palace client    005 wiki backend    006 frontend base
+                        ✅ 003 palace client    005 wiki backend    006 frontend base
                                   │                   │                   │
                                   ▼                   │                   ▼
                            004 MCP gateway ◄──────────┘            007 search (UI)
@@ -59,7 +59,7 @@ A task without a **Co zostało zrobione** section does not go to `DONE/`.
                            011 polish
 
   ❌ 010 server-side mining — CANCELLED (D-012)
-  ⏸  013 English documentation — independent; the earlier the cheaper
+  ✅ 013 English documentation · ✅ 014 continuous integration
 ```
 
 Tasks 000–002 are strictly sequential. Beyond that the backend (003–005) and
