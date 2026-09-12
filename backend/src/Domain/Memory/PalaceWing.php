@@ -20,11 +20,47 @@ namespace App\Domain\Memory;
  */
 final readonly class PalaceWing implements \Stringable
 {
+    /**
+     * Separator between a wing and an entity name in the knowledge graph.
+     *
+     * Two colons rather than one character, because entity names come from
+     * prose and a single colon appears in them ("Uwaga: termin"). A collision
+     * would not be a crash — it would quietly file a fact into the wrong space.
+     */
+    public const SEPARATOR = '::';
+
     public function __construct(public string $value)
     {
         if ('' === trim($value)) {
             throw new \InvalidArgumentException('A wing name cannot be empty — an unfiltered palace query is never allowed.');
         }
+    }
+
+    /**
+     * The entity name as it is stored in the graph for this wing.
+     *
+     * The palace's knowledge graph has no wing axis at all: mempalace_kg_query
+     * takes an entity and nothing else. Filtering facts after fetching them
+     * would be precisely what inviolable rule 3 forbids, so we put the scope
+     * into the key instead — every fact is written and queried under a
+     * wing-qualified name (D-021). A query for another space's facts then does
+     * not return them to be filtered; it does not match them.
+     */
+    public function qualify(string $entity): string
+    {
+        return $this->value . self::SEPARATOR . $entity;
+    }
+
+    /**
+     * The bare entity name, or null if this name belongs to another wing.
+     */
+    public function unqualify(string $entity): ?string
+    {
+        $prefix = $this->value . self::SEPARATOR;
+
+        return str_starts_with($entity, $prefix)
+            ? substr($entity, \strlen($prefix))
+            : null;
     }
 
     public function equals(self $other): bool

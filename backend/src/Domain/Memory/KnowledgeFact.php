@@ -29,6 +29,45 @@ final readonly class KnowledgeFact
     }
 
     /**
+     * The same fact as it is stored in the palace for one wing.
+     *
+     * Subject and object are both qualified, because mempalace_kg_query matches
+     * an entity in either position; qualifying only the subject would leave
+     * incoming facts reachable from every space. The predicate stays bare — it
+     * is a relationship type, not an entity, and nobody queries by it.
+     */
+    public function scopedTo(PalaceWing $wing): self
+    {
+        return new self(
+            $wing->qualify($this->subject),
+            $this->predicate,
+            $wing->qualify($this->object),
+            $this->validFrom,
+            $this->validTo,
+        );
+    }
+
+    /**
+     * The fact as it was before scoping, or null if it belongs to another wing.
+     *
+     * Null is the expected answer for anything the graph happens to hold that
+     * we did not write in this wing, and it is dropped rather than reported:
+     * an unqualified fact is either older than this scheme or somebody else's,
+     * and in both cases returning it would cross a space boundary.
+     */
+    public function unscopedFrom(PalaceWing $wing): ?self
+    {
+        $subject = $wing->unqualify($this->subject);
+        $object = $wing->unqualify($this->object);
+
+        if (null === $subject || null === $object) {
+            return null;
+        }
+
+        return new self($subject, $this->predicate, $object, $this->validFrom, $this->validTo);
+    }
+
+    /**
      * A stable digest of the triple, ignoring its validity window.
      *
      * Case- and whitespace-insensitive: the palace is queried with whatever an
