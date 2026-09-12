@@ -34,3 +34,23 @@ services:
     App\Infrastructure\MemPalace\MemPalaceHealthProbe:
         arguments:
             $baseUrl: '%mempalace.base_url%'
+
+when@test:
+    services:
+        _defaults:
+            autowire: true
+            autoconfigure: true
+
+        # Symfony removes services nothing references yet, and a use case
+        # reachable only from a test looks exactly like that. We expose the few
+        # the tests reach for, by name.
+        #
+        # Deliberately NOT a blanket `public: true` on App\: that turns every
+        # value object and DTO into a service and the container then fails on
+        # constructors it cannot autowire — SpaceId(string $value) and the like.
+        App\Application\Invitation\IssueInvitation:
+            public: true
+        App\Application\Invitation\AcceptInvitation:
+            public: true
+        App\Domain\Space\SpaceAccessResolver:
+            public: true
