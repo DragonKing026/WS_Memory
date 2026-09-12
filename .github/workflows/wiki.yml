@@ -1,0 +1,80 @@
+# Publikacja wiki — renderowane lustro katalogu `docs/`.
+#
+# Wiki jest wygodniejsza do czytania (pasek boczny, wyszukiwarka), ale NIE jest
+# drugim źródłem prawdy. Treść powstaje w repozytorium, przechodzi przegląd
+# w pull requeście i kontrolę spójności w CI; tutaj tylko ląduje.
+#
+# Ręczna edycja strony w wiki zostanie nadpisana przy najbliższym scaleniu do
+# `main` — każda strona nosi o tym ostrzeżenie w nagłówku.
+
+name: Publikacja wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'AGENTS.md'
+      - 'AGENTS.en.md'
+      - 'README.md'
+      - 'README.en.md'
+      - 'CHANGELOG.md'
+      - 'scripts/zbuduj-wiki.py'
+      - '.github/workflows/wiki.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: true
+
+jobs:
+  publikuj:
+    name: Zbuduj i wypchnij wiki
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Zbuduj strony z docs/
+        run: ./scripts/zbuduj-wiki.py "${RUNNER_TEMP}/wiki-tresc"
+
+      - name: Pobierz repozytorium wiki
+        id: pobierz
+        continue-on-error: true
+        run: |
+          git clone --depth 1 \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git" \
+            "${RUNNER_TEMP}/wiki-repo"
+
+      - name: Wiki nieutworzona
+        if: steps.pobierz.outcome == 'failure'
+        run: |
+          echo "::error::Repozytorium wiki nie istnieje."
+          echo "GitHub tworzy je dopiero po zapisaniu pierwszej strony przez interfejs."
+          echo "Wejdź w zakładkę Wiki, kliknij 'Create the first page' i zapisz cokolwiek —"
+          echo "ten workflow nadpisze to przy następnym uruchomieniu."
+          exit 1
+
+      - name: Wypchnij zmiany
+        run: |
+          cd "${RUNNER_TEMP}/wiki-repo"
+          # Usuwamy wszystko poza .git: strona skasowana w repozytorium ma
+          # zniknąć także z wiki, a nie zostać jako sierota.
+          find . -maxdepth 1 -name '*.md' -delete
+          cp "${RUNNER_TEMP}"/wiki-tresc/*.md .
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Wiki jest już aktualna — nic do wypchnięcia."
+            exit 0
+          fi
+
+          git commit -m "Wiki z ${{ github.sha }}"
+          git push

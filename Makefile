@@ -7,7 +7,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 BAZA_TESTOWA := ws_memory_test
 
-.PHONY: pomoc start stop test test-semantyka sprawdz-dokumentacje sprawdz-zadania analiza sprawdz-wszystko migracje konsola logi
+.PHONY: pomoc start stop test test-semantyka sprawdz-dokumentacje sprawdz-zadania analiza sprawdz-wszystko wiki migracje konsola logi
 
 pomoc:  ## Lista poleceń
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/ —/' | sort
@@ -51,6 +51,10 @@ baza-testowa:
 		 GRANT USAGE ON SCHEMA public TO ws_app;"
 	@$(COMPOSE) exec -T backend php bin/console doctrine:migrations:migrate \
 		--no-interaction --env=test 2>&1 | tail -2
+
+wiki:  ## Zbuduj podgląd wiki lokalnie (bez wypychania)
+	@./scripts/zbuduj-wiki.py var/podglad-wiki
+	@echo "Podgląd w var/podglad-wiki/"
 
 konsola:  ## Powłoka w kontenerze backendu
 	$(COMPOSE) exec backend bash
