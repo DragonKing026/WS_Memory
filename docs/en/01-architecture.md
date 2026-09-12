@@ -133,8 +133,10 @@ is a complete system backup: wiki, revisions, accounts, permissions, audit
 ### C. An agent reads and writes
 
 1. Claude Code → `nginx` → `backend` `/mcp`, header `Authorization: Bearer`.
-2. `backend` resolves the token to its owner and their permissions; a token
-   **never** grants more than its owner has.
+2. `backend` resolves the token to its owner and their permissions — in one
+   statement, together with checking revocation, expiry and whether the account is
+   active. A token **never** grants more than its owner has. The same write
+   accrues the rate limit (D-022).
 3. `tools/call` reaches one of the `ws_*` tools (`docs/en/03-mcp-gateway.md`),
    which calls **the same domain services as REST** — one set of permission
    rules, not two.
