@@ -39,7 +39,7 @@ final class InMemoryMemoryStore implements MemoryStore
 
     public bool $unavailable = false;
 
-    /** @var array<string, list<MemoryFragment>> keyed by wing */
+    /** @var array<string, array<int, MemoryFragment>> keyed by wing */
     private array $contents = [];
 
     /** @var array<string, MemoryFragment> keyed by drawer id */
@@ -55,7 +55,7 @@ final class InMemoryMemoryStore implements MemoryStore
         $this->guard();
         $this->searches[] = ['wing' => $wing->value, 'query' => $query->text];
 
-        return $this->contents[$wing->value] ?? [];
+        return array_values($this->contents[$wing->value] ?? []);
     }
 
     public function fetch(DrawerId $drawer): ?MemoryFragment

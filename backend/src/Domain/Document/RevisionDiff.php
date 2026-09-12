@@ -93,7 +93,11 @@ final readonly class RevisionDiff
      * @param list<string> $left
      * @param list<string> $right
      *
-     * @return list<list<int>>
+     * Indexed by position in both sequences rather than a list: it is written into
+     * from the bottom right corner, so "list" would be a promise about insertion
+     * order that this loop does not keep.
+     *
+     * @return array<int, array<int, int>>
      */
     private static function lcsTable(array $left, array $right): array
     {
@@ -114,9 +118,9 @@ final readonly class RevisionDiff
     }
 
     /**
-     * @param list<string>   $left
-     * @param list<string>   $right
-     * @param list<list<int>> $table
+     * @param list<string>                $left
+     * @param list<string>                $right
+     * @param array<int, array<int, int>>  $table
      *
      * @return list<array{type: string, line: string, from: ?int, to: ?int}>
      */
