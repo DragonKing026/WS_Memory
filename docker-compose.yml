@@ -1,0 +1,112 @@
+# WS_Memory — fundament (TODO-000).
+#
+# Na tym etapie stoją trzy usługi: baza, serwer embeddingów i pamięć.
+# Backend, frontend, worker i nginx dojdą w kolejnych zadaniach.
+#
+# ŻADNA usługa nie ma mapowania portu na hosta (D-006). Jedynym wejściem z
+# zewnątrz będzie nginx; do czasu jego dodania testujemy z wnętrza sieci:
+#   docker compose exec mempalace curl -s localhost:8765/healthz
+#
+# KAŻDA usługa ma twardy limit pamięci. Nie jest to strojenie wydajności, tylko
+# zabezpieczenie: kontener bez limitu weźmie całą pamięć maszyny. Przy pierwszym
+# uruchomieniu serwer embeddingów zajął ~20 GB i zdławił komputer.
+
+name: ws-memory
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ws_memory}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ustaw POSTGRES_PASSWORD w .env}
+      MEMPALACE_DB_PASSWORD: ${MEMPALACE_DB_PASSWORD:?ustaw MEMPALACE_DB_PASSWORD w .env}
+      WS_DB_PASSWORD: ${WS_DB_PASSWORD:?ustaw WS_DB_PASSWORD w .env}
+    volumes:
+      # Postgres 18+ trzyma dane w podkatalogu z numerem wersji, żeby
+      # `pg_upgrade --link` nie przekraczał granicy montowania. Montujemy więc
+      # /var/lib/postgresql, a NIE /var/lib/postgresql/data — obraz odmawia
+      # startu, gdy zamontować to drugie.
+      - postgres-dane:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    mem_limit: ${POSTGRES_MEM_LIMIT:-2g}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-ws_memory}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  embeddings:
+    # Wersja obrazu i nazwa modelu są przypięte świadomie: zmiana modelu
+    # unieważnia wszystkie wektory w bazie (D-003).
+    image: ${EMBEDDING_IMAGE:-ghcr.io/huggingface/text-embeddings-inference:cpu-1.8}
+    restart: unless-stopped
+    # Parametry bufora, NIE kosmetyka. bge-m3 przyjmuje 8192 tokenów, a TEI
+    # rezerwuje pamięć proporcjonalnie do --max-batch-tokens razy liczba
+    # wątków tokenizacji. Przy domyślnych wartościach (16384 tokenów, tyle
+    # wątków ile rdzeni) zajęło to ~20 GB i zdławiło maszynę. Same wagi
+    # modelu to ~2,3 GB — reszta była rezerwacją, której nie potrzebujemy:
+    # szuflady pałaca to fragmenty tekstu, nie dokumenty na 8 tysięcy tokenów.
+    command:
+      - "--model-id"
+      - "${EMBEDDING_MODEL:-BAAI/bge-m3}"
+      - "--port"
+      - "80"
+      - "--max-batch-tokens"
+      - "${EMBEDDING_MAX_BATCH_TOKENS:-2048}"
+      - "--max-client-batch-size"
+      - "${EMBEDDING_MAX_CLIENT_BATCH:-8}"
+      - "--max-concurrent-requests"
+      - "32"
+      - "--tokenization-workers"
+      - "${EMBEDDING_TOKENIZATION_WORKERS:-2}"
+      - "--auto-truncate"
+    volumes:
+      - embeddings-cache:/data
+    # Twardy limit pamięci. Gdyby mimo strojenia usługa chciała więcej, ma
+    # zginąć sama, a nie zabrać ze sobą maszynę. Kontener bez limitu weźmie
+    # tyle, ile jest — i dokładnie to się stało przy pierwszym uruchomieniu.
+    mem_limit: ${EMBEDDING_MEM_LIMIT:-4g}
+    cpus: ${EMBEDDING_CPUS:-4}
+    # Bez healthchecku: obraz nie zawiera narzędzi, którymi mógłby sprawdzić
+    # sam siebie. Na gotowość czeka entrypoint usługi mempalace.
+
+  mempalace:
+    build:
+      context: ./docker/mempalace
+      args:
+        MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.7.0}
+    image: ws-memory/mempalace:${MEMPALACE_VERSION:-3.7.0}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      embeddings:
+        condition: service_started
+    environment:
+      # Pałac mieszka w Postgresie razem z danymi aplikacji (D-002).
+      MEMPALACE_BACKEND: pgvector
+      MEMPALACE_PGVECTOR_DSN: postgresql://mempalace:${MEMPALACE_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-ws_memory}
+      # Wektory liczy jeden serwer dla całego systemu (D-003).
+      MEMPALACE_EMBEDDING_MODEL: openai-compat
+      MEMPALACE_EMBEDDING_API_URL: http://embeddings:80/v1/embeddings
+      MEMPALACE_EMBEDDING_API_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
+      # Wykrywanie encji po polsku — domyślnie byłoby angielskie (D-011).
+      MEMPALACE_ENTITY_LANGUAGES: ${MEMPALACE_ENTITY_LANGUAGES:-pl,en}
+      MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN:?ustaw MEMPALACE_MCP_HTTP_TOKEN w .env}
+      EMBEDDINGS_HEALTH_URL: http://embeddings:80/health
+    volumes:
+      - mempalace-dane:/data
+    mem_limit: ${MEMPALACE_MEM_LIMIT:-2g}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sSf --max-time 5 http://localhost:8765/healthz || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+
+volumes:
+  postgres-dane:
+  embeddings-cache:
+  mempalace-dane:

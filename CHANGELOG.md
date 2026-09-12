@@ -11,6 +11,51 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 
 ---
 
+## 2026-09-12 17:52 — TODO-000 ukończone: fundament działa, polska semantyka potwierdzona
+
+**Pierwszy kod w projekcie.** Trzy usługi w Dockerze stoją, a założenie, na
+którym stoi cały projekt, jest potwierdzone w działaniu, nie na papierze:
+
+```
+zapisano: „Umowa najmu lokalu wymaga aneksu przy zmianie stawki czynszu"
+szukano:  „zmiana opłaty za wynajem — jakie dokumenty"
+wynik:    podobieństwo 0.743, dopasowanie słów (BM25) 0.0
+```
+
+`bm25_score = 0.0` jest tu istotą dowodu: wyszukiwarka nie miała ani jednego
+wspólnego słowa, więc trafienie jest wyłącznie semantyczne. Wymiar wektora w
+bazie to **1024**, czyli pracuje `bge-m3`, a nie domyślny 384-wymiarowy
+`minilm`.
+
+**Powstało:** `docker-compose.yml` (postgres 18 + pgvector, TEI z bge-m3,
+mempalace 3.7.0), `docker/mempalace/` (obraz z `psycopg` i oczekiwaniem na
+embeddingi), `docker/postgres/init/` (schematy `palace` i `ws`, dwie role z
+rozdzielonymi uprawnieniami), `docker/wygeneruj-sekrety.sh`, `.env.example`,
+`README.docker.md`, `test/semantyka.sh` z `test/sprawdz_odpowiedz.py`.
+
+**Cztery rzeczy wyszły dopiero w działaniu:**
+
+1. **Postgres 18 zmienił konwencję montowania** — wolumen na
+   `/var/lib/postgresql`, nie na `/var/lib/postgresql/data`. Stara ścieżka
+   kończy się odmową startu.
+2. **Obraz TEI jest distroless** — brak `curl`, `wget`, `nc` i powłoki, więc
+   healthcheck Dockera jest tam niewykonalny. Zastąpiony oczekiwaniem w
+   entrypoincie `mempalace` i udokumentowanym poleceniem diagnostycznym.
+   Pierwotny plan zadania zakładał healthcheck przez `/health` — nie dało się.
+3. **Wyszukiwanie degraduje się cicho.** Przy niedostępnym serwerze
+   embeddingów MemPalace zwraca **poprawną** odpowiedź JSON-RPC z błędem
+   ukrytym w treści narzędzia i pustą listą wyników. Pierwsza wersja testu
+   postawiła z tego powodu fałszywą diagnozę. Rozróżnienie trafiło do testu
+   i do monitorowania w `docs/05-deployment.md` — alert patrzący tylko na kod
+   HTTP tej awarii nie zobaczy.
+4. **`bge-m3` potrzebuje ~2–3 GB RAM** po załadowaniu i 1–3 minut na start
+   z cache'u. Przy braku pamięci kontener się przeładowuje, a wyszukiwanie
+   w tym czasie zwraca puste wyniki.
+
+Zadanie przeniesione do `TODO/DONE/` z pełnym zapisem weryfikacji.
+
+---
+
 ## 2026-09-12 18:10 — Lokalny pałac pierwotny, serwer trzyma kopię
 
 Doprecyzowanie kierunku: praca dzieje się lokalnie, serwer dostaje **kopię**.

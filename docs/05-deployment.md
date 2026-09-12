@@ -13,7 +13,7 @@ Powstanie w zadaniu `TODO/000`.
 
 | Zasób | Minimum | Zalecane | Dlaczego |
 |---|---|---|---|
-| RAM | 6 GB | 12 GB | model embeddingów (`bge-m3`) zajmuje ~2-3 GB; Postgres z HNSW lubi cache |
+| RAM | 6 GB | 12 GB | model `bge-m3` zajmuje ~2–3 GB **po załadowaniu** (zmierzone); Postgres z HNSW lubi cache |
 | CPU | 4 rdzenie | 8 rdzeni | liczenie wektorów przy mieleniu repozytoriów |
 | Dysk | 40 GB | 100 GB SSD | baza rośnie z wolumenem wiedzy; wektory 1024-wymiarowe |
 | Docker | Engine 24+ z Compose v2 | | |
@@ -106,6 +106,8 @@ To osobna operacja z przeliczeniem całej bazy.
 | Co | Jak |
 |---|---|
 | żywotność mempalace | `GET /healthz` (bez uwierzytelnienia) |
+| żywotność embeddingów | `docker compose exec mempalace curl http://embeddings:80/health` — obraz TEI jest distroless i nie ma czym sprawdzić sam siebie |
+| **ciche degradacje wyszukiwania** | wyszukiwanie z błędem w treści narzędzia (`results: []` + `error`) — MemPalace nie zgłasza tego w kopercie JSON-RPC, więc alert musi zaglądać do środka |
 | żywotność backendu | `GET /api/health` |
 | zaległości kolejki | zadania Messenger starsze niż godzina |
 | rozjazd pałaca z rejestrem | zadanie nocne: `memory_entries` bez szuflady w pałacu |
@@ -113,6 +115,11 @@ To osobna operacja z przeliczeniem całej bazy.
 
 Rozjazdu nie naprawiamy po cichu — raportujemy. Cicha naprawa ukryłaby błąd,
 który go powoduje.
+
+**Najgroźniejsza awaria tego systemu jest cicha.** Gdy serwer embeddingów nie
+odpowiada, wyszukiwanie nadal zwraca poprawną odpowiedź — tylko pustą. Dla
+użytkownika wygląda to jak „nic o tym nie mamy", a nie jak awaria. Dlatego
+monitorowanie musi sprawdzać treść odpowiedzi, nie sam kod HTTP.
 
 ## Retencja
 
