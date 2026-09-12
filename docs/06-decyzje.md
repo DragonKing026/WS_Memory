@@ -409,3 +409,61 @@ DOCX do bazy — zostaje jej pisanie w wiki. Obejście: ktoś z lokalnym pałace
 mieli katalog dokumentów (`mempalace mine ~/dokumenty --mode extract`,
 wymaga wariantu `mempalace[extract]`) i publikuje wynik. Uznano za akceptowalne
 w pierwszej wersji; przywrócenie ścieżki serwerowej byłoby osobną decyzją.
+
+---
+
+## D-013 — Przenośność między klientami AI: wartość w serwerze, powłoki cienkie
+
+**Data:** 2026-09-12 17:30 · **Stan:** Przyjęta
+
+Budujemy **najpierw dla Claude Code** (biuro przechodzi na Claude), ale tak,
+żeby port do Codeksa, Cursora czy innego klienta MCP był przepisaniem
+manifestów, a nie przepisywaniem systemu. Trzy zasady:
+
+1. **Cała wartość mieszka po stronie serwera.** Narzędzia `ws_*`, uprawnienia,
+   tokeny, audyt, wiki — nic z tego nie jest w wtyczce.
+2. **Treść instrukcji ma jedno źródło** (`plugin/shared/`) i jest dodatkowo
+   wystawiona jako **zasoby MCP** oraz w opisach narzędzi.
+3. **Części nieprzenośne trzymamy minimalne**: jeden skrypt hooka z argumentem
+   zdarzenia zamiast osobnego skryptu na zdarzenie.
+
+**Co jest już przenośne bez żadnej pracy:** gateway to serwer MCP po HTTP.
+`codex mcp add --transport http`, `mcp.json` Cursora, Zed, Antigravity,
+Copilot w VS Code — wszystkie się z nim połączą. Użytkownik innego klienta
+dostaje **identyczne gwarancje bezpieczeństwa**, bo model uprawnień nie jest
+we wtyczce.
+
+**Co jest nieprzenośne:** hooki, skille, subagenci, komendy — czyli opakowanie.
+
+**Co ustalono, patrząc jak zrobił to MemPalace** (cztery pakowania w jednym
+repozytorium):
+
+- `.claude-plugin/` — commands, hooks (`hooks.json` + skrypty), skills;
+- `.codex-plugin/` — **ten sam kształt `hooks.json`** (SessionStart / Stop /
+  PreCompact), tylko ze zmienną `${CODEX_PLUGIN_ROOT}`, i **jeden** skrypt
+  przyjmujący nazwę zdarzenia jako argument;
+- `.cursor-plugin/` — sam `mcp.json`, bez hooków (Cursor używa reguł);
+- `.antigravity-plugin/` — `hooks.json.tmpl`, `mcp_config.json`, reguły, skille;
+- `integrations/shared/` — wspólna treść protokołów, niezależna od klienta.
+
+Czyli: różnice sprowadzają się do manifestów i nazw zmiennych, a treść jest
+wspólna. Kopiujemy ten układ.
+
+**Dlaczego zasoby MCP, a nie tylko skille:** zasoby czyta każdy klient MCP
+(w tym harness ma do tego narzędzia `ListMcpResources` / `ReadMcpResource`),
+a opisy narzędzi dostaje z definicji. Instrukcja przeniesiona z pliku wtyczki
+do zasobu serwera zyskuje jeszcze jedno: **zmiana instrukcji to deploy serwera,
+a nie aktualizacja wtyczki u każdej osoby z osobna.**
+
+> Nie zweryfikowano, jak poszczególne klienty wystawiają **prompty** MCP
+> użytkownikowi (dokumentacja Claude Code o tym milczy), więc nie opieramy na
+> nich niczego. Zasoby i opisy narzędzi wystarczą.
+
+**Czego nie robimy teraz:** nie piszemy pakowania dla Codeksa ani Cursora,
+dopóki nikt ich nie używa. Zasady 1–3 sprawiają, że będzie to zadanie na
+godziny, nie na tygodnie — i o to chodzi.
+
+**Uwaga o zależności:** pole `dependencies` w `plugin.json` istnieje tylko w
+Claude Code. Dla innych klientów ten sam efekt daje polecenie instalacyjne
+plus rejestracja lokalnego serwera MemPalace (`codex mcp add mempalace`);
+MemPalace ma gotowe pakowania dla Codeksa, Cursora i Antigravity.

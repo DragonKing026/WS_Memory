@@ -61,6 +61,10 @@ ma, a czego potrzebuje zespół:
 10. **Lokalny pałac nigdy nie pisze wprost do centralnej bazy.** Publikacja
     idzie przez API, bo tylko tam działają token, role i audyt. Dawanie
     `MEMPALACE_PGVECTOR_DSN` na zewnątrz unieważniłoby całą warstwę uprawnień.
+11. **Nic wartościowego nie mieszka we wtyczce.** Narzędzia, uprawnienia i
+    instrukcje żyją na serwerze; wtyczka je tylko podłącza. Reguła nie jest
+    estetyczna — decyduje o tym, czy port na inny klient AI to godziny czy
+    tygodnie (D-013).
 
 ## 3. Architektura w jednym akapicie
 
@@ -241,8 +245,17 @@ TODO/                  ← ponumerowane zadania
   DONE/                ← zadania ukończone
 backend/               ← Symfony 8: API + gateway MCP (samodzielne repo-w-repo)
 frontend/              ← Vue 3 + Vite (samodzielna aplikacja)
-plugin/                ← plugin WS_Memory do Claude Code
+plugin/                ← plugin WS_Memory
+  shared/              ← JEDNO źródło treści: protokoły, opisy agentów, instrukcje
+  .claude-plugin/      ← cienka powłoka: plugin.json, hooks.json, skills, agents
+  .codex-plugin/       ← (dopiero gdy ktoś użyje Codeksa) hooks.json + skills
 ```
+
+**Wtyczka jest powłoką, nie systemem** (D-013). Budujemy najpierw dla Claude
+Code, ale gateway to zwykły serwer MCP po HTTP — Codex, Cursor, Zed czy
+Antigravity połączą się z nim bez zmian po naszej stronie. Dlatego treść
+instrukcji ma jedno źródło w `plugin/shared/`, jest wystawiona także jako
+**zasoby MCP**, a hooki to jeden skrypt przyjmujący nazwę zdarzenia.
 
 **Rozdzielenie jest twarde.** `backend/` nie zawiera ani jednego szablonu
 renderującego interfejs, a `frontend/` nie wie nic o Doctrine ani o MemPalace.

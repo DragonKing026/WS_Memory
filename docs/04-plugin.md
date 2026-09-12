@@ -20,28 +20,25 @@ co użytkownik opublikuje. Serwer nie mieli niczego i nie przyjmuje surowych
 
 ```
 plugin/
+  shared/                    ← JEDNO źródło treści, niezależne od klienta AI
+    protokol-recall.md       ← szukaj w bazie, zanim odpowiesz
+    jak-dokumentowac.md      ← struktura dokumentu, język, gdzie co trafia
+    agenci/                  ← opisy podagentów jako Markdown
   .claude-plugin/
-    plugin.json          ← serwer MCP + metadane
-    marketplace.json     ← wpis do firmowego marketplace'u
-  hooks/
-    session-start.sh     ← wstrzyknięcie kontekstu z bazy
-    session-end.sh       ← przyrostowy wysył transkryptu
-    pre-compact.sh       ← zapis podsumowania przed kompaktowaniem
-  skills/
-    ws-memory-recall/    ← protokół: szukaj przed odpowiedzią
-    ws-memory-document/  ← jak pisać firmową dokumentację
-    ws-memory-setup/     ← konfiguracja tokena
-  commands/
-    ws-search.md
-    ws-doc.md
-    ws-status.md
-    ws-publish.md        ← publikacja z lokalnego pałaca (tryb hybrydowy)
-  agents/
-    ws-dokumentalista.md
-    ws-archiwista.md
-    ws-onboarding.md
-    ws-recall.md
+    plugin.json              ← dependencies, userConfig, serwer MCP
+    marketplace.json         ← wpis z poleceniem instalacyjnym
+    hooks.json               ← mapowanie zdarzeń na jeden skrypt
+    hooks/ws-hook.sh         ← JEDEN skrypt: ws-hook.sh <zdarzenie>
+    skills/                  ← cienkie opakowania treści z shared/
+    commands/                ← /ws-search /ws-doc /ws-status /ws-publish
+    agents/                  ← podagenci, treść z shared/agenci/
+  .codex-plugin/             ← powstanie dopiero, gdy ktoś użyje Codeksa
 ```
+
+Podział jest celowy (D-013): **`shared/` to treść, reszta to opakowanie.**
+Jeden skrypt hooka przyjmujący nazwę zdarzenia zamiast trzech osobnych —
+tak samo jak w pakowaniu MemPalace dla Codeksa. Dzięki temu port na inny
+klient AI to nowy manifest, nie nowy kod.
 
 ## Konfiguracja: zależność, MCP i `userConfig`
 
@@ -178,6 +175,31 @@ cyklicznie w tle. Cztery zabezpieczenia, bo lustro pracuje bez nadzoru:
 
 Czego tryb hybrydowy nie daje: jednego zapytania obejmującego oba magazyny.
 To dwa indeksy, więc agent pyta dwa razy.
+
+## Przenośność na inne klienty AI
+
+Budujemy najpierw dla Claude Code, ale system nie jest do niego przywiązany
+(D-013).
+
+**Przenośne bez żadnej pracy:** gateway to serwer MCP po HTTP. Codex
+(`codex mcp add --transport http`), Cursor (`mcp.json`), Zed, Antigravity czy
+Copilot w VS Code połączą się z nim od razu. Narzędzia `ws_*`, uprawnienia,
+tokeny i audyt działają identycznie, bo **żadne z nich nie jest we wtyczce**.
+
+**Przenośne niskim kosztem:** instrukcje. Treść ma jedno źródło w `shared/`
+i jest wystawiona także jako **zasoby MCP** (`ws-memory://protokol-recall`,
+`ws-memory://jak-dokumentowac`) oraz w opisach narzędzi — a to czyta każdy
+klient MCP. Skutek uboczny, cenny sam w sobie: zmiana instrukcji to **deploy
+serwera, a nie aktualizacja wtyczki u każdej osoby z osobna**.
+
+**Nieprzenośne i duplikowane:** hooki, skille, komendy, podagenci. Patrząc na
+MemPalace, który utrzymuje cztery pakowania naraz, koszt jest znany:
+`.codex-plugin` ma ten sam kształt `hooks.json` co Claude (SessionStart / Stop
+/ PreCompact), różni się nazwą zmiennej ze ścieżką; `.cursor-plugin` to sam
+`mcp.json`, bo Cursor nie ma hooków. To przepisanie manifestów, nie logiki.
+
+Pakowania dla innych klientów **nie powstają na zapas** — dopiero gdy ktoś
+faktycznie z nich korzysta.
 
 ## Instalacja u dewelopera
 

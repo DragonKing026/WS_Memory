@@ -11,6 +11,37 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 
 ---
 
+## 2026-09-12 17:30 — Przenośność na inne klienty AI
+
+Pytanie z biura: skoro MemPalace działa nie tylko z Claude, czy struktura
+wtyczek nie zablokuje nas później przy Codeksie? Sprawdzono, jak zrobił to
+MemPalace — utrzymuje cztery pakowania naraz (`.claude-plugin`,
+`.codex-plugin`, `.cursor-plugin`, `.antigravity-plugin`) plus wspólną treść
+protokołów w `integrations/shared/`. Codex ma **ten sam kształt `hooks.json`**
+co Claude i jeden skrypt przyjmujący nazwę zdarzenia; Cursor nie ma hooków
+wcale, tylko `mcp.json` i reguły.
+
+**D-013** — budujemy najpierw dla Claude Code, ale trzy zasady utrzymują
+przenośność tanim kosztem:
+
+1. Cała wartość mieszka na serwerze. Gateway to zwykły serwer MCP po HTTP,
+   więc Codex, Cursor, Zed czy Antigravity połączą się z nim **bez zmian po
+   naszej stronie**, z identycznymi gwarancjami bezpieczeństwa — bo model
+   uprawnień nie jest we wtyczce.
+2. Treść instrukcji ma jedno źródło (`plugin/shared/`) i jest wystawiona także
+   jako **zasoby MCP**. Skutek uboczny: zmiana instrukcji to deploy serwera,
+   a nie aktualizacja wtyczki u dwunastu osób.
+3. Części nieprzenośne trzymamy minimalne — **jeden** skrypt hooka z argumentem
+   zdarzenia zamiast trzech osobnych.
+
+- Reguła nienaruszalna nr 11: nic wartościowego nie mieszka we wtyczce.
+- Struktura `plugin/` przebudowana: `shared/` (treść) + `.claude-plugin/`
+  (powłoka); `.codex-plugin/` powstanie dopiero, gdy ktoś użyje Codeksa.
+- Nie oparto niczego na promptach MCP — nie zweryfikowano, jak klienty je
+  wystawiają. Zasoby i opisy narzędzi wystarczają.
+
+---
+
 ## 2026-09-12 17:15 — Jedna droga: mielenie wyłącznie lokalne
 
 Konsekwencja hybrydy, doprowadzona do końca. Skoro każdy może mielić u siebie,

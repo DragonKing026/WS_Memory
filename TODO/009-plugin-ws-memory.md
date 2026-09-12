@@ -45,16 +45,23 @@ jeśli użytkownik ma ustawione lustro.
 
 ## Rozwiązanie
 
-1. `plugin/.claude-plugin/plugin.json` — `dependencies: ["mempalace"]`,
+1. `plugin/shared/` — treść niezależna od klienta: protokół recall, zasady
+   dokumentowania, opisy podagentów. **Pakowania jej nie duplikują, tylko
+   zaciągają** (D-013).
+2. Wystawienie tej samej treści jako **zasobów MCP** przez gateway
+   (`ws-memory://protokol-recall`, `ws-memory://jak-dokumentowac`) — czyta je
+   każdy klient MCP, a zmiana instrukcji nie wymaga aktualizacji wtyczek.
+3. `plugin/.claude-plugin/plugin.json` — `dependencies: ["mempalace"]`,
    `userConfig` (adres + token `sensitive`), serwer MCP `ws_memory` po HTTP
    z `${user_config.*}`.
-2. `plugin/.claude-plugin/marketplace.json` — wpis z `source` typu `command`
+4. `plugin/.claude-plugin/marketplace.json` — wpis z `source` typu `command`
    instalującym `mempalace[extract]` i wykonującym `mempalace init`.
-3. `hooks/session-start.sh` — woła `ws_status`, wstrzykuje do kontekstu:
-   kim jest użytkownik, jakie ma przestrzenie, co się ostatnio zmieniło.
-4. `hooks/session-end.sh` — **nie** mieli i **nie** wysyła transkryptu
-   (robi to hook MemPalace lokalnie); uruchamia publikację lustra, jeśli
-   użytkownik je skonfigurował.
+5. **Jeden** skrypt `hooks/ws-hook.sh <zdarzenie>` (wzorzec z pakowania
+   MemPalace dla Codeksa) plus `hooks.json` mapujący zdarzenia:
+   - `session-start` — woła `ws_status`, wstrzykuje kontekst: kim jest
+     użytkownik, jakie ma przestrzenie, co się ostatnio zmieniło;
+   - `session-end` — **nie** mieli i **nie** wysyła transkryptu (robi to hook
+     MemPalace lokalnie); uruchamia publikację lustra, jeśli skonfigurowane.
 4. `hooks/pre-compact.sh` — `ws_diary_write` z podsumowaniem przed
    kompaktowaniem kontekstu.
 5. Skille: `ws-memory-recall` (szukaj przed odpowiedzią), `ws-memory-document`
@@ -77,5 +84,9 @@ jeśli użytkownik ma ustawione lustro.
   nie ma ani jednego bajtu surowej rozmowy (sprawdzone na zapisie ruchu).
 - Token nie występuje w żadnym pliku pluginu ani w zmiennych środowiskowych
   ustawianych ręcznie (sprawdzone `grep`).
+- Treść instrukcji występuje w repozytorium **raz** — w `plugin/shared/`;
+  pakowanie jej nie kopiuje (sprawdzone przeglądem).
+- Zasoby MCP z instrukcjami są odczytywalne przez klienta i zgodne z treścią
+  w `shared/`.
 - `ws-onboarding` zapytany o rzecz nieobecną w bazie mówi, że jej nie ma,
   zamiast odpowiadać z wiedzy ogólnej.
