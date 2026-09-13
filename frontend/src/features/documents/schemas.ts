@@ -52,6 +52,38 @@ export const documentListSchema = z.object({
   hasMore: z.boolean(),
 })
 
+export const documentHistorySchema = z.object({
+  slug: z.string().min(1),
+  currentRevision: z.number().nullable(),
+  revisions: z.array(
+    documentRevisionSchema.extend({
+      /** Resolved server-side: a revision stores raw ids, and a column of UUIDs
+       *  answers "who wrote this" with "no idea". */
+      authorName: z.string(),
+    }),
+  ),
+})
+
+export const diffLineSchema = z.object({
+  type: z.enum(['kept', 'added', 'removed']),
+  line: z.string(),
+  from: z.number().nullable(),
+  to: z.number().nullable(),
+})
+
+export const revisionDiffSchema = z.object({
+  from: z.number(),
+  to: z.number(),
+  identical: z.boolean(),
+  added: z.number(),
+  removed: z.number(),
+  lines: z.array(diffLineSchema),
+})
+
 export type DocumentDetail = z.infer<typeof documentSchema>
+export type DocumentHistory = z.infer<typeof documentHistorySchema>
+export type HistoryRevision = DocumentHistory['revisions'][number]
+export type RevisionDiff = z.infer<typeof revisionDiffSchema>
+export type DiffLine = z.infer<typeof diffLineSchema>
 export type DocumentListItem = z.infer<typeof documentListItemSchema>
 export type DocumentList = z.infer<typeof documentListSchema>

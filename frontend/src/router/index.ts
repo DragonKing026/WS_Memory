@@ -46,6 +46,21 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Przestrzeń' },
       },
       {
+        // These two come BEFORE the document route: the slug parameter is greedy, so
+        // `s/wiedza/umowy/edit` would otherwise be read as a document called
+        // "umowy/edit". The suffix is matched explicitly for the same reason.
+        path: 's/:space/:slug(.*)/edytuj',
+        name: 'document-edit',
+        component: () => import('@/pages/DocumentEditPage.vue'),
+        meta: { title: 'Edycja dokumentu' },
+      },
+      {
+        path: 's/:space/:slug(.*)/historia',
+        name: 'history',
+        component: () => import('@/pages/DocumentHistoryPage.vue'),
+        meta: { title: 'Historia dokumentu' },
+      },
+      {
         // A slug may contain slashes (`umowy/najem`), so the parameter is greedy.
         // Declared after the space route, or `s/wiedza` itself would match here.
         path: 's/:space/:slug(.*)',

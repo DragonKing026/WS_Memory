@@ -16,9 +16,10 @@ import { useAuthStore } from '@/stores/auth'
  * footer, and it states the human case as plainly as the AI one — a badge that only
  * appears sometimes gets read as "unknown" the rest of the time.
  *
- * Editing and history are TODO-008. The buttons are shown disabled rather than hidden:
- * "this exists and is coming" is more useful than a screen that silently lacks the
- * thing a reader is looking for.
+ * Verification is offered here rather than on the editor, and only to people: an
+ * agent has no way to reach this endpoint at all (D-005). The confirmation spells out
+ * what the claim is, because a button labelled only "Verify" gets clicked to make a
+ * badge go away.
  */
 const route = useRoute()
 const auth = useAuthStore()
@@ -26,6 +27,8 @@ const auth = useAuthStore()
 const document = ref<DocumentDetail | null>(null)
 const busy = ref(false)
 const problem = ref<string | null>(null)
+const verifying = ref(false)
+const confirmingVerify = ref(false)
 
 const space = computed(() => String(route.params.space ?? ''))
 const slug = computed(() => {
@@ -80,6 +83,21 @@ async function load(): Promise<void> {
   }
 }
 
+async function verify(): Promise<void> {
+  verifying.value = true
+  problem.value = null
+
+  try {
+    await documentService.verify(space.value, slug.value)
+    confirmingVerify.value = false
+    await load()
+  } catch (error) {
+    problem.value = error instanceof Error ? error.message : 'Nie udało się zweryfikować.'
+  } finally {
+    verifying.value = false
+  }
+}
+
 watch([space, slug], () => void load(), { immediate: true })
 </script>
 
@@ -107,13 +125,12 @@ watch([space, slug], () => void load(), { immediate: true })
           <h1 class="text-2xl font-semibold break-words">{{ document.title }}</h1>
         </div>
 
-        <div class="flex shrink-0 gap-2">
+        <div class="flex shrink-0 flex-wrap gap-2">
           <UButton
             size="sm"
             variant="subtle"
             icon="i-lucide-history"
-            disabled
-            title="Historia rewizji dochodzi w TODO-008"
+            :to="{ name: 'history', params: { space, slug } }"
           >
             Historia
           </UButton>
@@ -121,8 +138,7 @@ watch([space, slug], () => void load(), { immediate: true })
             v-if="canWrite"
             size="sm"
             icon="i-lucide-pencil"
-            disabled
-            title="Edytor dochodzi w TODO-008"
+            :to="{ name: 'document-edit', params: { space, slug } }"
           >
             Edytuj
           </UButton>
@@ -149,6 +165,20 @@ watch([space, slug], () => void load(), { immediate: true })
         </UBadge>
         <UBadge v-else color="neutral" variant="outline">Niezweryfikowane</UBadge>
 
+        <!-- Verification is a human act and the button says what the act means. A
+             button labelled only "Verify" gets clicked to make the badge go away;
+             one that spells out the claim gets clicked by somebody making it. -->
+        <UButton
+          v-if="canWrite && !document.verified"
+          size="xs"
+          variant="subtle"
+          icon="i-lucide-badge-check"
+          :loading="verifying"
+          @click="confirmingVerify = true"
+        >
+          Zweryfikuj
+        </UButton>
+
         <UBadge v-if="document.archived" color="error" variant="subtle">Zarchiwizowane</UBadge>
         <UBadge v-if="document.status === 'draft'" color="neutral" variant="outline">
           Szkic
@@ -160,13 +190,32 @@ watch([space, slug], () => void load(), { immediate: true })
         <span v-if="updatedAt" class="text-muted">· {{ updatedAt }}</span>
       </div>
 
-      <!-- Said out loud rather than left to a disabled button: a dimmed button with a
-           tooltip is invisible to anybody not hovering over it, and "why can't I edit
-           this" is a worse question than a plain sentence. -->
-      <p class="text-xs text-muted">
-        Edycja i historia w przeglądarce jeszcze nie działają. Dokument można zmienić
-        przez API albo agentem AI (<code>ws_doc_write</code>).
-      </p>
+      <UAlert
+        v-if="confirmingVerify"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-badge-check"
+        title="Potwierdzasz, że treść jest prawdziwa"
+      >
+        <template #description>
+          <p>
+            Weryfikacja to twoje oświadczenie, że przeczytałeś ten dokument i treść się
+            zgadza. Znika automatycznie przy następnej zmianie — bo „Anna to sprawdziła”
+            przestaje być prawdą w chwili, gdy tekst się zmienia.
+          </p>
+          <div class="mt-2 flex gap-2">
+            <UButton size="xs" :loading="verifying" @click="verify">Tak, potwierdzam</UButton>
+            <UButton
+              size="xs"
+              variant="subtle"
+              color="neutral"
+              @click="confirmingVerify = false"
+            >
+              Anuluj
+            </UButton>
+          </div>
+        </template>
+      </UAlert>
 
       <UAlert
         v-if="document.authoredByAi && !document.verified"

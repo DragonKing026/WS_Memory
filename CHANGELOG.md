@@ -15,6 +15,44 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 11:43 — TODO-008: edytor, historia i weryfikacja
+
+Edytor Markdown (CodeMirror 6) z podglądem obok, ekran historii z porównaniem
+**dowolnych dwóch** rewizji, cofanie i weryfikacja dokumentu.
+
+**Podgląd renderuje dokładnie ten tekst, który poleci do API** — ten sam ciąg
+znaków i ten sam renderer, co na ekranie dokumentu. Podgląd różniący się od
+wyniku uczy ludzi, żeby mu nie ufać, a potem żeby go nie oglądać.
+
+**Opis zmiany jest wymagany**, nie proszony. Historia bez opisów to lista dat,
+a pole opcjonalne w pośpiechu jest polem pustym.
+
+**Szkic przeżywa zamknięcie karty** — zapis do `localStorage` chwilę po
+przerwie w pisaniu, przywracanie **z pytaniem**. Nigdy po cichu: szkic może być
+starszy niż to, co jest na serwerze, a nadpisanie cudzej nowszej treści
+zapomnianym szkicem to gorsza porażka niż utrata szkicu.
+
+**Rewizja zapisana w trakcie edycji to ostrzeżenie, nie blokada.** Agent może
+zapisać w dowolnej chwili. Odmowa zapisu straciłaby pracę człowieka, cichy zapis
+— pracę agenta; więc ekran mówi, co się stało, i pozwala zdecydować.
+
+**Historia idzie do przodu także przy cofaniu** i potwierdzenie mówi to wprost:
+cofnięcie dopisuje nową rewizję z dawną treścią, nie usuwa niczego. Sprawdzone
+w przeglądarce: edycja dała rewizję 2, cofnięcie do 1 dało rewizję **3**,
+a wszystkie trzy zostały w historii.
+
+**Historia pokazuje nazwiska, nie identyfikatory.** Rewizja przechowuje surowe
+UUID-y (celowo — skopiowane nazwisko się starzeje, a klucz obcy do kont
+uniemożliwiłby ich usuwanie), więc nowy port `AuthorDirectory` rozwiązuje je
+hurtem przy odczycie. Konto usunięte zostawia rewizję na miejscu, bez nazwiska —
+historia gubiąca wpisy, gdy ktoś odchodzi, jest gorsza niż historia bez nazwiska.
+
+**Dwie usterki złapane w przeglądarce, nie w kodzie:** cofanie wysyłało pole
+`revision`, a API oczekuje `toRevision` (400); w tabeli różnic numery linii były
+centrowane w pionie, więc przy zawiniętym wierszu wypadały poniżej swojej
+pierwszej linii — zgłoszone przez użytkownika.
+
+---
 ## 2026-09-13 11:33 — Skrypt pyta GitHuba, czy to jego wina
 
 **GitHub ma dziś krytyczną awarię** — od 09:16 UTC: Pull Requests niesprawne,
