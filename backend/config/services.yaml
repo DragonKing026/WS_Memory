@@ -24,6 +24,13 @@ parameters:
     # nginx; in production the real domain.
     app.public_base_url: '%env(default:app_default_base_url:WS_PUBLIC_URL)%'
     app_default_base_url: 'http://127.0.0.1:8080'
+    # Where the instruction texts published as MCP resources are read from. They
+    # have one source — `plugin/shared/` (D-013) — but that source sits in a
+    # different place in every environment: next to `backend/` when the test suite
+    # runs on a host, a read-only mount in the containers, a copy baked into the
+    # production image. Hence a variable with a default rather than a fixed path.
+    app.instructions_dir: '%env(default:app_default_instructions_dir:WS_INSTRUCTIONS_DIR)%'
+    app_default_instructions_dir: '%kernel.project_dir%/../plugin/shared'
     # The version the palace image was BUILT from — `MEMPALACE_VERSION` in the
     # root .env, which drives `pip install mempalace==...`. Deliberately not the
     # same fact as the version that answers: the two drift the moment somebody
@@ -87,6 +94,7 @@ services:
     App\Domain\Identity\AuthorDirectory: '@App\Infrastructure\Doctrine\DoctrineAuthorDirectory'
     App\Domain\Identity\UserRoster: '@App\Infrastructure\Doctrine\DoctrineUserRoster'
     App\Domain\Identity\InvitationRoster: '@App\Infrastructure\Doctrine\DoctrineInvitationRoster'
+    App\Domain\Instruction\InstructionLibrary: '@App\Infrastructure\Instruction\FileInstructionLibrary'
     App\Domain\Audit\AuditTrail: '@App\Infrastructure\Doctrine\DoctrineAuditTrail'
     App\Domain\Audit\AuditJournal: '@App\Infrastructure\Doctrine\DoctrineAuditJournal'
     App\Domain\Dependency\ReleaseCatalog: '@App\Infrastructure\PyPi\PyPiReleaseCatalog'
@@ -94,6 +102,10 @@ services:
     App\Domain\Dependency\DependencyStateStore: '@App\Infrastructure\Doctrine\DoctrineDependencyStateStore'
     App\Domain\Dependency\UpdateRequestRepository: '@App\Infrastructure\Doctrine\DoctrineUpdateRequestRepository'
     App\Domain\Dependency\UpdaterHeartbeat: '@App\Infrastructure\Doctrine\DoctrineUpdaterHeartbeat'
+
+    App\Infrastructure\Instruction\FileInstructionLibrary:
+        arguments:
+            $directory: '%app.instructions_dir%'
 
     App\Infrastructure\PyPi\PyPiReleaseCatalog:
         arguments:
@@ -162,6 +174,14 @@ when@test:
             public: true
             arguments:
                 $registered: !tagged_iterator app.mcp_tool
+        # The instruction library is reached directly by the test that compares
+        # what the gateway serves with the files in plugin/shared. Arguments are
+        # repeated because a second definition replaces the first one whole.
+        App\Domain\Instruction\InstructionLibrary: '@App\Infrastructure\Instruction\FileInstructionLibrary'
+        App\Infrastructure\Instruction\FileInstructionLibrary:
+            public: true
+            arguments:
+                $directory: '%app.instructions_dir%'
         App\Domain\Memory\MemoryRegistry: '@App\Infrastructure\Doctrine\DoctrineMemoryRegistry'
         App\Domain\Space\SpaceCatalog: '@App\Infrastructure\Doctrine\DoctrineSpaceCatalog'
         App\Domain\Dependency\DependencyStateStore: '@App\Infrastructure\Doctrine\DoctrineDependencyStateStore'
