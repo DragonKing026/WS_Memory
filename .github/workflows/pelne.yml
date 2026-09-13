@@ -25,10 +25,26 @@ on:
   # jedyne, co potrafi ją sprawdzić, chodziło dopiero po fakcie. Usterka
   # integracyjna wykryta minutę po scaleniu jest już usterką na main-ie.
   pull_request:
+    paths-ignore: &tylko-tekst
+      # Zmiana wyłącznie w tekście nie może zepsuć stawiania stosu, więc nie ma
+      # po co stawiać stosu. Rozliczenie TODO-016 zmieniło dwa pliki tekstowe
+      # i zajęło pełnemu przebiegowi 4 min 57 s — czysta strata.
+      #
+      # Filtr ścieżek na poziomie workflowu jest tu **bezpieczny wyłącznie
+      # dlatego**, że ten przebieg nie jest wymaganym checkiem. Gdyby był,
+      # pominięcie nie zgłosiłoby się jako zielone, tylko jako wiecznie
+      # oczekujące, i zablokowałoby każdy pull request dokumentacyjny. Jedynym
+      # wymaganym checkiem jest `Wynik sprawdzenia` z szybkiego przebiegu.
+      # Zmieniając tę listę, sprawdź najpierw, czy reguła nadal tak wygląda.
+      - 'docs/**'
+      - 'TODO/**'
+      - '**.md'
+      - 'LICENSE'
   # Po scaleniu również. Pull request sprawdza commit scalający, którego po
   # scaleniu na main-ie nie ma — a interesuje nas stan, który obowiązuje.
   push:
     branches: [main]
+    paths-ignore: *tylko-tekst
   schedule:
     # 03:17 UTC — nie o pełnej godzinie, bo wtedy kolejki GitHuba są najdłuższe.
     - cron: '17 3 * * *'
