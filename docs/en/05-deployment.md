@@ -147,7 +147,9 @@ routes leave the same trace.
 
 | Variable | Role |
 |---|---|
-| `WS_DOMAIN` | public domain (certificate, links in e-mails) |
+| `WS_PUBLIC_URL` | the application's public address **with a scheme** — links in e-mails are built from it; empty means e-mails carrying links are not sent (TODO-017) |
+| `MAILER_DSN` | mail server; `null://null` means nothing is sent |
+| `MAIL_FROM`, `MAIL_FROM_NAME` | the sender in the `From` header |
 | `POSTGRES_PASSWORD` | password of the database superuser role |
 | `MEMPALACE_DB_PASSWORD` | password of the `mempalace` role (schema `palace`) |
 | `WS_DB_PASSWORD` | password of the `ws_app` role (schema `ws`) |

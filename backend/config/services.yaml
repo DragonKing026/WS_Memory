@@ -24,6 +24,18 @@ parameters:
     # nginx; in production the real domain.
     app.public_base_url: '%env(default:app_default_base_url:WS_PUBLIC_URL)%'
     app_default_base_url: 'http://127.0.0.1:8080'
+    # Nadawca wpisywany w nagłówek From. Nie jest to ten sam adres co odbiorca
+    # odpowiedzi ani nazwa instancji — jedno pole, jedno znaczenie.
+    app.mail.from: '%env(MAIL_FROM)%'
+    app.mail.from_name: '%env(MAIL_FROM_NAME)%'
+    # Ten sam WS_PUBLIC_URL co wyżej, ale **bez wartości zastępczej**, i w tym
+    # jest cała rzecz. Link wypisany w konsoli czyta człowiek siedzący przy tej
+    # maszynie, więc `http://127.0.0.1:8080` jest dla niego poprawny. Link w
+    # mailu czyta ktoś z innego komputera, gdzie ten adres prowadzi do jego
+    # własnej przeglądarki. Puste znaczy „nie wiem, jak mnie widać z zewnątrz",
+    # a wtedy mail się nie wysyła i dziennik maili mówi dlaczego — martwy link
+    # w cudzej skrzynce jest gorszy niż brak wiadomości.
+    app.mail.link_base_url: '%env(default::WS_PUBLIC_URL)%'
     # Where the instruction texts published as MCP resources are read from. They
     # have one source — `plugin/shared/` (D-013) — but that source sits in a
     # different place in every environment: next to `backend/` when the test suite

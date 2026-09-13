@@ -15,6 +15,40 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 20:00 — Mailer wpuszczony do systemu, dokumentacja przestaje kłamać
+
+Pierwsza warstwa TODO-017: `symfony/mailer` jest zależnością, `MAILER_DSN`,
+`MAIL_FROM` i `MAIL_FROM_NAME` istnieją w konfiguracji, w `.env.example`
+i w `docker-compose.yml` (backend i worker). Nic jeszcze nie wysyła — to
+przyjdzie z szablonami i dziennikiem — ale transport da się skonfigurować.
+
+W środowisku testowym transport `null` jest wpisany **wprost w `when@test`**,
+nie przez `.env.test`. Zmienna środowiskowa kontenera wygrywa z `.env.test`,
+co przy D-035 wywróciło CI; wartość wpisana w konfiguracji jest jedyną, której
+nie da się nadpisać z zewnątrz. Nawet przebieg testów z prawdziwym `MAILER_DSN`
+w środowisku nie wyśle niczego do nikogo.
+
+`WS_PUBLIC_URL` zyskał **drugi parametr bez wartości zastępczej**
+(`app.mail.link_base_url`). Link wypisany w konsoli czyta człowiek przy tej
+maszynie, więc `127.0.0.1:8080` jest dla niego poprawny; link w mailu czyta ktoś
+z innego komputera, gdzie ten sam adres prowadzi do jego własnej przeglądarki.
+Pusta wartość będzie odmową wysyłki z powodem widocznym w dzienniku, a nie
+wiadomością z martwym linkiem.
+
+`docs/05-deployment.md` opisywał `WS_DOMAIN` jako „domena publiczna
+(certyfikat, **linki w mailach**)". Zmiennej o tej nazwie nie ma w żadnym pliku
+tego repozytorium i nigdy nie było, a maili nie było tym bardziej — wiersz
+opisywał dwie rzeczy nieistniejące naraz. Zastąpiony trzema, które istnieją.
+Dokumentacja jest wsadem dla agentów AI, więc nieaktualne zdanie nie jest
+kosmetyką: zostaje potraktowane jako fakt i powielone.
+
+Doszedł **mailpit za profilem `dev`** — skrzynka na próby na własnej maszynie.
+Bez niej jedynym sposobem sprawdzenia, czy zaproszenie naprawdę wychodzi i czy
+link w treści działa, byłaby wysyłka na prawdziwą skrzynkę, czyli prawdziwy
+token w cudzej infrastrukturze. `docker compose up` jej nie podnosi.
+
+
+---
 ## 2026-09-13 19:50 — Metodologia zadań zapisana tam, gdzie się jej szuka
 
 Reguły o polach wyboru i o zadaniu zrobionym w części trafiły dotąd tylko do

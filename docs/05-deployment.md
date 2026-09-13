@@ -143,7 +143,9 @@ usługę co `DELETE /api/agent-tokens/{id}`, więc obie drogi zostawiają ten sa
 
 | Zmienna | Rola |
 |---|---|
-| `WS_DOMAIN` | domena publiczna (certyfikat, linki w mailach) |
+| `WS_PUBLIC_URL` | publiczny adres aplikacji **ze schematem** — z niego budują się linki w mailach; pusty = maile z linkami się nie wysyłają (TODO-017) |
+| `MAILER_DSN` | serwer poczty; `null://null` = nie wysyłamy nic |
+| `MAIL_FROM`, `MAIL_FROM_NAME` | nadawca w nagłówku `From` |
 | `POSTGRES_PASSWORD` | hasło roli nadrzędnej bazy |
 | `MEMPALACE_DB_PASSWORD` | hasło roli `mempalace` (schemat `palace`) |
 | `WS_DB_PASSWORD` | hasło roli `ws_app` (schemat `ws`) |

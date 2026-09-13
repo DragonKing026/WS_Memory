@@ -1,0 +1,16 @@
+framework:
+    mailer:
+        dsn: '%env(MAILER_DSN)%'
+
+# Transport `null` wpisany na sztywno, nie przez `.env.test`.
+#
+# Zmienna środowiskowa kontenera wygrywa z `.env.test` — sprawdzone boleśnie przy
+# D-035, gdzie `WS_DEFAULT_SPACE_SLUG` z docker-compose przebił plik testowy
+# i przebieg w CI wywrócił się na kolizji. Wartość wpisana wprost w `when@test`
+# jest jedyną, której nie da się nadpisać z zewnątrz: nawet gdy ktoś uruchomi
+# testy z prawdziwym `MAILER_DSN` w środowisku, żaden pakiet nie pojedzie
+# do prawdziwej skrzynki.
+when@test:
+    framework:
+        mailer:
+            dsn: 'null://null'
