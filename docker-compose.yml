@@ -172,6 +172,16 @@ services:
       # Port, na którym przeglądarka widzi aplikację — websocket HMR musi być
       # ogłoszony na porcie nginxa, nie Vite, bo przeglądarka rozmawia z nginxem.
       WS_DEV_PORT: ${WS_DEV_PORT:-8080}
+      # Node dobiera domyślny rozmiar sterty od pamięci kontenera — przy limicie
+      # 1 GB wychodziło 549 MB, a `vue-tsc` przy obecnej liczbie plików potrzebuje
+      # ~600 MB i wywracał się na „heap out of memory". Objaw jest mylący: wygląda
+      # jak błąd typów, a jest brakiem pamięci, i dotyka każdego, kto uruchomi
+      # sprawdzenie w kontenerze — łącznie ze skryptem wypychającym.
+      #
+      # Wartość świadomie niższa od limitu kontenera: gdy sterta może urosnąć do
+      # granicy pamięci, proces ginie z ręki Dockera zamiast zgłosić własny błąd,
+      # a wtedy w dzienniku nie ma nawet śladu po przyczynie.
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=1536}
     volumes:
       # Źródła z hosta, żeby zmiana pliku była widoczna od razu. W trybie prod ten
       # wolumen jest nieszkodliwy: obraz nie uruchamia Vite.
@@ -179,7 +189,7 @@ services:
       # Anonimowy wolumen na node_modules: bez niego katalog z hosta (pusty albo
       # zbudowany na inną architekturę) przysłoniłby ten z obrazu.
       - frontend_node_modules:/app/node_modules
-    mem_limit: ${FRONTEND_MEM_LIMIT:-1g}
+    mem_limit: ${FRONTEND_MEM_LIMIT:-2g}
     healthcheck:
       # Vite odpowiada na HEAD dopiero po pierwszym przetworzeniu zależności,
       # dlatego start_period jest hojny.
