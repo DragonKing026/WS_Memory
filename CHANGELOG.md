@@ -15,6 +15,18 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 17:46 — Nowy dokument da się wreszcie zacząć z przeglądarki
+
+Edytor **od początku** umiał tworzyć dokumenty — otwarcie nieistniejącego adresu
+to jego normalna droga — ale nic w interfejsie tam nie prowadziło. Jedynym
+wejściem było wpisanie adresu ręcznie w pasku przeglądarki, więc pusta przestrzeń
+uczciwie pisała, że „edytor dochodzi w TODO-008", długo po tym, jak doszedł.
+
+Przycisk **Nowy dokument** w nagłówku przestrzeni, widoczny dla piszących. Pyta
+o adres i od razu sprawdza go regułą serwera, żeby odmowa przyszła przy pisaniu,
+a nie po pierwszej próbie zapisu — oraz mówi, gdy taki dokument już jest.
+
+---
 ## 2026-09-13 17:44 — Trzy usterki wyłapane pierwszym logowaniem na świeże konto
 
 **Ekran zaproszeń nie otwierał się w ogóle.** Schemat frontendu wymagał, żeby

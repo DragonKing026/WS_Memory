@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import DocumentTree from '@/components/documents/DocumentTree.vue'
+import { documentEditPath } from '@/features/documents/paths'
 import type { DocumentListItem } from '@/features/documents/schemas'
 import { documentService } from '@/features/documents/service'
 import { buildTree } from '@/features/documents/tree'
@@ -26,6 +27,7 @@ import { useAuthStore } from '@/stores/auth'
  * server refuses.
  */
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 
 const slug = computed(() => (typeof route.params.space === 'string' ? route.params.space : ''))
@@ -57,6 +59,53 @@ function toggle(path: string): void {
 }
 
 const archivedCount = computed(() => documents.value.filter((item) => item.archived).length)
+
+/**
+ * Starting a document from the browser.
+ *
+ * The editor has always been able to create one — opening an address that does not
+ * exist is how it works — but nothing in the interface led there, so the only way in
+ * was to type the URL by hand. The empty space said the editor "was coming", long
+ * after it had arrived.
+ *
+ * There is no separate creation screen and there should not be: a document is its
+ * address plus its content, and the editor already asks for the content.
+ */
+const canWrite = computed(() => auth.canWriteIn(slug.value))
+const naming = ref(false)
+const newSlug = ref('')
+
+/** The address rule the server enforces (`ws_doc_write`): lowercase without Polish
+ *  marks, digits, hyphens, slash as a folder separator. Checked here so the refusal
+ *  arrives while typing rather than after the first save attempt. */
+const ADDRESS = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/
+
+const addressProblem = computed<string | null>(() => {
+  const value = newSlug.value.trim()
+  if (value === '') {
+    return null
+  }
+
+  if (!ADDRESS.test(value)) {
+    return 'Małe litery bez ogonków, cyfry i łączniki. Ukośnik robi folder: wdrozenia/backup-bazy.'
+  }
+
+  return documents.value.some((item) => item.slug === value)
+    ? 'Taki dokument już jest — otworzysz go do edycji, nie założysz drugiego.'
+    : null
+})
+
+const canOpenEditor = computed(
+  () => newSlug.value.trim() !== '' && addressProblem.value === null,
+)
+
+function openEditor(): void {
+  if (!canOpenEditor.value) {
+    return
+  }
+
+  void router.push(documentEditPath(slug.value, newSlug.value.trim()))
+}
 
 const byAiUnverified = computed(
   () => visible.value.filter((item) => item.authoredByAi && !item.verified).length,
@@ -116,15 +165,47 @@ watch(
           </p>
         </div>
 
-        <UButton
-          size="sm"
-          variant="subtle"
-          icon="i-lucide-search"
-          :to="{ name: 'home', query: { q: '', przestrzen: space.slug } }"
-        >
-          Szukaj tutaj
-        </UButton>
+        <div class="flex shrink-0 gap-2">
+          <UButton
+            size="sm"
+            variant="subtle"
+            icon="i-lucide-search"
+            :to="{ name: 'home', query: { q: '', przestrzen: space.slug } }"
+          >
+            Szukaj tutaj
+          </UButton>
+          <UButton
+            v-if="canWrite"
+            size="sm"
+            icon="i-lucide-file-plus"
+            @click="naming = true"
+          >
+            Nowy dokument
+          </UButton>
+        </div>
       </div>
+
+      <UCard v-if="naming && canWrite">
+        <p class="font-medium">Adres nowego dokumentu</p>
+        <p class="mt-1 text-sm text-muted">
+          Adres nazywa <strong>rzecz</strong>, nie okazję: <code>wdrozenia/backup-bazy</code>,
+          a nie <code>notatki-ze-spotkania</code>. Jest trwały i widoczny w linkach.
+        </p>
+
+        <div class="mt-3 flex flex-wrap items-start gap-2">
+          <UInput
+            v-model="newSlug"
+            class="min-w-64 flex-1"
+            placeholder="wdrozenia/backup-bazy"
+            autofocus
+            @keyup.enter="openEditor"
+          />
+          <UButton :disabled="!canOpenEditor" @click="openEditor">Pisz</UButton>
+          <UButton variant="ghost" @click="naming = false">Anuluj</UButton>
+        </div>
+
+        <p v-if="addressProblem" class="mt-2 text-sm text-error">{{ addressProblem }}</p>
+      </UCard>
 
       <UAlert
         v-if="problem"
@@ -157,9 +238,14 @@ watch(
         <UCard v-if="visible.length === 0">
           <p class="font-medium">Tu jeszcze nic nie ma.</p>
           <p class="mt-1 text-sm text-muted">
-            Pierwszy dokument w przestrzeni może napisać człowiek przez API albo agent AI
-            narzędziem <code>ws_doc_write</code>. Edytor w przeglądarce dochodzi
-            w TODO-008.
+            <template v-if="canWrite">
+              Zacznij od <strong>Nowego dokumentu</strong> u góry. Pisać może też agent AI
+              narzędziem <code>ws_doc_write</code> — w tę samą przestrzeń.
+            </template>
+            <template v-else>
+              Masz tu prawo czytać, ale nie pisać. Pierwszy dokument napisze ktoś z rolą
+              piszącego albo agent AI narzędziem <code>ws_doc_write</code>.
+            </template>
           </p>
         </UCard>
 
