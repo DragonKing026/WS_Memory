@@ -125,9 +125,14 @@ final readonly class SpaceAdministrationController
         if ($space->isPrivate()) {
             // A private space that can be shared is not private. There is no
             // role, global or otherwise, that unlocks this.
+            //
+            // 422 rather than 403, and the same code the administration route answers
+            // with for the same rule. This is not a permission problem — no role fixes
+            // it — but a request that cannot mean anything, and one rule answering with
+            // two codes forces every client to learn both.
             return new JsonResponse(
                 ['error' => 'Przestrzeni prywatnej nie da się z nikim dzielić.'],
-                Response::HTTP_FORBIDDEN,
+                Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
 
@@ -155,20 +160,44 @@ final readonly class SpaceAdministrationController
             );
         }
 
+        if (!$member->isActive()) {
+            // Granting access to a switched-off account succeeds and changes nothing:
+            // the person still cannot sign in. Worse, it leaves an audit entry saying
+            // somebody was given access, which is the opposite of what happened.
+            return new JsonResponse(
+                ['error' => 'To konto jest wyłączone. Włącz je najpierw — sama rola nic nie da.'],
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+            );
+        }
+
         $existing = $this->entityManager->getRepository(SpaceMember::class)
             ->findOneBy(['space' => $space, 'user' => $member]);
 
+        // Two different things happen here and the trail has to tell them apart.
+        // „Somebody was let in" and „somebody already inside was promoted" are not the
+        // same event, and D-016 exists to answer exactly that question afterwards.
+        // The route accepts both because a client should not have to know which case
+        // it is in — but the log must.
         if (null !== $existing) {
+            $previous = $existing->getRole();
             $existing->changeRole($role);
+            $action = 'space.member_role_changed';
+            $details = [
+                'member' => $member->getEmail(),
+                'role' => $role->value,
+                'previousRole' => $previous->value,
+            ];
         } else {
             $this->entityManager->persist(new SpaceMember($space, $member, $role, $this->currentUser()));
+            $action = 'space.member_added';
+            $details = ['member' => $member->getEmail(), 'role' => $role->value];
         }
 
         $this->audit->record(
-            action: 'space.member_added',
+            action: $action,
             actor: $actor,
             spaceSlug: $slug,
-            target: ['member' => $member->getEmail(), 'role' => $role->value],
+            target: $details,
         );
 
         $this->entityManager->flush();

@@ -121,10 +121,11 @@ final class AdminAuditTest extends WebTestCase
             array_keys($payload),
         );
         self::assertCount(100, $payload['entries']);
-        // The fixture plus this very request's own sign-in entry. Reading the log adds to
-        // it, which is not a flaw to be worked around: the alternative is a surface that
-        // reads the record of who read the record without being recorded.
-        self::assertSame(self::SEEDED + 1, $payload['count'], 'count is the whole log, not this page');
+        // Exactly the fixture. Reading the log no longer adds to it: presenting a token
+        // that was already issued is not a sign-in, and the firewalls here are stateless,
+        // so treating it as one wrote an entry per HTTP request. That is the defect this
+        // number used to encode — it read `SEEDED + 1` and the extra one was fiction.
+        self::assertSame(self::SEEDED, $payload['count'], 'count is the whole log, not this page');
         self::assertSame(100, $payload['limit']);
         self::assertSame(0, $payload['offset']);
         self::assertTrue($payload['hasMore']);
@@ -135,7 +136,9 @@ final class AdminAuditTest extends WebTestCase
             array_keys($first),
             'the frontend reads these keys by name; a nullable one must be present, not absent',
         );
-        self::assertSame('user.login', $first['action'], 'the newest entry is this reader arriving');
+        // The newest entry in the fixture, and nothing of the reader's own: opening this
+        // screen no longer writes to the log it is showing.
+        self::assertSame('mcp.tool_called', $first['action'], 'newest first, and it is the fixture');
         self::assertGreaterThan($payload['entries'][1]['createdAt'], $first['createdAt']);
         self::assertGreaterThan($payload['entries'][2]['createdAt'], $payload['entries'][1]['createdAt']);
     }
@@ -260,9 +263,11 @@ final class AdminAuditTest extends WebTestCase
 
     public function testActionListDescribesTheLogAndNotThePage(): void
     {
-        // `user.login` is in the list because this reader's own arrival is in the log.
+        // No `user.login`: the fixture does not contain one, and reading the log does not
+        // add one. It used to, because a stateless firewall re-authenticates on every
+        // request and that was being recorded as arriving.
         $expected = [
-            'dependency.checked', 'mcp.tool_called', 'memory.remember', 'space.member_added', 'user.login',
+            'dependency.checked', 'mcp.tool_called', 'memory.remember', 'space.member_added',
         ];
 
         $this->get('/api/admin/audit', $this->adminToken);
@@ -299,7 +304,7 @@ final class AdminAuditTest extends WebTestCase
         // A panel clearing its fields sends empty strings. Taken literally they would match
         // nothing, and an empty audit log is exactly the wrong thing to show by accident.
         self::assertResponseIsSuccessful();
-        self::assertSame(self::SEEDED + 1, $this->json()['count']);
+        self::assertSame(self::SEEDED, $this->json()['count']);
     }
 
     public function testThereIsNoWayToDeleteAnEntry(): void

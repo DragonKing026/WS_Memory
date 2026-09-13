@@ -183,10 +183,75 @@ final class SpaceAdministrationTest extends WebTestCase
             'role' => 'reader',
         ], $this->tokenFor('piszacy@web-systems.pl'));
 
+        // 422, not 403, and the same code the administration route gives for this rule.
+        // No role unlocks it, so it is not a permission problem — it is a request that
+        // cannot mean anything. One rule answering with two codes made every client
+        // learn both, which is how the two routes drifted apart in the first place.
         self::assertResponseStatusCodeSame(
-            403,
+            422,
             'a private space stops being private the moment it can be shared',
         );
+    }
+
+    /**
+     * Letting somebody in and promoting somebody already inside are different events.
+     *
+     * This route accepts both, because a client should not have to know which case it
+     * is in — but the audit log must, or D-016 cannot answer the question it exists
+     * for: did that person gain access then, or did they already have it?
+     */
+    public function testPromotingAnExistingMemberIsNotRecordedAsLettingThemIn(): void
+    {
+        $token = $this->tokenFor('szef@web-systems.pl');
+
+        // `admin@web-systems.pl` is not in `alfa` yet, so the first call lets them in
+        // and the second only changes what they may do.
+        $this->postJson('/api/spaces/alfa/members', [
+            'email' => 'admin@web-systems.pl',
+            'role' => 'reader',
+        ], $token);
+        self::assertResponseIsSuccessful();
+
+        $this->postJson('/api/spaces/alfa/members', [
+            'email' => 'admin@web-systems.pl',
+            'role' => 'writer',
+        ], $token);
+        self::assertResponseIsSuccessful();
+
+        $actions = $this->em->getConnection()->fetchFirstColumn(
+            "SELECT action FROM ws.audit_log WHERE space_slug = 'alfa' "
+            . "AND action LIKE 'space.member%' ORDER BY created_at"
+        );
+
+        self::assertSame(['space.member_added', 'space.member_role_changed'], $actions);
+    }
+
+    /**
+     * A switched-off account cannot be given access, because giving it changes nothing.
+     *
+     * The grant would succeed, the person still could not sign in, and the trail would
+     * carry an entry saying they were let in — the opposite of what happened.
+     */
+    public function testAccessCannotBeGrantedToADeactivatedAccount(): void
+    {
+        $this->deactivate('admin@web-systems.pl');
+
+        $this->postJson('/api/spaces/alfa/members', [
+            'email' => 'admin@web-systems.pl',
+            'role' => 'reader',
+        ], $this->tokenFor('szef@web-systems.pl'));
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
+    /** Switches an account off through the entity, the same way the console does. */
+    private function deactivate(string $email): void
+    {
+        $user = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
+        self::assertInstanceOf(User::class, $user);
+
+        $user->deactivate();
+        $this->em->flush();
     }
 
     private function tokenFor(string $email): string
