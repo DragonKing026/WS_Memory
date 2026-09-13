@@ -15,6 +15,21 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 15:29 — Domyślna wersja MemPalace w repozytorium to 3.9.0
+
+Aktualizacja na działającej instalacji zmieniła tylko `.env`, którego w
+repozytorium nie ma. Domyślne przypięcie zostawało na 3.7.0 w trzech miejscach
+(`.env.example`, `ARG` w Dockerfile pałaca, wartości zastępcze w compose), więc
+**każda nowa instalacja startowałaby z wersji o dwie mniejsze wstecz** i od razu
+pokazywała w panelu, że jest co aktualizować.
+
+Podniesienie domyślnej wartości jest tu decyzją, nie porządkami: wersja jest
+przypięta świadomie, a przypięcie wolno przesunąć dopiero po tym, co właśnie się
+odbyło — kopii zapasowej, przebudowie i teście polskiej semantyki na nowej
+wersji. Ten test przeszedł, więc 3.9.0 przestaje być „nowością do sprawdzenia"
+i staje się tym, co instalujemy.
+
+---
 ## 2026-09-13 15:25 — MemPalace podniesiony do 3.9.0; dwie usterki z prawdziwego przebiegu
 
 Agent aktualizacji zainstalowany jako jednostka systemd i **użyty naprawdę**:

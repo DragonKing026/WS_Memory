@@ -83,8 +83,8 @@ services:
     build:
       context: ./docker/mempalace
       args:
-        MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.7.0}
-    image: ws-memory/mempalace:${MEMPALACE_VERSION:-3.7.0}
+        MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.9.0}
+    image: ws-memory/mempalace:${MEMPALACE_VERSION:-3.9.0}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -144,7 +144,7 @@ services:
       # pokazać. Bez przekazania zmiennej tutaj backend czytałby wartość
       # zastępczą z `backend/.env` i rozjazd byłby niewidoczny dokładnie wtedy,
       # gdy zaistnieje.
-      MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.7.0}
+      MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.9.0}
       # Token do MemPalace zna WYŁĄCZNIE backend. Agenci dostają własne
       # tokeny wystawiane w aplikacji (reguła nienaruszalna nr 1).
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
@@ -218,7 +218,7 @@ services:
       # pokazać. Bez przekazania zmiennej tutaj backend czytałby wartość
       # zastępczą z `backend/.env` i rozjazd byłby niewidoczny dokładnie wtedy,
       # gdy zaistnieje.
-      MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.7.0}
+      MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.9.0}
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?ustaw JWT_PASSPHRASE w .env}
     volumes:

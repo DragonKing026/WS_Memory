@@ -9,7 +9,7 @@
 
 FROM python:3.14-slim
 
-ARG MEMPALACE_VERSION=3.7.0
+ARG MEMPALACE_VERSION=3.9.0
 
 # curl — healthcheck, oczekiwanie na zależności i diagnostyka z wnętrza sieci
 # Compose (żadna usługa nie ma portu na hoście, więc to jedyne wejście).
