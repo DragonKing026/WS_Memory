@@ -1,0 +1,72 @@
+# WS_Memory — agent aktualizacji MemPalace (TODO-015).
+#
+# Jednostka uruchamia scripts/aktualizator.sh: zgłasza puls do aplikacji,
+# podejmuje zlecenie aktualizacji, robi kopię zapasową schematu palace,
+# przebudowuje obraz i sprawdza testem semantyki, czy wyszukiwanie nadal działa.
+#
+# MA CHODZIĆ JAKO UŻYTKOWNIK Z DOSTĘPEM DO DOCKERA I DO KATALOGU PROJEKTU —
+# nie jako root. Agent nie potrzebuje roota: potrzebuje gniazda Dockera
+# (grupa docker albo Docker w trybie rootless) i prawa zapisu do .env oraz do
+# katalogu kopie/. Root dałby mu więcej, niż mu potrzeba, na nic w zamian.
+#
+# Instalacja — wariant zalecany, jednostka użytkownika:
+#   mkdir -p ~/.config/systemd/user
+#   cp docker/systemd/ws-memory-aktualizator.* ~/.config/systemd/user/
+#   sed -i "s|__KATALOG_PROJEKTU__|$PWD|g" ~/.config/systemd/user/ws-memory-aktualizator.*
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now ws-memory-aktualizator.timer
+#   loginctl enable-linger "$USER"   # żeby timer chodził bez zalogowanej sesji
+#
+# Pełna instrukcja wraz z wariantem systemowym: docker/systemd/README.md
+#
+# Podmień __KATALOG_PROJEKTU__ na ścieżkę repozytorium (bez ukośnika na końcu).
+
+[Unit]
+Description=WS_Memory — agent aktualizacji MemPalace
+Documentation=file://__KATALOG_PROJEKTU__/docker/systemd/README.md
+
+# Tylko w wariancie systemowym (/etc/systemd/system/) — ODKOMENTUJ tam obie
+# linie, żeby agent nie startował przed demonem Dockera. W wariancie
+# użytkownika nie mają zastosowania: jednostka użytkownika nie widzi jednostek
+# systemowych, więc zależność po cichu nie zadziała.
+#After=docker.service
+#Wants=docker.service
+
+[Service]
+Type=oneshot
+
+# Skrypt sam ustala katalog projektu ze swojej ścieżki, ale `docker compose`
+# potrzebuje go jako katalogu roboczego, żeby znaleźć docker-compose.yml i .env.
+WorkingDirectory=__KATALOG_PROJEKTU__
+ExecStart=__KATALOG_PROJEKTU__/scripts/aktualizator.sh
+
+# Pełny przebieg to przebudowa obrazu (pip install z PyPI), oczekiwanie na
+# zdrowy kontener i test semantyki. Na zimnej pamięci podręcznej Dockera
+# potrafi to zająć kilkanaście minut, a jednostka ubita w połowie przebudowy
+# zostawiłaby .env wskazujące na wersję, której obraz nie istnieje.
+# Limit jest więc hojny świadomie — tu lepiej czekać, niż przerwać.
+TimeoutStartSec=1800
+
+# Dziennik agenta trafia do journala. To jedyne miejsce, gdzie widać przebiegi
+# bez zlecenia („brak zlecenia — nie ma nic do zrobienia”); przebiegi ze
+# zleceniem widać dodatkowo w panelu administratora.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ws-memory-aktualizator
+
+# Przebudowa obrazu potrafi wysycić procesor i dyski. Agent działa w tle i nikt
+# na niego nie czeka, więc ustępuje pierwszeństwa temu, co obsługuje ruch.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+# Wariant systemowy (/etc/systemd/system/) — wtedy ODKOMENTUJ i podmień nazwę
+# na użytkownika, który ma dostęp do Dockera i do katalogu projektu.
+# W wariancie użytkownika te linie MUSZĄ zostać zakomentowane: jednostka
+# użytkownika nie ma prawa zmieniać tożsamości i nie wstanie.
+#User=__UZYTKOWNIK__
+#Group=__UZYTKOWNIK__
+
+# Celowo BEZ sekcji [Install]: tę jednostkę uruchamia timer, a nie target.
+# Włącza się `systemctl enable ws-memory-aktualizator.timer` — `enable` na samej
+# usłudze nic by nie dał i tylko mylił.
