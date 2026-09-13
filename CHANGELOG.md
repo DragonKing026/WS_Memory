@@ -15,6 +15,38 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 12:46 — E2E na buildzie produkcyjnym; „Nocne” staje się „Pełnym”
+
+Poprzednia poprawka pustego ekranu edytora **nie wystarczyła** i widać to w danych.
+`router.onError` zadziałał — błąd `R0010` zniknął, a w śladzie widać, że strona
+faktycznie się przeładowała — ale po przeładowaniu przeglądarka wzięła przetworzony
+moduł z własnej pamięci podręcznej, trafiła w ten sam nieaktualny skrót
+(`v=58af5a6d`) i 504 wrócił. Drugiego przeładowania blokuje zapora przed pętlą,
+więc kończyło się białą stroną.
+
+Właściwe rozwiązanie okazało się prostsze niż walka z optymalizatorem: **testy E2E
+chodzą teraz po buildzie produkcyjnym** (`FRONTEND_TARGET=prod`, statyczne `dist/`
+za nginxem). Build nie ma optymalizatora, więc problem znika u źródła — a przy
+okazji testujemy artefakt, który naprawdę jedzie na serwer. Lokalnie: 5,1 s zamiast
+8,9 s.
+
+Obie wcześniejsze poprawki zostają, bo mają wartość poza CI: `optimizeDeps.include`
+oszczędza to samo deweloperowi, a `router.onError` dotyczy **produkcji** — po
+wdrożeniu ktoś ma otwartą starą stronę i prosi o plik, którego już nie ma.
+
+Druga rzecz z tego samego przebiegu: cache modelu **nadal się nie zapisał**, mimo
+poprawionej ścieżki. Przyczyna jest w logu: `save-always: false` i brak kroku
+„Post Cache”. `actions/cache` zapisuje **tylko gdy zadanie kończy się sukcesem**,
+a zadanie padało na E2E. To pułapka, która sama się nakręca: jeden czerwony test
+blokuje cache na zawsze, więc każdy kolejny przebieg znowu pobiera 2,3 GB.
+
+Przy okazji przebieg „Nocne sprawdzenie pełnego stosu” zmienia się w **„Pełne
+sprawdzenie”** (`nocne.yml` → `pelne.yml`). Rusza po scaleniu na main, a nie raz
+na dobę — nocna pora była konsekwencją zepsutego cache'u, nie prawem natury.
+Harmonogram dobowy zostaje, bo łapie to, czego push nie złapie: zależność
+zewnętrzną psującą się **bez naszego commita**.
+
+---
 ## 2026-09-13 12:22 — Cache modelu, który od początku zapisywał pustkę
 
 Pytanie brzmiało, czy przebieg nocny musi pobierać 2 GB za każdym razem.

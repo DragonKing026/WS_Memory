@@ -2,7 +2,7 @@
 #
 # Celowo NIE stawia serwera embeddingów: pobranie modelu bge-m3 to ~2 GB i
 # 6-8 minut, a sprawdza założenie zmieniające się raz na kwartał. Robi to
-# przebieg nocny (nocne.yml). Tutaj liczy się czas odpowiedzi — poniżej pięciu
+# pełne sprawdzenie (pelne.yml). Tutaj liczy się czas odpowiedzi — poniżej pięciu
 # minut, żeby wynik przyszedł, zanim autor zdąży przełączyć kontekst.
 
 name: Szybkie sprawdzenie
