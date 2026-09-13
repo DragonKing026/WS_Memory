@@ -109,6 +109,36 @@ final class AuthenticationTest extends WebTestCase
         self::assertNotEmpty($actions, 'every sign-in must leave a trace');
     }
 
+    /**
+     * One sign-in leaves one entry, no matter how many requests follow it.
+     *
+     * The firewalls are stateless, so the bearer token is re-authenticated on every
+     * single request and `LoginSuccessEvent` fires each time. Before this was guarded,
+     * clicking around the application wrote a "user.login" row per HTTP request: the
+     * audit screen, the first time anybody opened it, held 40 889 entries of which
+     * 20 335 were sign-ins that never happened.
+     *
+     * The test that existed asserted the log was *not empty*, which is true of both
+     * the working and the broken version — which is why it caught nothing. This one
+     * counts.
+     */
+    public function testAuthenticatedRequestsDoNotEachCountAsASignIn(): void
+    {
+        $token = $this->signIn();
+
+        foreach (['/api/me', '/api/me', '/api/spaces'] as $path) {
+            $this->client->request('GET', $path, server: [
+                'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+            ]);
+        }
+
+        $entries = (int) $this->em->getConnection()->fetchOne(
+            "SELECT count(*) FROM ws.audit_log WHERE action = 'user.login'"
+        );
+
+        self::assertSame(1, $entries, 'presenting a token again is not signing in again');
+    }
+
     public function testDeactivatedAccountLosesAccessImmediately(): void
     {
         $token = $this->signIn();
