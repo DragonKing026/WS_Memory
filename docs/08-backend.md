@@ -134,6 +134,14 @@ mieszkają w `Domain/`.
 | `GET/POST /api/agent-tokens`, `DELETE /api/agent-tokens/{id}` | `Api/AgentTokenController.php` | Wyłącznie **własne** tokeny, również dla administratora globalnego (D-016). Jawna wartość w jednej odpowiedzi — tej, która token utworzyła. |
 | `ws:user:invite` | `Console/InviteUserCommand.php` | Jedyna droga do pierwszego konta. Wypisuje link, bo pierwsze zaproszenie powstaje zwykle przed konfiguracją poczty. |
 | `ws:agent:token` | `Console/IssueAgentTokenCommand.php` | Jedyna droga do podłączenia agenta, dopóki nie ma ekranów (TODO-008). Wypisuje gotowe `claude mcp add`, bo alternatywą jest odtwarzanie polecenia z dokumentacji i mylenie nagłówka. |
+| `ws:agent:list` | `Console/ListAgentTokensCommand.php` | Identyfikatory, etykiety, ostatnie użycie i stan tokenów konta — nigdy sam token, bo w bazie jest wyłącznie jego skrót. **Osobne polecenie** od odwoływania: jedno, które z flagą czyta, a bez niej niszczy, jest o jedną literówkę od zdjęcia agenta z pracy. |
+| `ws:agent:revoke` | `Console/RevokeAgentTokenCommand.php` | Woła `RevokeAgentToken` — ten sam przypadek użycia co `DELETE /api/agent-tokens/{id}`. Druga ścieżka odwoływania (a do tej pory był nią `UPDATE` wprost w bazie) omija audyt i regułę „tylko własny token". Cudzy token odpowiada identycznie jak nieistniejący. |
+
+Trzy polecenia przyjmują adres e-mail jako pierwszy argument i rozwiązuje go
+`Console/AccountLookup.php` — jedno miejsce na normalizację adresu i jeden
+komunikat o nieistniejącym koncie. Rozpisana przy każdym z osobna, rozjechałaby
+się właśnie normalizacja: adres z wielkiej litery działałby w jednym poleceniu,
+a w następnym nie, i nikt nie podejrzewałby wyszukiwania konta.
 
 ### `Presentation/Mcp/` — gateway dla agentów
 

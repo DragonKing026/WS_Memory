@@ -2,7 +2,7 @@
 tags: [ws-memory, documentation, backend, symfony, layers, api]
 ---
 
-> Translated from [`docs/08-backend.md`](../08-backend.md) (synced 2026-09-12).
+> Translated from [`docs/08-backend.md`](../08-backend.md) (synced 2026-09-13).
 > **The Polish version is authoritative.**
 
 # The backend — what each part is for
@@ -138,6 +138,15 @@ the **persistence model**, and the rules live in `Domain/`.
 | `GET/POST /api/agent-tokens`, `DELETE /api/agent-tokens/{id}` | `Api/AgentTokenController.php` | One's **own** tokens only, global administrators included (D-016). The plain value appears in one response — the one that created it. |
 | `ws:agent:token` | `Console/IssueAgentTokenCommand.php` | The only route to connecting an agent until the screens exist (TODO-008). Prints a ready `claude mcp add`, because the alternative is everybody reconstructing it from the documentation and getting the header wrong. |
 | `ws:user:invite` | `Console/InviteUserCommand.php` | The only route to the first account. It prints the link, because the first invitation is usually issued before the mailer is configured. |
+| `ws:agent:list` | `Console/ListAgentTokensCommand.php` | The identifiers, labels, last use and state of an account's tokens — never a token itself, since only its hash is stored. **A separate command** from revoking: one that reads with a flag and destroys without it is a single typo away from taking an agent offline. |
+| `ws:agent:revoke` | `Console/RevokeAgentTokenCommand.php` | Calls `RevokeAgentToken` — the same use case as `DELETE /api/agent-tokens/{id}`. A second revocation path (until now it was an `UPDATE` straight against the database) skips the audit trail and the "only your own token" rule. Somebody else's token answers exactly like one that does not exist. |
+
+Three commands take an e-mail address as their first argument, and
+`Console/AccountLookup.php` resolves it — one place for normalising the address
+and one message for an account that is not there. Written out at each of them,
+the normalisation is what would drift: an address typed with a capital letter
+would work in one command and not in the next, and nobody would suspect the
+lookup.
 
 ### `Presentation/Mcp/` — the gateway for agents
 

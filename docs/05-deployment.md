@@ -52,7 +52,55 @@ make test-semantyka              # polskie zapytanie znajduje polską treść
 curl http://127.0.0.1:8080/api/health
 ```
 
-Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
+Pierwsze konto administratora zakłada się z konsoli:
+`ws:user:invite ty@firma.pl --admin` — patrz niżej.
+
+## Operacje administracyjne z konsoli
+
+Instancja ma stany, z których interfejs nie wyprowadzi — choćby ten, w którym
+nikt nie ma jeszcze konta. Na to jest konsola backendu; wszystkie polecenia
+uruchamiamy w jego kontenerze:
+
+```bash
+docker compose exec backend php bin/console <polecenie>
+```
+
+| Polecenie | Kiedy się go używa |
+|---|---|
+| `ws:user:invite <email> [--admin]` | pierwsze konto w instancji i każde następne; wypisuje link, bo pierwsze zaproszenie powstaje zwykle przed konfiguracją poczty |
+| `ws:agent:token <email> <etykieta> [--space=…] [--expires=…]` | podłączenie agenta AI; wypisuje gotowe `claude mcp add` razem z tokenem, jeden raz |
+| `ws:agent:list <email>` | co to konto ma do odwołania: identyfikator, etykieta, ostatnie użycie, stan |
+| `ws:agent:revoke <email> <identyfikator>` | **sprzątanie po tokenie** wystawionym do jednorazowej pracy z konsoli |
+| `ws:dependency:check` | sprawdzenie tu i teraz, jaka wersja MemPalace działa i jaka jest najnowsza |
+| `ws:updater:claim`, `ws:updater:finish`, `ws:updater:heartbeat` | rozmowa z agentem aktualizacji na hoście (D-032), nie do ręcznego użytku |
+
+### Sprzątanie po tokenie agenta: `ws:agent:list` i `ws:agent:revoke`
+
+```bash
+docker compose exec backend php bin/console ws:agent:list ty@firma.pl
+docker compose exec backend php bin/console ws:agent:revoke ty@firma.pl 0191b8d2-…
+```
+
+Token wystawiony „na jedną robotę" trzeba potem odwołać, a jego identyfikator
+został w wyjściu `ws:agent:token`, które dawno przewinęło się z ekranu — dlatego
+wypisywanie i odwoływanie idą w parze. Są to **dwa polecenia**, nie jedno z
+flagą: polecenie, które z flagą czyta, a bez niej niszczy, jest o jedną literówkę
+od zdjęcia agenta z pracy w jej trakcie.
+
+- Odwołanie działa **od następnego wywołania** agenta — token sprawdzany jest
+  przy każdym żądaniu, nic nie trzeba restartować.
+- Odwołać da się **tylko token wskazanego konta**. Cudzy odpowiada dokładnie tak
+  samo jak nieistniejący (`Nie ma takiego tokena.`), bo inaczej konsola byłaby
+  narzędziem do enumerowania cudzych poświadczeń po identyfikatorze.
+- Powtórzone odwołanie kończy się powodzeniem i **nie przesuwa** zapisanego
+  momentu odwołania — to jedyna data, którą czyta przegląd incydentu.
+- Lista nigdy nie pokazuje samego tokena. W bazie jest wyłącznie jego skrót,
+  więc nie ma czego pokazać.
+
+Do tej pory token z konsoli odwoływało się `UPDATE`-em wprost w bazie, czyli
+z pominięciem audytu i reguły „tylko własny token". Polecenie woła tę samą
+usługę co `DELETE /api/agent-tokens/{id}`, więc obie drogi zostawiają ten sam
+ślad.
 
 ## Zmienne środowiskowe
 
