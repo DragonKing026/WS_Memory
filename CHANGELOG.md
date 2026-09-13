@@ -15,6 +15,22 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 18:30 — Slug testowej przestrzeni wpisany, a nie brany ze środowiska
+
+Testy dostawały nazwę wspólnej przestrzeni z `backend/.env.test`. Lokalnie
+działało; na pełnym stosie w CI **zmienna środowiskowa kontenera wygrywa z tym
+plikiem**, więc testy dostały produkcyjne `wiedza`, zderzyły się z własną fiksturą
+o tym samym slugu i padły — 58 błędów naraz, po raz drugi tego samego dnia.
+
+Teraz wartość jest **wpisana** w `when@test`, więc nie zależy od tego, w jakim
+środowisku akurat lecą. Sprawdzone przez uruchomienie całego zestawu z jawnie
+podstawioną zmienną `WS_DEFAULT_SPACE_SLUG=wiedza` — czyli dokładnie w warunkach,
+które wywróciły CI. 422 testy zielone.
+
+Przy okazji zniknął drugi opis tego samego z `.env.test`: dwa źródła prawdy dla
+jednej wartości to pytanie, które z nich obowiązuje.
+
+---
 ## 2026-09-13 18:24 — Wartość ze spacją w `.env.example` wywróciła CI
 
 `WS_DEFAULT_SPACE_NAME=Baza wiedzy` bez cudzysłowów. Docker Compose czyta taki

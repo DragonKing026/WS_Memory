@@ -175,6 +175,20 @@ services:
             $role: '%app.default_space.role%'
 
 when@test:
+    parameters:
+        # Wartość WPISANA, nie z `%env()%`, i to jest sedno.
+        #
+        # Testy tworzą własną przestrzeń zespołową o slugu `wiedza` i sprawdzają na
+        # niej dostęp. Gdyby mechanizm domyślnej przestrzeni tworzył ją także, testy
+        # sprawdzałyby zderzenie fikstur zamiast reguły dostępu — 58 błędów naraz.
+        #
+        # Wersja z `WS_DEFAULT_SPACE_SLUG` w `backend/.env.test` tego nie załatwiała:
+        # zmienna środowiskowa kontenera **wygrywa** z plikiem `.env.test`, więc na
+        # pełnym stosie w CI testy i tak dostawały `wiedza` z compose i padały. Wpis
+        # tutaj nie zależy od środowiska, w którym akurat lecą.
+        app.default_space.slug: 'wspolna'
+        app.default_space.name: 'Wspólna baza'
+
     services:
         _defaults:
             autowire: true
