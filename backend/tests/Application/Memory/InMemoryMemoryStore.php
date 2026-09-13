@@ -200,6 +200,18 @@ final class InMemoryMemoryStore implements MemoryStore
         $this->storedFacts[] = $fact;
     }
 
+    /**
+     * What the palace currently holds under this identifier, or null.
+     *
+     * Reading the stored content back rather than inspecting the write log, because
+     * the interesting question after a republish is what is there NOW — a log of two
+     * writes cannot tell an update from a second copy.
+     */
+    public function contentOf(string $drawerId): ?string
+    {
+        return isset($this->drawers[$drawerId]) ? $this->drawers[$drawerId]->content : null;
+    }
+
     private function guard(): void
     {
         if ($this->unavailable) {
