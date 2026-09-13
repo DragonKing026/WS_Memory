@@ -75,13 +75,26 @@ interface MemoryRegistry
      * The row a local drawer already has here, if it has one.
      *
      * The lookup that makes republishing safe. `ws.memory_entries` holds the pair
-     * (replica, local drawer id) unique where both halves are set, so this either
-     * finds the row a second publication must update or says there is none. Asked
-     * before writing rather than discovering it through a constraint violation,
-     * because the violation would abort a whole batch over its most ordinary
-     * event: an outbox resending something that already arrived (D-015).
+     * (owner, replica, local drawer id) unique where the replica is set, so this
+     * either finds the row a second publication must update or says there is none.
+     * Asked before writing rather than discovering it through a constraint
+     * violation, because the violation would abort a whole batch over its most
+     * ordinary event: an outbox resending something that already arrived (D-015).
+     *
+     * **The owner is part of the question, not context.** Without it the lookup
+     * matched on a pair the caller supplies in full — so naming somebody else's
+     * replica and one of their local drawer ids returned *their* row, and the
+     * republication path then overwrote their drawer and moved its registry row
+     * into the caller's own space. Two people are also allowed to hold the same
+     * pair: replica names are chosen locally and nothing stops two laptops from
+     * picking one name, which without the owner would let the first publisher
+     * block the second for ever.
      */
-    public function bindingForSource(string $sourceReplica, string $sourceDrawerId): ?SourceBinding;
+    public function bindingForSource(
+        string $ownerUserId,
+        string $sourceReplica,
+        string $sourceDrawerId,
+    ): ?SourceBinding;
 
     /**
      * Whether this space already holds content with this hash.

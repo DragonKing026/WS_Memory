@@ -321,7 +321,11 @@ Dwa mechanizmy zmniejszają to z góry, i oba są w tej migracji:
 
 - **para źródłowa** (`uniq_entries_source`) — powtórna wysyłka tej samej
   lokalnej szuflady aktualizuje wiersz, więc kolejka wyjściowa może ponawiać
-  bez końca;
+  bez końca. Indeks obejmuje **właściciela wpisu**, nie samą parę
+  (`Version20260913000006`), i to nie jest szczegół: para pochodzi w całości od
+  nadawcy, więc bez właściciela wystarczyło podać cudzą nazwę repliki, żeby
+  dostać cudzy wiersz do nadpisania. Przy okazji dwie osoby mogą mieć tę samą
+  parę — nazwy replik wybiera się lokalnie i nic ich nie uzgadnia;
 - **odsiew po skrócie treści** (`idx_entries_dedup`) — trzy osoby mielące to
   samo repozytorium płacą za wektor raz **w obrębie przestrzeni docelowej**.
   W trzech prywatnych przestrzeniach nadal będą trzy kopie; jedno potwierdzone
