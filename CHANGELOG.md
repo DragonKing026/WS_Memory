@@ -15,6 +15,21 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 17:21 — Dwie reguły gita dla pracy równoległej w jednym drzewie
+
+Indeks gita jest wspólny dla wszystkich sesji w katalogu, więc gołe `git commit`
+zabiera to, co ktoś inny zdążył zapisać do indeksu. Dziś commit „backend: dodaj
+port biblioteki instrukcji w Domain" wciągnął przy okazji całe pakowanie wtyczki
+Claude Code. Nic nie zginęło, ale opis commita zaczął kłamać — a to jedyna rzecz,
+po której za pół roku poznaje się, co się wtedy działo. Reguła: **commit z podaną
+ścieżką**, `git commit -- <ścieżki>`.
+
+Druga, z tej samej godziny: `git commit -- <ścieżka>` wskazująca **dowiązanie do
+katalogu** przechodzi przez nie i zapisuje zawartość jako zwykłe pliki. W świeżym
+klonie treść podagentów istniałaby przez to dwa razy — dokładnie to, czego
+zabrania D-013. Sprawdzenie to `git ls-files -s` i tryb `120000`.
+
+---
 ## 2026-09-13 17:20 — Wtyczka WS_Memory dla Claude Code (TODO-009)
 
 Wtyczka działa i jest zainstalowana z tego repozytorium: trzy skille, czterech

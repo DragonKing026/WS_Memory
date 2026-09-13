@@ -341,6 +341,18 @@ A change that is not committed does not exist. The rules:
   appears there, the correction goes in a **new** commit. It has already gone
   otherwise once (2026-09-12) and the result was two versions of the same commit
   diverging between the machine and GitHub.
+- **When working in parallel in one tree, commit with an explicit pathspec:**
+  `git commit -- <paths>`, never a bare `git commit`. The index is shared by every
+  session in this directory, so a bare `git commit` takes **everything anyone else
+  has staged** and files it under its own message. It happened on 2026-09-13:
+  a commit titled "backend: dodaj port biblioteki instrukcji w Domain" swallowed
+  the entire Claude Code plugin packaging. Nothing is lost, but the message starts
+  lying — and the message is the only thing that tells you six months later what
+  was going on.
+- **Watch out for symlinked directories.** `git commit -- <path>` pointing at a
+  symlinked directory **follows it** and records the contents as regular files.
+  After such a commit check `git ls-files -s <path>`: a symlink has mode `120000`.
+
 - **This repository has a remote and is sometimes pushed from outside this
   session.** Before changing history and before committing, glance at
   `git log --oneline -3` so as not to overwrite someone else's work.
