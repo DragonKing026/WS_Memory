@@ -246,6 +246,20 @@ database holds only its `sha256` digest. The `wsm_` prefix is not decoration: it
 lets secret scanners and humans recognise what they are looking at in a
 configuration file.
 
+From the console a token can also be **seen and revoked**. Until now there was
+nothing there to do it with: a token issued for one piece of work was revoked with
+an `UPDATE` straight against the database, skipping the audit trail and the "only
+your own token" rule.
+
+```bash
+docker compose exec backend php bin/console ws:agent:list artur@web-systems.pl
+docker compose exec backend php bin/console ws:agent:revoke artur@web-systems.pl <identifier>
+```
+
+Revoking calls `RevokeAgentToken` — the same service as `DELETE /api/agent-tokens/{id}`,
+so both routes share one rule and leave one kind of trace. When this is used:
+`docs/05-deployment.md`.
+
 For the frontend: `GET /api/agent-tokens`, `POST /api/agent-tokens`,
 `DELETE /api/agent-tokens/{id}`. All of them cover **one's own tokens only**,
 global administrators included — somebody who could quietly retire another

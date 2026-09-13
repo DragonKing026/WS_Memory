@@ -242,6 +242,19 @@ Polecenie wypisuje gotowe `claude mcp add`. **Token widać jeden raz** — w baz
 jest tylko skrót `sha256`. Przedrostek `wsm_` nie jest ozdobą: pozwala skanerom
 sekretów i ludziom rozpoznać, na co patrzą w pliku konfiguracyjnym.
 
+Z konsoli token da się też **zobaczyć i odwołać**. Do tej pory nie było tam czym:
+token wystawiony do jednorazowej pracy odwoływało się `UPDATE`-em wprost w bazie,
+czyli z pominięciem audytu i reguły „tylko własny token".
+
+```bash
+docker compose exec backend php bin/console ws:agent:list artur@web-systems.pl
+docker compose exec backend php bin/console ws:agent:revoke artur@web-systems.pl <identyfikator>
+```
+
+Odwołanie woła `RevokeAgentToken` — tę samą usługę co `DELETE /api/agent-tokens/{id}`,
+więc obie drogi mają tę samą regułę i ten sam ślad w audycie. Kiedy się tego używa:
+`docs/05-deployment.md`.
+
 Dla frontendu: `GET /api/agent-tokens`, `POST /api/agent-tokens`,
 `DELETE /api/agent-tokens/{id}`. Wszystko **wyłącznie własne tokeny**, również
 dla administratora globalnego — kto mógłby po cichu wycofać cudzego agenta,

@@ -15,6 +15,105 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:21 — Serwer przyjmuje publikację z lokalnego pałaca (TODO-012, punkty 1–4)
+
+`POST /api/publish` to jedyna droga, którą wiedza z lokalnego pałaca wchodzi do
+wspólnej bazy poza pisaniem w wiki — i od D-014 jeździ **sama, bez udziału
+użytkownika**. Powstała serwerowa połowa mostka: migracja `Version20260913000005`
+z tabelami `mirrors`, `publish_settings` i `publish_batches`, reguła lądowania,
+filtr sekretów, endpoint publikacji i wycofanie partii. Kolumny mostka
+w `memory_entries` istniały już od `Version20260912000003`; brakowało wszystkiego
+wokół nich.
+
+Trzy rzeczy są tu ważniejsze od samego endpointu. **Serwer nie ufa klientowi**:
+wtyczka filtruje sekrety przed wysłaniem, serwer filtruje po odebraniu — filtr,
+który działa wyłącznie na laptopie, działa czasami. **Powtórna wysyłka jest
+darmowa**: para (replika, szuflada źródłowa) jest unikalna, więc kolejka wyjściowa
+może ponawiać bez końca, a odsiew po skrócie treści łapie drugi rodzaj powtórzenia
+— trzy osoby mielące to samo repozytorium. **Partia jest niepodzielna**: jedna
+transakcja obejmuje wiersze rejestru i partię, która za nie odpowiada, bo osiem
+wierszy bez partii to treść, której nikt nie cofnie.
+
+Filtr sekretów rozpoznaje **wartości zastępcze**, bo bez tego odrzuciłby własny
+`.env.example` — plik istniejący po to, żeby nikt nie zapisywał prawdziwych haseł.
+Skłania się przy tym do odmowy: pominięcie zapisuje sekret do wspólnej,
+indeksowanej i backupowanej bazy, a fałszywy alarm kosztuje jedną szufladę
+wymienioną w raporcie, bo lokalny oryginał zostaje.
+
+`/api/publish` przyjmuje **token agenta** i jest to jedyne wyłamanie z reguły
+„agenci na `/mcp`, ludzie na `/api`". Nadawcą jest kolejka wyjściowa działająca
+bez nadzoru na czyimś laptopie (D-015), a ośmiogodzinny JWT nie jest
+poświadczeniem, które coś takiego może trzymać. Osłona jest wąska: żądanie zostaje
+przejęte tylko gdy ścieżka to `/api/publish` **i** nagłówek zaczyna się od
+`Bearer wsm_`, więc żądanie zalogowanej osoby przechodzi dalej do JWT. Ta granica
+dostała własny test jednostkowy sprawdzony sabotażem — test przez HTTP wymaga
+żywego pałaca i nie chodziłby na zwykłych commitach.
+
+Klient — wtyczka, kolejka wyjściowa, `/ws-publish` — jest osobnym zadaniem; do tego
+czasu endpointu nie ma kto zawołać poza testami. Rozstrzygnięcia, których D-014 nie
+zawiera, zapisano jako **D-036**.
+
+---
+## 2026-09-13 19:11 — Testy integracyjne przestały zaśmiecać pałac (D-037)
+
+Trzy klasy z grupy `integracja` pisały do prawdziwego pałaca i nie kasowały po
+sobie **niczego**. Stan zmierzony tego dnia: **1554 szuflady i 100% z nich to
+śmieci po testach** — 531 skrzydeł `test-integracja-*`, 447 `test-wiki-*`, 324
+`test-mcp-*` i 162 osierocone `priv_<uuid>` po użytkownikach testowych.
+Prawdziwej treści: zero. Każdy przebieg dokładał 14 szuflad.
+
+Sprzątanie stoi raz, we wspólnej cesze, i bierze listę z rejestru
+`ws.memory_entries` — bo kasowanie własnego skrzydła przebiegu **nie wystarcza**:
+zapis bez wskazanej przestrzeni ląduje w prywatnej przestrzeni autora (reguła
+nienaruszalna 6) i stamtąd wzięło się te 162 skrzydła `priv_`. Kasuje przez API
+pałaca, nigdy SQL-em w schemacie `palace` — D-004 obowiązuje też testy.
+
+Porażka sprzątania nie wywraca testu, bo niedostępny pałac na końcu przebiegu nic
+nie mówi o sprawdzanym kodzie — ale idzie na stderr z nazwą skrzydła. **Cicha
+porażka sprzątania to dokładnie mechanizm, który wyprodukował te tysiąc skrzydeł**,
+więc ścieżkę porażki sprawdzono celowo psując nazwę narzędzia.
+
+Przy okazji ustalenie o samym narzędziu: `mempalace_status` wymienia **najwyżej
+1000 skrzydeł**, a resztę wrzuca do jednej pozycji `unknown`. Wyglądało to jak
+skrzydło z setkami szuflad, którego `list_drawers` nie potrafi pokazać — bo ono
+nie istnieje. Jedyną wiarygodną liczbą z tego narzędzia jest `total_drawers`.
+
+Zmierzone: 1727 szuflad przed przebiegiem grupy, 1727 po.
+
+---
+## 2026-09-13 19:04 — Konsola umie ustawić hasło i odwołać token agenta
+
+Do dziś z konsoli dało się konto **stworzyć**, ale nie **naprawić**. Konta
+administratora bez hasła nie odzyskiwało się w ogóle — jedynym wyjściem było
+zaproszenie na inny adres, po którym stare konto zostawało zablokowane, a obok
+niego powstawało drugie. `ws:user:password` kończy ten stan: **domyślnie
+generuje** hasło i wypisuje je raz, bo hasło podane w argumencie zostaje
+w historii powłoki i przeżywa każdy powód, dla którego je ustawiono. Reguła hasła
+przestała przy tym istnieć w dwóch kopiach — dwanaście znaków i odrzucanie haseł
+znanych z publicznych wycieków mieszkają w jednej klasie `PasswordPolicy`,
+z której korzysta i przyjmowanie zaproszenia, i to polecenie.
+
+Druga luka była gorsza, bo miała obejście: token agenta wystawiony do
+jednorazowej pracy odwoływało się **zapisem wprost w bazie**, czyli z pominięciem
+audytu i reguły „tylko własny token". Zrobiłem tak dziś sam, bo nie było innej
+drogi. `ws:agent:revoke` woła tę samą usługę co `DELETE /api/agent-tokens/{id}`,
+więc obie drogi mają jedną regułę i jeden ślad, a cudzy token odpowiada dokładnie
+jak nieistniejący. Towarzyszy mu `ws:agent:list` — **osobne polecenie, nie flaga**,
+bo takie, które z flagą czyta, a bez niej niszczy, jest o jedną literówkę od
+zdjęcia agenta z pracy w jej trakcie.
+
+Dwie rzeczy polecenie hasła **mówi wprost**, bo inaczej nikt by ich nie
+podejrzewał. Wydane tokeny JWT działają do wygaśnięcia — JWT jest bezstanowe
+(D-017), więc reset hasła brzmi jak odcięcie dostępu, a nim nie jest; odcina
+wyłączenie konta. I konto wyłączone hasło dostaje, ale się nim nie zaloguje:
+odmowa byłaby tu gorsza, bo hasło nie nadaje żadnego dostępu, więc wpis w audycie
+nie ma o czym skłamać — inaczej niż przy nadaniu roli, które dlatego odrzucamy.
+Sam wpis `user.password_reset` **nie ma aktora**: z konsoli nikt nie jest
+zalogowany, a wpisanie konta czytałoby się jak „sam sobie zmienił hasło".
+
+Dwanaście testów poleceń, każdy sprawdzony, że pada bez poprawki.
+
+---
 ## 2026-09-13 18:30 — Slug testowej przestrzeni wpisany, a nie brany ze środowiska
 
 Testy dostawały nazwę wspólnej przestrzeni z `backend/.env.test`. Lokalnie

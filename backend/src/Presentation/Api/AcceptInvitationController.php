@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Presentation\Api;
 
+use App\Application\Identity\PasswordPolicy;
 use App\Application\Invitation\AcceptInvitation;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,6 +19,9 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
  * Public by necessity — the caller has no account yet, which is the point.
  * The invitation token is the only credential, so the password policy is
  * enforced here rather than trusted to the frontend.
+ *
+ * The policy itself lives in PasswordPolicy, because `ws:user:password` sets
+ * passwords too and the rule has to be the same one, not a copy of it.
  */
 final readonly class AcceptInvitationController
 {
@@ -41,23 +45,10 @@ final readonly class AcceptInvitationController
             new Assert\Collection([
                 'token' => [new Assert\NotBlank()],
                 'displayName' => [new Assert\NotBlank(), new Assert\Length(min: 2, max: 120)],
-                'password' => [
-                    new Assert\NotBlank(),
-                    // Twelve characters rather than eight, and no composition
-                    // rules: length beats character classes, and rules only
-                    // push people towards Haslo123!.
-                    new Assert\Length(
-                        min: 12,
-                        minMessage: 'Hasło musi mieć co najmniej {{ limit }} znaków.',
-                    ),
-                    // Refuses passwords known from public breaches. Checked
-                    // against Have I Been Pwned by k-anonymity: only the first
-                    // five characters of the hash leave the server.
-                    new Assert\NotCompromisedPassword(
-                        message: 'To hasło wyciekło już w znanych wyciekach danych. Wybierz inne.',
-                        skipOnError: true,
-                    ),
-                ],
+                // The one password rule, shared with the console. Twelve
+                // characters, no composition rules, and nothing known from a
+                // public breach — spelled out in PasswordPolicy.
+                'password' => PasswordPolicy::constraints(),
             ]),
         );
 

@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Presentation\Console;
 
 use App\Application\AgentToken\IssueAgentToken;
-use App\Entity\User;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -31,7 +29,7 @@ final class IssueAgentTokenCommand extends Command
 {
     public function __construct(
         private readonly IssueAgentToken $issueAgentToken,
-        private readonly EntityManagerInterface $entityManager,
+        private readonly AccountLookup $accounts,
         private readonly string $publicBaseUrl,
     ) {
         parent::__construct();
@@ -70,11 +68,10 @@ final class IssueAgentTokenCommand extends Command
         /** @var string|null $expires */
         $expires = $input->getOption('expires');
 
-        $owner = $this->entityManager->getRepository(User::class)
-            ->findOneBy(['email' => strtolower(trim($email))]);
-
-        if (!$owner instanceof User) {
-            $io->error(\sprintf('Nie ma konta %s. Najpierw zaproś je przez ws:user:invite.', $email));
+        try {
+            $owner = $this->accounts->byEmail($email);
+        } catch (\DomainException $e) {
+            $io->error($e->getMessage());
 
             return Command::FAILURE;
         }

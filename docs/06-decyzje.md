@@ -1486,6 +1486,7 @@ cokolwiek znaczyć.
 
 ---
 
+<<<<<<< HEAD
 ## D-036 — Kształt serwerowej strony mostka: partia na przestrzeń, filtr w Domain, jeden wyjątek w firewallu
 
 **Data:** 2026-09-13 18:40 · **Stan:** Przyjęta · **Doprecyzowuje D-010, D-014, D-015**
@@ -1636,3 +1637,63 @@ odmawia wydania szuflady, której skrzydło w pałacu nie zgadza się z
 autoryzowaną przestrzenią. Zmiana widoczności ma osobny klucz w dzienniku
 audytu (`movedFrom`), bo to jedyna rzecz w tym przepływie, o którą ktoś może
 chcieć zapytać audyt po fakcie.
+=======
+## D-037 — Testy integracyjne kasują z pałaca to, co zapisały, po rejestrze
+
+**Data:** 2026-09-13 18:56 · **Stan:** Przyjęta
+
+Trzy klasy z grupy `integracja` piszą do **prawdziwego** pałaca i nie kasowały
+po sobie niczego. Stan zmierzony 2026-09-13: pałac serwera trzymał **ponad 1500
+szuflad**, z czego **872 skrzydła `test-integracja-*`** i **128 osieroconych
+skrzydeł `priv_<uuid>`** po użytkownikach testowych. Prawdziwej treści: zero.
+Narosło w kilka dni, a każdy przebieg dokładał kilkanaście szuflad.
+
+**Rozstrzygnięcie.** Sprzątanie stoi raz, we wspólnej cesze
+`RequiresLivePalace`, jako metoda wołana z `tearDown()` każdej z trzech klas.
+Listę szuflad bierze z **rejestru `ws.memory_entries`**, pomijając wiersze
+`kg_fact`, i kasuje je **przez API pałaca** (`mempalace_delete_drawer`).
+Porażka sprzątania nie wywraca testu, ale idzie na stderr z nazwą skrzydła.
+
+**Dlaczego po rejestrze, a nie po skrzydle przebiegu.** Każdy przebieg tworzy
+własne skrzydło `test-…-<hex>`, więc „usuń wszystko z mojego skrzydła" wygląda na
+rozwiązanie prostsze. Nie jest pełne: **zapis bez wskazanej przestrzeni ląduje
+w prywatnej przestrzeni autora** (reguła nienaruszalna 6), a testy takie zapisy
+robią celowo — właśnie tego dowodzą. Stąd te 128 skrzydeł `priv_<uuid>`.
+`ws.memory_entries` wymienia szuflady niezależnie od tego, gdzie wylądowały,
+a w `tearDown` jest jeszcze nietknięty, bo czyści go `setUp` **następnego** testu.
+
+Wiersze `kg_fact` są pomijane, bo ich `drawer_id` jest wyliczany z faktu
+(`DrawerId::forFact`) i nie nazywa żadnej szuflady w pałacu — fakty żyją w grafie.
+Szufladę wstawioną **wprost przez klienta pałaca**, bez wiersza w rejestrze,
+test księguje jawnie (`alsoDeleteDrawer`); bez tego jedna szuflada na przebieg
+zostawałaby na zawsze.
+
+**Odrzucone alternatywy:**
+
+1. **`TRUNCATE` w schemacie `palace`** — najszybsze i wprost zabronione przez
+   D-004. Schemat pałaca należy do MemPalace; jego kształt to szczegół
+   implementacyjny zależności, a nie nasz kontrakt. Reguła nie ma wyjątku dla
+   testów: test, który obchodzi jedyną dopuszczalną drogę zapisu, przestaje
+   sprawdzać tę drogę.
+2. **Osobny pałac dla testów** (druga usługa, własny wolumen) — rozwiązuje
+   problem, ale podwaja pamięć i czas startu stosu, a przede wszystkim
+   **przestaje sprawdzać to, co jest sprawdzane**: wartość tych testów polega na
+   rozmowie z tą samą instancją i tą samą wersją MemPalace, którą ma produkcja.
+   Do rozważenia, jeśli kiedyś zaczną chodzić równolegle.
+3. **Kasowanie po nazwie skrzydła** (`test-…-<hex>`) — patrz wyżej: pomija
+   wszystko, co wylądowało w przestrzeni prywatnej. Do tego pałac nie ma
+   narzędzia „usuń skrzydło", więc i tak trzeba mieć listę szuflad.
+4. **Osobne sprzątanie w każdej z trzech klas** — tak wyglądał prototyp.
+   Po całym przebiegu grupy pałac i tak rósł, bo dwie klasy nie sprzątały nic.
+   Trzy kopie to trzy miejsca, w których można zapomnieć.
+5. **Porażka sprzątania wywraca test** — mieszałaby dwie różne informacje.
+   Niedostępny pałac na końcu przebiegu nic nie mówi o sprawdzanym kodzie,
+   a czerwone światło, które nie znaczy „kod jest zepsuty", uczy ignorowania
+   czerwonych świateł. Dlatego **głośno na stderr, ale bez porażki testu** —
+   i z nazwą skrzydła, bo bez niej nie wiadomo, co pozostało do ręcznego
+   usunięcia.
+
+**Jak to się sprawdza.** `mempalace_status` przed przebiegiem grupy i po nim ma
+podać tę samą liczbę `total_drawers`. Zmierzone: 1689 → 1689 (przed zmianą ten
+sam przebieg dokładał 14 szuflad).
+>>>>>>> main
