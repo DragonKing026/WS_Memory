@@ -271,6 +271,21 @@ potwierdz() {
   case "${odpowiedz}" in [tTyY]*) return 0 ;; *) return 1 ;; esac
 }
 
+# Identyfikator przestrzeni trafia wprost do adresu (`/s/<slug>`), więc spacja
+# albo wielka litera dają adres, który nie działa. Zamiast odrzucać odpowiedź —
+# poprawiamy ją i mówimy o tym głośno: człowiek, który w polu „identyfikator"
+# wpisał nazwę, chciał tej nazwy, a nie błędu. Sprawdzone na żywym przebiegu,
+# gdzie w to pole wpisano „Baza wiedzy".
+normalizuj_slug() {
+  printf '%s' "$1" | python3 -c '
+import re, sys, unicodedata
+tekst = unicodedata.normalize("NFKD", sys.stdin.read())
+tekst = tekst.replace("ł", "l").replace("Ł", "L")
+tekst = "".join(z for z in tekst if not unicodedata.combining(z))
+print(re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", tekst.lower())).strip("-"))
+'
+}
+
 # ─── Sekrety ─────────────────────────────────────────────────────────────────
 
 losowy_sekret() { openssl rand -base64 33 | tr -d '/+=\n' | cut -c1-32; }
@@ -374,6 +389,22 @@ czekaj_na_zdrowie() {
 
 w_backendzie() { docker compose exec -T backend "$@"; }
 
+# Czy klucz prywatny JWT daje się otworzyć hasłem, które jest w konfiguracji.
+#
+# Sprawdzane PHP-em, bo ten w kontenerze jest na pewno, a `openssl` niekoniecznie.
+# Pytanie brzmi „czy to działa", a nie „czy plik istnieje": plik istniejący
+# i niepasujący do hasła jest gorszy niż jego brak, bo instalacja wygląda wtedy
+# na udaną i wywraca się dopiero przy pierwszym logowaniu.
+klucz_otwiera_sie_haslem() {
+  w_backendzie php -r '
+    $klucz = @openssl_pkey_get_private(
+        file_get_contents("config/jwt/private.pem"),
+        (string) getenv("JWT_PASSPHRASE"),
+    );
+    exit(false === $klucz ? 1 : 0);
+  ' >/dev/null 2>&1
+}
+
 # Serwer embeddingów nie ma healthchecka w compose (nie mierzy go nic poza tym,
 # czy odpowiada), więc pytamy go wprost — z wnętrza sieci Compose, bo na hosta
 # nie wychodzi żadnym portem. Pytamy przez mempalace, bo tamten obraz ma curl.
@@ -443,12 +474,27 @@ instaluj_docker() {
   naglowek "Klucze JWT"
   if [ "${NA_SUCHO}" -eq 1 ]; then
     powiedz "(na sucho) pominięte: lexik:jwt:generate-keypair"
-  elif w_backendzie test -f config/jwt/private.pem 2>/dev/null; then
-    udalo "Klucze już są — zostawiam. Nadpisanie unieważniłoby wszystkie wydane tokeny."
-  else
+  elif ! w_backendzie test -f config/jwt/private.pem 2>/dev/null; then
     w_backendzie php bin/console lexik:jwt:generate-keypair --no-interaction \
       || przerwij "Nie udało się wygenerować kluczy JWT."
     udalo "Wygenerowane."
+  elif klucz_otwiera_sie_haslem; then
+    udalo "Klucze już są i pasują do hasła — zostawiam. Nadpisanie unieważniłoby wydane tokeny."
+  else
+    # Zastane klucze plus świeży `.env` to zastane klucze i NOWE hasło — a stary
+    # klucz nowym hasłem się nie otwiera. Objawem jest 500 przy logowaniu
+    # („bad decrypt”) na instancji, która poza tym wygląda na zdrową: strona
+    # stoi, baza odpowiada, pałac odpowiada. Dokładnie tak wyglądała pierwsza
+    # prawdziwa instalacja w trybie prod.
+    #
+    # Poprzednia wersja tego kroku zostawiała klucze zawsze, „żeby nie
+    # unieważniać wydanych tokenów". Słuszne, dopóki hasło się nie zmieniło;
+    # gdy się zmieniło, tokenów i tak nie da się już ani wydać, ani sprawdzić.
+    ostrzez "Klucze JWT nie otwierają się hasłem z .env — hasło jest nowe, a klucze stare."
+    ostrzez "Generuję nowe. Wszystkie wcześniej wydane tokeny przestają działać (i tak już nie działały)."
+    w_backendzie php bin/console lexik:jwt:generate-keypair --overwrite --no-interaction \
+      || przerwij "Nie udało się wygenerować kluczy JWT."
+    udalo "Wygenerowane od nowa."
   fi
 
   naglowek "Migracje bazy"
@@ -714,8 +760,27 @@ fi
 
 naglowek "Wspólna przestrzeń"
 powiedz "Każde nowe konto trafia do niej od razu — bez tego pierwszą rzeczą, jaką widzi nowa osoba, jest „nie należysz do żadnej przestrzeni”."
-zapytaj WS_DEFAULT_SPACE_SLUG "Identyfikator wspólnej przestrzeni (pusty = wyłącz)" "wiedza" 1
-zapytaj WS_DEFAULT_SPACE_NAME "Jej nazwa w interfejsie" "Baza wiedzy" 1
+zapytaj WS_DEFAULT_SPACE_NAME "Nazwa wspólnej przestrzeni (pusta = wyłącz mechanizm)" "Baza wiedzy" 1
+# Identyfikator PO nazwie i domyślnie z niej wyliczony: pytanie o „identyfikator"
+# przed pytaniem o nazwę zaprasza do wpisania nazwy w to pierwsze pole — i tak
+# się właśnie stało przy pierwszej prawdziwej instalacji.
+zapytaj WS_DEFAULT_SPACE_SLUG \
+  "Jej identyfikator w adresie (bez spacji, małymi literami)" \
+  "$(normalizuj_slug "${ODP[WS_DEFAULT_SPACE_NAME]:-wiedza}")" 1
+
+if [ -n "${ODP[WS_DEFAULT_SPACE_SLUG]}" ]; then
+  czysty_slug="$(normalizuj_slug "${ODP[WS_DEFAULT_SPACE_SLUG]}")"
+
+  if [ -z "${czysty_slug}" ]; then
+    przerwij "Z identyfikatora „${ODP[WS_DEFAULT_SPACE_SLUG]}” nie da się zrobić adresu. Podaj coś z liter albo cyfr."
+  fi
+
+  if [ "${czysty_slug}" != "${ODP[WS_DEFAULT_SPACE_SLUG]}" ]; then
+    ostrzez "Identyfikator „${ODP[WS_DEFAULT_SPACE_SLUG]}” nie nadaje się do adresu — używam „${czysty_slug}”."
+    powiedz "Nazwa widoczna w interfejsie zostaje bez zmian: ${ODP[WS_DEFAULT_SPACE_NAME]:-Baza wiedzy}"
+    ODP[WS_DEFAULT_SPACE_SLUG]="${czysty_slug}"
+  fi
+fi
 
 zapytaj MEMPALACE_VERSION "Wersja MemPalace" "3.9.0"
 

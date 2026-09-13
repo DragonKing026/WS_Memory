@@ -15,6 +15,68 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 21:58 — Sprawdzenia frontendu przestały zależeć od trybu instancji
+
+Skrypt wypychający padał na trzech sprawdzeniach naraz: `pnpm: executable file
+not found`. Powód nie ma nic wspólnego z jakością zmiany — po instalacji
+w trybie `prod` kontener frontendu to **nginx ze statycznym `dist/`**, więc nie
+ma w nim ani Node'a, ani pnpm.
+
+To jest najgorszy rodzaj czerwonego światła: takie, które zapala się z powodu
+niezwiązanego z tym, co się właśnie zmieniło. Uczy ignorowania czerwonych
+świateł, a wtedy przestają działać także te prawdziwe.
+
+Sprawdzenia frontendu idą teraz przez `w_frontendzie`: gdy pnpm jest
+w działającym kontenerze, korzystamy z niego (szybciej, `node_modules` już
+rozpakowane); gdy go nie ma — jednorazowy kontener z obrazu dev, z tym samym
+wolumenem `node_modules`. **To nie jest pominięcie sprawdzenia**: to samo
+polecenie, inne miejsce uruchomienia.
+
+Przy okazji pułapka warta zapisania: nazwa **obrazu** jest w compose wpisana na
+stałe (`ws-memory/frontend`), a nazwę **wolumenu** Compose prefiksuje nazwą
+projektu. Pomylenie tych dwóch daje „no such image" na instancji o innej nazwie
+projektu — a taka istnieje, bo na niej testowałem instalator.
+
+
+---
+## 2026-09-13 21:53 — Pierwsza prawdziwa instalacja w trybie prod: obraz produkcyjny nigdy się nie zbudował
+
+Instalacja na instancji rozwojowej, w trybie **prod** (wybór domyślny), znalazła
+trzy rzeczy, których przebieg w trybie `dev` znaleźć nie mógł.
+
+**`proxy_dir` w bloku `when@prod` w `doctrine.yaml`.** DoctrineBundle 3 usunął tę
+opcję, a wpis został z przepisu Symfony dla wersji 2. Budowanie obrazu
+produkcyjnego padało na `cache:warmup --env=prod`. To jest błąd w repozytorium,
+nie w instalatorze, i wart jest jednego zdania wprost: **obraz produkcyjny tego
+projektu nigdy się nie zbudował**, bo przez cały czas pracy budowany był
+wyłącznie obraz `dev`. Instalator był pierwszą rzeczą, która o to poprosiła.
+
+**Stare klucze JWT z nowym hasłem.** Instalator zostawiał zastane klucze — „nie
+unieważniaj wydanych tokenów" — ale świeży `.env` niesie nowy `JWT_PASSPHRASE`,
+więc klucz się nie otwierał. Objaw jest podstępny: 500 przy logowaniu na
+instancji, która poza tym wygląda na całkowicie zdrową. Strona stoi, baza
+odpowiada, pałac odpowiada, wyszukiwanie znaczeniem działa. Instalator sprawdza
+teraz, czy klucz **otwiera się** hasłem z konfiguracji, a nie czy plik istnieje;
+deinstalator kasuje klucze razem z `.env`, bo są sekretem tej samej instancji.
+
+**Identyfikator przestrzeni wpisany jako nazwa.** W pole „identyfikator" padło
+„Baza wiedzy" — adres wyszedłby `/s/Baza wiedzy`. Wina jest po stronie pytania:
+pytało o identyfikator przed nazwą, więc zapraszało do wpisania nazwy. Teraz
+pyta najpierw o nazwę, podpowiada z niej identyfikator i normalizuje wpisany
+(`Baza wiedzy` → `baza-wiedzy`), mówiąc głośno, co zmienił.
+
+Do tego drobiazg zgłoszony przez Artura: instalator zakładał `var/` w korzeniu
+repozytorium na ślad instalacji, a ignorowany był tylko `backend/var/`. Katalog
+widać było w `git status`. Dopisany do `.gitignore` z wyjaśnieniem, po co
+w ogóle istnieje.
+
+**Efekt uboczny:** reinstalacja wyczyściła instancję rozwojową ze śmieci po
+testach. Było **40 922 wpisy audytu i 1822 szuflady** w pałacu, jest **4 wpisy
+i 1 szuflada**. Przed usunięciem sprawdzone, że nie ginie nic wartościowego:
+zero dokumentów, zero rewizji, zero wpisów pamięci, zero tokenów agentów.
+
+
+---
 ## 2026-09-13 21:39 — Instalator sprawdzony pełnym przebiegiem: trzy błędy, których przegląd nie znajdzie
 
 Postawiłem **osobną instancję obok** — świeży klon, własna nazwa projektu

@@ -124,6 +124,33 @@ Kryterium o przerwaniu w połowie odhaczone **z przebiegu, nie z założenia**:
 pierwsza próba padła na kluczach JWT, zostawiając kontenery i `.env`; kolejne
 przebiegi to dokończyły, a deinstalator posprzątał wszystko.
 
+**Instalacja na prawdziwej instancji rozwojowej** (tryb `prod`, wybór domyślny)
+znalazła jeszcze trzy rzeczy, których nie znalazł przebieg w trybie `dev`:
+
+4. **`proxy_dir` w `when@prod` w `doctrine.yaml`.** DoctrineBundle 3 usunął tę
+   opcję; wpis został z przepisu Symfony dla wersji 2. Budowanie obrazu
+   produkcyjnego padało na `cache:warmup --env=prod` — nikt tego nie zauważył,
+   bo przez cały czas pracy budowany był wyłącznie obraz `dev`. To błąd
+   w repozytorium, nie w instalatorze: **obraz produkcyjny nigdy się nie
+   zbudował** i nikt o tym nie wiedział.
+5. **Stare klucze JWT plus nowe hasło.** Instalator zostawiał zastane klucze
+   („nie unieważniaj wydanych tokenów"), ale świeży `.env` ma nowy
+   `JWT_PASSPHRASE`, więc klucz się nie otwierał. Objaw: 500 przy logowaniu na
+   instancji, która poza tym wygląda na zdrową — strona stoi, baza i pałac
+   odpowiadają, wyszukiwanie działa. Instalator **sprawdza teraz, czy klucz
+   otwiera się hasłem**, a deinstalator kasuje klucze razem z `.env`, bo są
+   sekretem tej samej instancji.
+6. **Identyfikator przestrzeni wpisany jako nazwa.** W polu „identyfikator"
+   padło „Baza wiedzy", co dałoby adres `/s/Baza wiedzy`. Pytanie o nazwę idzie
+   teraz PRZED pytaniem o identyfikator i podpowiada go z nazwy, a wpisany
+   identyfikator jest normalizowany (`Baza wiedzy` → `baza-wiedzy`) z głośnym
+   powiedzeniem, co się stało.
+
+**Efekt uboczny wart odnotowania:** reinstalacja wyczyściła instancję rozwojową
+ze śmieci po testach. Było 40 922 wpisy audytu i 1822 szuflady w pałacu, jest
+**4 wpisy i 1 szuflada**. Nic wartościowego nie zginęło — przed usunięciem
+sprawdzone: zero dokumentów, zero rewizji, zero wpisów pamięci, zero tokenów.
+
 **Czego nie sprawdziłem:** instalacji na maszynie bez Dockera w ogóle — do tego
 służy maszyna testowa z punktu 7.
 
