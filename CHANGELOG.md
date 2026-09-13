@@ -15,6 +15,22 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 11:17 — TODO-007 ukończone: baza wiedzy da się przeszukać
+
+Zadanie rozliczone i przeniesione do `TODO/DONE/`. Wszystkie siedem kryteriów
+ukończenia spełnione, z pomiarem na bazie 10 037 szuflad i 10 005 dokumentów.
+
+Rozliczenie zawiera to, czego w kodzie nie widać: dlaczego próg słabych wyników
+jest **względny, a nie stały** (zmierzone przedziały trafności zachodzą na
+siebie, więc żadna stała ich nie rozdziela — stały jest odstęp od najlepszego
+wyniku), oraz cztery usterki znalezione dopiero na ekranie albo w pomiarze,
+z których żadnej nie było widać w kodzie.
+
+Wypisane jest też, **czego w zadaniu nie ma**: grafu wiedzy na ekranie surowej
+pamięci (fakt nie jest szufladą i nie wraca z listowania rejestru — potrzebuje
+własnego widoku) oraz historii rewizji i edytora, które są w `TODO-008`.
+
+---
 ## 2026-09-13 11:15 — Publikacja wiki ponawia push, CodeQL wyjaśniony
 
 **Publikacja wiki padła na błędzie 500 GitHuba.** Nie po naszej stronie: commit

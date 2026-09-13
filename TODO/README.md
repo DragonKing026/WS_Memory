@@ -50,7 +50,7 @@ Zadanie bez sekcji **Co zostało zrobione** nie trafia do `DONE/`.
                        ✅ 003 klient pałaca ✅ 005 wiki backend ✅ 006 frontend fundament
                                  │                   │                   │
                                  ▼                   │                   ▼
-                       ✅ 004 gateway MCP ◄──────────┘            007 szukanie (UI)
+                       ✅ 004 gateway MCP ◄──────────┘         ✅ 007 szukanie (UI)
                                  │                                       │
                                  ▼                                       ▼
                           009 plugin                              008 edytor i historia
