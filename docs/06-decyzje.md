@@ -1091,3 +1091,81 @@ jest przeoczone.
 **Odrzucono:** *token w pamięci plus „odświeżanie" przez ciasteczko* — to jest
 poprawna architektura i wymaga endpointu odświeżania, którego nie ma (D-017).
 Do rozważenia razem z nim.
+
+---
+
+## D-029 — Tryb leksykalny działa na naszych danych, nie w pałacu
+
+**Data:** 2026-09-13 00:12 · **Stan:** Przyjęta
+
+TODO-007 wymaga dwóch trybów wyszukiwania: semantycznego („czy ktoś coś o tym
+wie") i leksykalnego („gdzie dokładnie występuje ta nazwa"). Okazało się, że
+**pałac nie umie tego drugiego**: `mempalace_search` przyjmuje `query`, `wing`,
+`room`, `since`, `before` i `max_distance` — i nic więcej. Nie ma parametru
+trybu.
+
+**Decyzja:** tryb leksykalny realizujemy po naszej stronie, w PostgreSQL, na
+danych, które i tak trzymamy:
+
+| Źródło | Co obejmuje | Zakres |
+|---|---|---|
+| `ws.document_revisions.content` | pełna treść bieżącej rewizji | cały tekst |
+| `ws.memory_entries.title` + `tags` | notatki, dziennik, transkrypty | tytuł i tagi |
+
+**Konsekwencja wypowiedziana wprost:** wyszukiwanie leksykalne **nie przeszukuje
+treści szuflad innych niż dokumenty**. Treść notatki czy wpisu dziennika mieszka
+wyłącznie w pałacu, a pałac oferuje do niej tylko dostęp semantyczny. Interfejs
+ma to mówić, a nie udawać pełne pokrycie — wynik wyszukiwania, który po cichu
+pomija połowę bazy, jest gorszy niż brak trybu.
+
+**Odrzucono:** *pytanie tabel `palace.*` bezpośrednio* — łamie regułę
+nienaruszalną (pałac jest zależnością, nie naszą bazą; `schema_filter` celowo go
+wycina) i wiąże nas z jego schematem, który przy aktualizacji może się zmienić
+bez ostrzeżenia. Cała wartość D-001 polega na tym, że aktualizacja pałacu dotyka
+jednego pliku.
+
+**Odrzucono:** *duplikowanie treści szuflad do `ws.memory_entries`* — podwaja
+zajętość i tworzy problem synchronizacji dwóch kopii tej samej treści. Kopia,
+która może się rozjechać z oryginałem, rozjedzie się.
+
+**Do rozważenia później:** gdyby pałac dodał tryb leksykalny, ta decyzja
+zostaje wyparta, a adapter jest jedynym miejscem do zmiany.
+
+---
+
+## D-030 — Leksykalnie szukamy `simple`, bez rdzeniowania
+
+**Data:** 2026-09-13 00:12 · **Stan:** Przyjęta
+
+PostgreSQL **nie ma polskiej konfiguracji wyszukiwania tekstowego** —
+sprawdzone przez `\dF` na naszym obrazie: jest angielski, niemiecki, węgierski
+i dwadzieścia innych, polskiego nie ma.
+
+**Decyzja:** tryb leksykalny używa konfiguracji `simple` (tokenizacja bez
+rdzeniowania) z **dopasowaniem przedrostkowym** (`to_tsquery('simple', 'palace:*')`),
+na indeksach GIN. Bez żadnego rozszerzenia.
+
+**Dlaczego to nie jest obejście, tylko właściwy wybór:** tryb leksykalny
+odpowiada na pytanie „gdzie dokładnie występuje ta nazwa". Przy takim pytaniu
+rdzeniowanie **szkodzi** — szukając `Version20260912000003` albo `PalaceWing`
+nie chcemy trafień na coś o wspólnym rdzeniu. Odmiana polska jest problemem
+wyszukiwania znaczeniowego, a to zadanie ma już swój tryb: semantyczny, który
+działa na wektorach i odmiany nie zauważa.
+
+**Odrzucono:** *konfiguracja `english` na polskim tekście* — rdzeniuje według
+reguł innego języka, więc dokłada trafienia błędne, a poprawnych nie dokłada.
+Gorsze niż brak rdzeniowania, bo wygląda na działające.
+
+**Odrzucono:** *słownik `ispell` z polskim `hunspell`* — wymaga plików słownika
+w obrazie bazy, czyli własnego obrazu Postgresa zamiast `pgvector/pgvector`, i
+utrzymywania go przy każdej aktualizacji. Koszt nieproporcjonalny do zysku,
+skoro odmianę obsługuje tryb semantyczny.
+
+**Odrzucono:** *`pg_trgm` dla dopasowań w środku słowa* — założenie rozszerzenia
+wymaga uprawnienia `CREATE` na bazie, którego rola `ws_app` **celowo nie ma**
+(zakłada je `postgres` w skrypcie inicjującym). Migracja uruchamiana jako `ws_app`
+nie mogłaby go dodać, a rozwiązaniem byłoby albo poszerzenie uprawnień roli
+aplikacji, albo ręczny krok administratora przy każdej istniejącej bazie. Jedno
+i drugie to zła cena za szukanie fragmentu w środku słowa, skoro przedrostek
+pokrywa realne użycie („wpisuję `Palace`, chcę `PalaceWing`"). Do dodania, gdy
+ktoś tego naprawdę potrzebuje — wtedy świadomie, z krokiem administracyjnym.

@@ -1097,3 +1097,79 @@ overlooked.
 **Rejected:** *a token in memory plus refresh through a cookie* — that is the correct
 architecture and it needs a refresh endpoint, which does not exist (D-017). To be
 considered together with it.
+
+---
+
+## D-029 — Lexical mode runs on our data, not in the palace
+
+**Date:** 2026-09-13 00:12 · **Status:** Accepted
+
+TODO-007 calls for two search modes: semantic ("does anybody know anything about
+this") and lexical ("where exactly does this name appear"). It turned out that
+**the palace cannot do the second one**: `mempalace_search` accepts `query`, `wing`,
+`room`, `since`, `before` and `max_distance` — and nothing else. There is no mode
+parameter.
+
+**Decision:** lexical mode is implemented on our side, in PostgreSQL, over data we
+already hold:
+
+| Source | What it covers | Extent |
+|---|---|---|
+| `ws.document_revisions.content` | full content of the current revision | the whole text |
+| `ws.memory_entries.title` + `tags` | notes, diary, transcripts | title and tags |
+
+**The consequence, stated plainly:** lexical search **does not search the content of
+drawers other than documents**. The body of a note or a diary entry lives only in the
+palace, and the palace offers semantic access to it and nothing else. The interface has
+to say so rather than imply full coverage — a search result that quietly skips half the
+base is worse than not offering the mode.
+
+**Rejected:** *querying the `palace.*` tables directly* — it breaks an inviolable rule
+(the palace is a dependency, not our database; `schema_filter` excludes it deliberately)
+and couples us to a schema that an upgrade may change without warning. The entire value
+of D-001 is that upgrading the palace touches one file.
+
+**Rejected:** *duplicating drawer content into `ws.memory_entries`* — it doubles storage
+and creates a synchronisation problem between two copies of the same content. A copy
+that can drift from the original will drift.
+
+**To revisit:** should the palace gain a lexical mode, this decision is superseded and
+the adapter is the only place to change.
+
+---
+
+## D-030 — Lexical search uses `simple`, without stemming
+
+**Date:** 2026-09-13 00:12 · **Status:** Accepted
+
+PostgreSQL **ships no Polish text-search configuration** — verified with `\dF` on our
+image: English, German, Hungarian and twenty others are there, Polish is not.
+
+**Decision:** lexical mode uses the `simple` configuration (tokenisation without
+stemming) with **prefix matching** (`to_tsquery('simple', 'palace:*')`), over GIN
+indexes. No extension required.
+
+**Why this is the right choice rather than a workaround:** lexical mode answers the
+question "where exactly does this name appear". For that question stemming **hurts** —
+searching for `Version20260912000003` or `PalaceWing`, we do not want hits that merely
+share a stem. Polish inflection is a problem for meaning-based search, and that job
+already has its own mode: the semantic one, which works on vectors and does not notice
+inflection at all.
+
+**Rejected:** *the `english` configuration over Polish text* — it stems by another
+language's rules, so it adds wrong hits without adding right ones. Worse than no
+stemming, because it looks like it works.
+
+**Rejected:** *an `ispell` dictionary with Polish `hunspell`* — it needs dictionary files
+inside the database image, meaning our own Postgres image instead of `pgvector/pgvector`,
+and maintaining it at every upgrade. The cost is out of proportion to the gain, given
+that the semantic mode already handles inflection.
+
+**Rejected:** *`pg_trgm` for infix matches* — creating the extension requires `CREATE`
+privilege on the database, which the `ws_app` role **deliberately does not have** (the
+init script creates extensions as `postgres`). A migration running as `ws_app` could not
+add it, and the way around that would be either widening the application role's
+privileges or a manual administrator step on every existing database. Both are a bad
+price for matching inside a word, given that prefixes cover the real use ("I type
+`Palace`, I want `PalaceWing`"). To be added if somebody genuinely needs it — then
+deliberately, with an administrative step.

@@ -15,6 +15,36 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 09:48 — TODO-007: fundament wyszukiwania i dwie decyzje
+
+Początek TODO-007. Zanim powstał choć jeden ekran, trafiły się trzy ustalenia,
+które zmieniają kształt zadania — dlatego są zapisane, a nie obchodzone.
+
+**REST API nie miało wyszukiwania w ogóle.** Istniało wyłącznie przez bramkę
+MCP, czyli dla agentów. TODO-007 jest opisane jako zadanie frontendowe, ale bez
+endpointu nie ma czego wyświetlać — backend wchodzi w zakres.
+
+**Pałac nie umie trybu leksykalnego** (D-029). `mempalace_search` przyjmuje
+`query`, `wing`, `room`, `since`, `before` i `max_distance` — parametru trybu
+nie ma. Tryb leksykalny realizujemy więc u siebie, w PostgreSQL, na treści
+rewizji dokumentów oraz tytułach i tagach wpisów. **Konsekwencja nazwana
+wprost:** nie sięga treści szuflad innych niż dokumenty, bo ta mieszka wyłącznie
+w pałacu. Interfejs ma to mówić, a nie udawać pełne pokrycie.
+
+**Postgres nie ma polskiej konfiguracji tekstowej** (D-030) — sprawdzone przez
+`\dF`. Używamy `simple` z dopasowaniem przedrostkowym, bez rdzeniowania, i to
+nie jest ustępstwo: tryb leksykalny odpowiada na „gdzie dokładnie występuje ta
+nazwa", a przy `PalaceWing` rdzeniowanie dokłada trafienia błędne. Odmianę
+obsługuje tryb semantyczny. `pg_trgm` odrzucone świadomie — założenie
+rozszerzenia wymaga uprawnienia `CREATE` na bazie, którego rola `ws_app`
+celowo nie ma.
+
+Migracja z indeksami GIN sprawdzona w obie strony (`up`, `down`, ponowne `up`).
+Typy domenowe: `SearchMode`, port `LexicalIndex` i `SearchHit` — osobny typ
+wyniku, bo `MemoryFragment` nie niesie autora ani weryfikacji, których zadanie
+wymaga, a świeżo zapisany dokument nie ma jeszcze identyfikatora szuflady.
+
+---
 ## 2026-09-13 00:11 — Edytor odzyskuje typy, `baseUrl` znika
 
 **Edytor nie widział żadnych typów.** Zgłaszał brak `vite/client`, a w praktyce
