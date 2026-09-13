@@ -128,11 +128,17 @@ final class AdminSpaceTest extends WebTestCase
 
         $payload = $this->json();
         self::assertSame(['spaces', 'count', 'limit', 'offset', 'hasMore'], array_keys($payload));
-        // Two shared spaces plus one private space per account.
-        self::assertSame(5, $payload['count']);
+        // Counted from the table, not written down: the number is background here (the
+        // subject is the shape and the counters), and the installation now also holds a
+        // space created by the default-space rule rather than by this fixture.
+        self::assertSame($this->spacesInTheDatabase(), $payload['count'], 'every space is listed');
         self::assertFalse($payload['hasMore']);
 
-        $alfa = $payload['spaces'][0];
+        // Keyed by slug: with a space arriving from configuration, the position of
+        // these two in the listing is not something this test should assume.
+        $bySlug = array_column($payload['spaces'], null, 'slug');
+
+        $alfa = $bySlug['alfa'];
         self::assertSame(
             [
                 'slug', 'name', 'description', 'isPrivate', 'requiresProposal', 'palaceWing',
@@ -150,7 +156,7 @@ final class AdminSpaceTest extends WebTestCase
         // somebody retired, and counting it would report a space as busier than it is.
         self::assertSame(2, $alfa['documentCount']);
 
-        $beta = $payload['spaces'][1];
+        $beta = $bySlug['beta'];
         self::assertSame('beta', $beta['slug']);
         self::assertNull($beta['description']);
         self::assertSame(1, $beta['memberCount']);
@@ -175,14 +181,18 @@ final class AdminSpaceTest extends WebTestCase
     public function testPagingSlicesTheListAndTheLimitIsCapped(): void
     {
         $token = $this->tokenFor('admin@web-systems.pl');
+        $total = $this->spacesInTheDatabase();
 
         $this->get('/api/admin/spaces?limit=2', $token);
         $first = $this->json();
         self::assertCount(2, $first['spaces']);
-        self::assertSame(5, $first['count'], 'count is the whole list, not this page');
+        self::assertSame($total, $first['count'], 'count is the whole list, not this page');
         self::assertTrue($first['hasMore']);
 
-        $this->get('/api/admin/spaces?limit=2&offset=4', $token);
+        // One short of the end, so the last page is a partial one: that is where an
+        // off-by-one in the window shows up, and it has to be derived from the total
+        // rather than typed, or it stops being the last page when a space is added.
+        $this->get('/api/admin/spaces?limit=2&offset=' . ($total - 1), $token);
         $last = $this->json();
         self::assertCount(1, $last['spaces']);
         self::assertFalse($last['hasMore']);
@@ -378,6 +388,18 @@ final class AdminSpaceTest extends WebTestCase
                 'archived_at' => $archivedAt,
             ]);
         }
+    }
+
+    /**
+     * How many spaces exist, asked of the table instead of counted by hand.
+     *
+     * The fixture is no longer the only thing that creates spaces — accepting an
+     * invitation admits the account to the shared space, creating it on first use —
+     * so a literal here would assert the fixture rather than the paging it is in.
+     */
+    private function spacesInTheDatabase(): int
+    {
+        return (int) $this->em->getConnection()->fetchOne('SELECT count(*) FROM ws.spaces');
     }
 
     private function privateMembersUri(): string
