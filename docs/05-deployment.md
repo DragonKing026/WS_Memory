@@ -74,6 +74,7 @@ Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
 | `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — wykrywanie encji; domyślnie `en`, patrz D-011 |
 | `MEMPALACE_TIMEOUT` | limit czasu na jedno wywołanie narzędzia pałaca, w sekundach (domyślnie 15, ustawiany w `backend/.env`) |
 | `MCP_CALLS_PER_MINUTE` | ile wywołań na minutę może wykonać jeden token agenta (domyślnie 120, `backend/.env`) |
+| `WS_INSTRUCTIONS_DIR` | katalog z treścią instrukcji wystawianą jako zasoby MCP — patrz niżej |
 | `FRONTEND_TARGET` | `dev` (Vite z przeładowaniem na gorąco) albo `prod` (statyczne `dist/` w nginxie) |
 | `WS_DEV_PORT` | port, pod którym przeglądarka widzi aplikację; websocket HMR musi być ogłoszony na nim, nie na porcie Vite |
 
@@ -93,6 +94,22 @@ Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
 
 Trzy zmienne embeddingów (`MEMPALACE_EMBEDDING_*`) są **nierozdzielne** — patrz
 D-003. Zmiana modelu unieważnia wszystkie wektory w bazie.
+
+`WS_INSTRUCTIONS_DIR` wskazuje katalog z **treścią instrukcji dla agentów** —
+protokołem recall, zasadami dokumentowania, opisami podagentów — którą gateway
+wystawia jako zasoby MCP (`docs/03-mcp-gateway.md`). Treść ma jedno źródło,
+`plugin/shared/` (D-013), ale w każdym środowisku leży gdzie indziej:
+
+| Gdzie | Ścieżka | Skąd się tam bierze |
+|---|---|---|
+| testy na hoście i w CI | `../plugin/shared` względem `backend/` | wartość domyślna, zmiennej się nie ustawia |
+| kontenery `backend` i `worker` | `/opt/ws-memory/instrukcje` | wolumen `./plugin/shared:/opt/ws-memory/instrukcje:ro` z `docker-compose.yml` |
+| obraz produkcyjny | `/opt/ws-memory/instrukcje` | `COPY plugin/shared/` w etapie `prod`, ze `ENV` w obrazie |
+
+W obrazie produkcyjnym jest to **kopia, nie wolumen**: obraz ma być
+samowystarczalny. Brakujący albo niepodmontowany katalog jest **błędem**, nie
+pustą listą zasobów — instrukcja wczytana jako pusty tekst czyta się dla modelu
+jak „nie ma żadnego protokołu" i agent po prostu jedzie dalej.
 
 `MEMPALACE_TIMEOUT` trzymamy **krótki celowo**. Przez czas oczekiwania na pałac
 otwarta jest transakcja bazy (D-020), więc hojny limit nie daje pewniejszego
