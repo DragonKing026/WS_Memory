@@ -59,6 +59,24 @@ describe('schematy zaproszeń', () => {
     expect(adminInvitationListSchema.parse(answer).invitations[0]?.status).toBe('oczekuje')
   })
 
+  /**
+   * The first account on any instance is invited from the console, where there is no
+   * signed-in user to record — so `invitedBy` is null on the very first row every
+   * instance ever has. A schema that refuses it breaks the invitations screen on day
+   * one, for everybody, which is exactly what happened on 2026-09-13.
+   */
+  it('przyjmuje zaproszenie bez zapraszającego, bo takie wystawia konsola', () => {
+    const answer = {
+      invitations: [{ ...invitation(), invitedBy: null }],
+      count: 1,
+      limit: 25,
+      offset: 0,
+      hasMore: false,
+    }
+
+    expect(adminInvitationListSchema.parse(answer).invitations[0]?.invitedBy).toBeNull()
+  })
+
   it('przyjmuje wszystkie trzy statusy i przyjęcie z datą', () => {
     expect(adminInvitationSchema.safeParse(invitation({ status: 'wygasle' })).success).toBe(true)
     expect(

@@ -196,6 +196,12 @@ mieszkają w `Domain/`.
 Nieznane konto i złe hasło odpowiadają identycznie — inaczej formularz
 logowania służyłby do sprawdzania, kto tu pracuje.
 
+**Reguła ogólna, z tej samej lekcji: czynność, która niczego nie zmieniła, nie
+zapisuje się w audycie.** Nadanie komuś roli, którą już ma, kończy się
+powodzeniem — powtórzenie żądania nie jest błędem — ale **nie dopisuje wiersza**.
+Wpis „zmieniono rolę z admina na admina" opisuje zmianę, której nie było, i psuje
+dziennik dokładnie tak samo jak fałszywe logowania, tylko wolniej.
+
 ### Odczyt przestrzeni
 
 1. Firewall `api` weryfikuje JWT i ładuje użytkownika **z bazy przy każdym żądaniu**.

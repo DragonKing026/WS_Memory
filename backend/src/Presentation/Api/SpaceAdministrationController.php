@@ -178,6 +178,21 @@ final readonly class SpaceAdministrationController
         // same event, and D-016 exists to answer exactly that question afterwards.
         // The route accepts both because a client should not have to know which case
         // it is in — but the log must.
+        if (null !== $existing && $existing->getRole() === $role) {
+            // Nothing changes, so nothing is recorded. The request still succeeds —
+            // repeating a grant is not an error, and a client should be able to state
+            // the role it wants without first asking what it is. But an entry reading
+            // „role changed from admin to admin" describes a change that did not
+            // happen, and a trail carrying those stops being worth reading. Learned
+            // the expensive way: 20 335 `user.login` rows written per request rather
+            // than per sign-in (Infrastructure/Security/LoginAuditSubscriber.php).
+            return new JsonResponse([
+                'space' => $slug,
+                'member' => $member->getEmail(),
+                'role' => $role->value,
+            ]);
+        }
+
         if (null !== $existing) {
             $previous = $existing->getRole();
             $existing->changeRole($role);

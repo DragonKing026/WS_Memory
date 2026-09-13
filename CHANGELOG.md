@@ -15,6 +15,64 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 17:50 — Sprawdzenie zadań przepuszczało anulowane leżące na liście
+
+Warunek w `sprawdz-zadania.py` brzmiał „zamknięte **i nie anulowane**", więc
+zadanie anulowane mogło zostać w `TODO/` bez słowa protestu. Dokładnie to zrobiło
+TODO-010: leżało dobę na liście do zrobienia, mimo że D-012 anulowała je dzień
+wcześniej — i zauważył to człowiek, pytając, czemu nie robimy go przed 011. Czyli
+tym kosztem, któremu ten skrypt ma zapobiegać.
+
+Teraz anulowane liczy się tak samo jak ukończone: **ma zniknąć z listy**.
+Sprawdzone symulacją — zadanie oznaczone jako anulowane i zostawione w `TODO/`
+jest zgłaszane, czego przed poprawką nie było.
+
+Drugą stroną tej zmiany jest to, że anulowanego nie zmuszamy już do sekcji
+**Co zostało zrobione**. Nic w nim nie powstało; wystarczy **Dlaczego anulowane**.
+Wymaganie rozliczenia z pracy, której nie było, produkuje tylko pustą sekcję.
+
+---
+## 2026-09-13 17:47 — Anulowane TODO-010 zeszło z listy zadań
+
+Zadanie jest anulowane od 2026-09-12 (decyzja D-012 zabrała mielenie po stronie
+serwera w całości), ale leżało dalej w `TODO/` i wyglądało na zaległe — na tyle,
+że padło pytanie, czemu nie robimy go przed 011. Przeniesione do `TODO/DONE/`,
+gdzie skrypt sprawdzający i tak akceptuje stan `ANULOWANE`.
+
+---
+## 2026-09-13 17:46 — Nowy dokument da się wreszcie zacząć z przeglądarki
+
+Edytor **od początku** umiał tworzyć dokumenty — otwarcie nieistniejącego adresu
+to jego normalna droga — ale nic w interfejsie tam nie prowadziło. Jedynym
+wejściem było wpisanie adresu ręcznie w pasku przeglądarki, więc pusta przestrzeń
+uczciwie pisała, że „edytor dochodzi w TODO-008", długo po tym, jak doszedł.
+
+Przycisk **Nowy dokument** w nagłówku przestrzeni, widoczny dla piszących. Pyta
+o adres i od razu sprawdza go regułą serwera, żeby odmowa przyszła przy pisaniu,
+a nie po pierwszej próbie zapisu — oraz mówi, gdy taki dokument już jest.
+
+---
+## 2026-09-13 17:44 — Trzy usterki wyłapane pierwszym logowaniem na świeże konto
+
+**Ekran zaproszeń nie otwierał się w ogóle.** Schemat frontendu wymagał, żeby
+każde zaproszenie miało zapraszającego, a **pierwsze konto każdej instancji
+zaprasza się z konsoli**, gdzie nikt nie jest zalogowany — więc `invitedBy` jest
+puste. Backend miał to poprawnie jako `?string` od encji po kontroler; złożenie
+psuł wyłącznie Zod. Efekt: ekran padał na każdej świeżo postawionej instancji, dla
+każdego, i wychodziło to dopiero po zalogowaniu się tym pierwszym kontem. Teraz
+zaproszenie bez zapraszającego wyświetla się jako „wystawione z konsoli".
+
+**Nadanie roli, którą ktoś już ma, dopisywało do audytu wpis o zmianie.**
+`space.member_role_changed` z `previousRole: "admin"` na `"admin"` — zdanie o
+zmianie, której nie było. Żądanie nadal kończy się powodzeniem, bo powtórzenie nie
+jest błędem, ale **nie zapisuje wiersza**. To ta sama rodzina co 20 335 fałszywych
+`user.login`: zdarzenie zapisywane przy żądaniu zamiast przy realnej czynności.
+Reguła ogólna trafiła do `docs/08-backend.md`.
+
+**Pusta przestrzeń odsyłała do TODO-008** — „edytor w przeglądarce dochodzi
+w TODO-008" — a edytor istnieje od wczoraj.
+
+---
 ## 2026-09-13 17:23 — Instrukcje jako zasoby MCP; TODO-009 zamknięte
 
 Gateway wystawia treść z `plugin/shared/` jako **zasoby MCP**: `resources/list`,
