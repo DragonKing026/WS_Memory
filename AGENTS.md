@@ -376,6 +376,18 @@ plików w `Domain/` trzeba tknąć? Odpowiedź ma brzmieć „zero".
 wchodzi wtedy, gdy potrafimy nazwać zmianę, której ma służyć — a powyższe
 zmiany są w `TODO/`, nie w wyobraźni.
 
+### Wtyczka — treść instrukcji istnieje w repozytorium raz
+
+Wszystko, co wtyczka mówi agentom (protokół recall, zasady dokumentowania,
+opisy podagentów), mieszka **wyłącznie** w `plugin/shared/`. Opakowania —
+`plugin/skills/`, `plugin/agents/` — to **dowiązania symboliczne** do tych
+plików, a nie kopie. Gateway wystawia tę samą treść jako zasoby MCP.
+
+Nie kopiuj tych plików „żeby dostosować do klienta". Rozjechana instrukcja
+jest gorsza niż jej brak: agent Claude i agent Codeksa mówiliby wtedy co
+innego o tej samej firmowej zasadzie, i nikt by nie wiedział która wersja
+obowiązuje. Szczegóły: D-013, `docs/04-plugin.md`.
+
 ### Język
 
 **W kodzie wszystko po angielsku** — nazwy klas, metod, zmiennych, tabel,

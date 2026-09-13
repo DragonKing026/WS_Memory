@@ -15,6 +15,41 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 17:20 — Wtyczka WS_Memory dla Claude Code (TODO-009)
+
+Wtyczka działa i jest zainstalowana z tego repozytorium: trzy skille, czterech
+podagentów, trzy komendy, jeden hook i serwer MCP `ws_memory` po HTTP.
+
+**Hook `session-start`** woła `ws_status` i wstrzykuje agentowi na wejściu:
+do jakich przestrzeni token ma prawo, z jaką rolą, ile jest w nich wpisów
+i **gdzie wyląduje zapis bez wskazanej przestrzeni**. Bez tego agent odkrywa
+własne uprawnienia przez porażki, a domysły trafiają do bazy.
+
+**Prywatność sprawdzona zapisem ruchu, nie deklaracją.** Hook uruchomiono
+z podstawionym transkryptem i znacznikami kontrolnymi na wejściu, po czym
+przechwycono całe żądanie: 91 bajtów, jedno wywołanie `ws_status` bez
+argumentów, zero znaczników. Nie ma czym wyciec, bo hook w ogóle nie dotyka
+transkryptu.
+
+**Treść instrukcji istnieje raz** — `plugin/skills/*/SKILL.md` i `plugin/agents`
+to dowiązania symboliczne do `plugin/shared/`. Przy czym podagenci wymagają
+dowiązania do **katalogu**: cztery dowiązania do plików dawały `Agents (0)` —
+nie ładowały się **bez żadnego błędu**. Skille tego problemu nie mają.
+
+**Prawdziwa instalacja wyłapała trzy rzeczy, których walidator nie widzi**:
+zadeklarowany klucz `"hooks"` (plik ładuje się sam, deklaracja to
+`Duplicate hooks file detected`), niekwalifikowana zależność `["mempalace"]`
+(szuka we własnym marketplace) i te dowiązania wyżej. Wniosek jest w D-034,
+a sprawdzeniem końcowym jest **policzenie składników** w
+`claude plugin details`, nie zielony walidator.
+
+Poprawiony też błąd, który wychodził tylko przy złym tokenie: hook wstrzykiwał
+**pustą** ramkę kontekstu. Pusty kontekst wygląda dla agenta jak „baza nic nie
+ma", czyli mówi nieprawdę. Teraz przy każdej porażce hook milczy — brak
+konfiguracji, brak sieci, padnięty serwer, odmowa uwierzytelnienia — i zawsze
+kończy zerem.
+
+---
 ## 2026-09-13 17:18 — D-033 i D-034: gdzie mieszka wtyczka i czego nie sprawdziliśmy
 
 **D-033** — wtyczka zostaje w tym repozytorium, jako `plugin/`, a

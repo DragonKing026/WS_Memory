@@ -388,6 +388,18 @@ many files in `Domain/` would need touching? The answer must be "zero".
 we can name the change it serves — and the changes above are in `TODO/`, not in
 our imagination.
 
+### The plugin — instruction content exists once in the repository
+
+Everything the plugin tells agents (the recall protocol, how to document
+things, the subagent briefs) lives **only** in `plugin/shared/`. The packaging
+— `plugin/skills/`, `plugin/agents/` — consists of **symlinks** to those files,
+not copies. The gateway serves the same content as MCP resources.
+
+Do not copy those files "to adapt them to a client". Diverged instructions are
+worse than none: a Claude agent and a Codex agent would then say different
+things about the same company rule, and nobody would know which one holds.
+Details: D-013, `docs/en/04-plugin.md`.
+
 ### Language
 
 **Everything in the code is in English** — class, method, variable, table and

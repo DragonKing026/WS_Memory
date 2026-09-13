@@ -2,90 +2,118 @@
 tags: [ws-memory, documentation, plugin, claude-code, hooks, ai-agents, hybrid]
 ---
 
-> Translated from [`docs/04-plugin.md`](../04-plugin.md) (synced 2026-09-12).
+> Translated from [`docs/04-plugin.md`](../04-plugin.md) (synced 2026-09-13).
 > **The Polish version is authoritative.**
 
 # The WS_Memory plugin for Claude Code
 
-Status: **design**, not implemented (2026-09-12).
+Status: **implemented** (2026-09-13, TODO-009). Version `0.1.0`.
 
 The plugin is the only thing a user installs — and it **pulls in the MemPalace
 plugin as a dependency**, so everyone ends up with a local palace (D-012).
 
-**The plugin exists so that a copy of your knowledge reaches the server.**
-Anyone who wants to work purely locally installs MemPalace alone and creates no
-account — that is the proper way to opt out, not a setting (D-015).
+**The plugin ultimately exists so that a copy of your knowledge reaches the
+server** (D-015) — and it does not do that yet, see the callout below. Anyone who
+wants to work purely locally installs MemPalace alone and creates no account;
+that is the proper way to opt out, not a setting.
 
-The division of labour is therefore simple: **mining happens exclusively
-locally** (projects, documents, conversation transcripts), and **the result
-travels to the server by default** — no clicking, nothing to remember (D-014).
-The server mines nothing and accepts no raw sources; it receives finished
-drawers.
+That makes the division of labour simple: **mining happens exclusively
+locally** (projects, documents, conversation transcripts), and the server mines
+nothing and accepts no raw sources.
+
+> **What is not there yet.** Automatic publication from the local palace to the
+> server (D-014) is `TODO-012` and is not implemented. The plugin therefore
+> **has no** `session-end` hook and no `auto_publish` switch — it would control
+> something that does not exist. What the plugin gives today: context at the
+> start of a session, the `ws_*` tools, the instructions and the subagents —
+> that is, **reading the shared base and writing to it directly**. Automatic
+> copying of the local palace arrives in `TODO-012`. Details and reasons: D-034.
 
 ## Structure
 
 ```
+.claude-plugin/
+  marketplace.json           ← in the repository ROOT, points at ./plugin (D-033)
 plugin/
   shared/                    ← ONE source of content, independent of the AI client
     protokol-recall.md       ← search the base before you answer
     jak-dokumentowac.md      ← document structure, language, where things go
-    agenci/                  ← subagent descriptions as Markdown
+    konfiguracja.md          ← token, local palace, diagnostics
+    agenci/                  ← subagent descriptions
   .claude-plugin/
     plugin.json              ← dependencies, userConfig, MCP server
-    marketplace.json         ← entry with the install command
-    hooks.json               ← maps events onto a single script
-    hooks/ws-hook.sh         ← ONE script: ws-hook.sh <event>
-    skills/                  ← thin wrappers around content from shared/
-    commands/                ← /ws-search /ws-doc /ws-status /ws-publish
-    agents/                  ← subagents, content from shared/agenci/
-  .codex-plugin/             ← created only once somebody actually uses Codex
+  hooks/
+    hooks.json               ← maps events onto a single script (loaded on its own)
+    ws-hook.sh               ← ONE script: ws-hook.sh <event>
+  skills/*/SKILL.md          ← symlinks to files in shared/
+  agents -> shared/agenci    ← a symlink to the DIRECTORY, not to files (see below)
+  commands/                  ← /ws-search /ws-doc /ws-status
 ```
 
 The split is deliberate (D-013): **`shared/` is content, the rest is
-packaging.** One hook script taking the event name instead of three separate
-ones — exactly as in MemPalace's own Codex packaging. Porting to another AI
-client is then a new manifest, not new code.
+packaging.**
+
+### The content exists once — literally
+
+`plugin/skills/ws-memory-recall/SKILL.md` **is a symbolic link** to
+`plugin/shared/protokol-recall.md`. There are no copies to keep in sync, because
+there are no copies.
+
+The validator says this about those files outright:
+
+> "3 components here were not read — the path is not a regular file (a symlink…).
+> **A session loading this plugin does follow them**, so validate the real paths
+> separately."
+
+So a session **does follow** the links, while the validator does not read them
+and tells us to check the real paths separately. We run both checks.
+
+**Subagents require a symlink to the directory, not to the files** — and that is
+not a matter of taste but the result of a measurement. With four
+`plugin/agents/*.md` symlinks, the plugin inventory showed `Agents (0)`: the
+files **did not load at all, without any error**. Replacing one of them with a
+regular file gave `Agents (1)`, and turning the whole of `plugin/agents/` into a
+symlink to `shared/agenci/` gave `Agents (4)`. Skills do not have this problem:
+there, symlinks to files load normally.
+
+This is exactly the kind of fault a validator does not protect you from: nothing
+breaks, half the plugin simply does not exist. The check is
+`claude plugin details ws-memory@web-systems` and counting the components.
+
+A cost worth naming: symbolic links in git require `core.symlinks=true` on
+Windows. The team works on Linux.
+
+### The same content as MCP resources
+
+The instructions are also exposed by the gateway as MCP resources
+(`ws-memory://protokol-recall`, `ws-memory://jak-dokumentowac`, …). **Every MCP
+client** reads them, not only Claude Code, and changing an instruction is then
+a server deployment rather than a plugin update on every person's machine
+separately. Details: `docs/03-mcp-gateway.md`.
 
 ## Configuration: dependency, MCP and `userConfig`
 
-Three Claude Code mechanisms carry this:
+**`dependencies: ["mempalace@mempalace"]`** — the plugin declares that it
+requires the MemPalace plugin. The user installs one thing.
 
-**`dependencies`** — the plugin declares that it requires the MemPalace plugin.
-The user need not know MemPalace is underneath; they install one thing.
+The name is **qualified with the marketplace**, and it has to be: with plain
+`"mempalace"` the installer looked for the dependency in **its own** marketplace
+and refused with the message `Dependency "mempalace@web-systems" is not
+installed`. The `plugin@marketplace` form says where to take it from.
 
-**`userConfig`** — the instance URL, the token and the `auto_publish` switch
-(on by default) are asked for **when the plugin is enabled**, with the token
-marked `sensitive`. The values reach the MCP configuration as
-`${user_config.KEY}` and the hooks as `CLAUDE_PLUGIN_OPTION_*`. Nobody sets
-environment variables by hand and **the token never enters the repository**.
-
-**`source: {"type": "command"}`** in the marketplace entry — a command run
-before installation. This is where the `mempalace` package is installed (with
-the `extract` extra, so PDFs and DOCX files can be mined) and the first
-`mempalace init` is performed.
+**`userConfig`** — the instance URL and the token are asked for **when the
+plugin is enabled**, with the token marked `sensitive`. The values reach the MCP
+configuration as `${user_config.KEY}` (inside headers as well) and the hooks as
+`CLAUDE_PLUGIN_OPTION_*`. Nobody sets environment variables by hand and **the
+token never enters the repository**.
 
 ```json
 {
   "name": "ws-memory",
-  "dependencies": ["mempalace"],
+  "dependencies": ["mempalace@mempalace"],
   "userConfig": {
-    "url": {
-      "type": "string",
-      "title": "WS_Memory URL",
-      "description": "e.g. https://wsmemory.your-domain.example"
-    },
-    "token": {
-      "type": "string",
-      "title": "Agent token",
-      "description": "Issue it in WS_Memory → Settings → Tokens",
-      "sensitive": true
-    },
-    "auto_publish": {
-      "type": "boolean",
-      "title": "Send to the server automatically",
-      "description": "On by default. Unmapped wings land in your private space.",
-      "default": true
-    }
+    "url":   { "type": "string", "title": "WS_Memory URL" },
+    "token": { "type": "string", "title": "Agent token", "sensitive": true }
   },
   "mcpServers": {
     "ws_memory": {
@@ -97,121 +125,138 @@ the `extract` extra, so PDFs and DOCX files can be mined) and the first
 }
 ```
 
+The `"hooks"` key is **deliberately absent** from the manifest.
+`hooks/hooks.json` loads on its own, and declaring it on top of that is a
+loading error: `Duplicate hooks file detected`. The field is there for pointing
+at **additional** hook files.
+
 The `mempalace` MCP server (local, stdio) comes from the MemPalace plugin — we
 do not configure it ourselves. The agent sees both at once.
 
+**The Python package is installed by a human.** The MemPalace plugin provides a
+manifest, but the `mempalace` server is run by a package the plugin does not
+install — and we do not pretend otherwise. `pip install "mempalace[extract]"`
+plus `mempalace init` is described by the `ws-memory-setup` skill. Why this
+cannot be automated with a marketplace entry: D-034.
+
 ## Hooks
 
-All three are short `curl` scripts. No dependencies beyond what every system
-already has.
+**One script, the event name as an argument** — `ws-hook.sh <event>`. The
+pattern comes from MemPalace's packaging for Codex: porting to another AI client
+is to be a new manifest, not new code (D-013).
 
-**`session-start`** — calls `ws_status` and injects into the context: who the
-user is, which spaces they have, what changed recently in the project they are
-working on. The point: an agent starts a session knowing where knowledge lives
-instead of guessing.
+### `session-start` — the only hook there is
 
-**`session-end`** — mining the transcript **into the local palace** (done by
-the MemPalace hook, which we do not duplicate) plus, if the user has a mirror
-configured, incremental publication of new drawers to the shared base. The raw
-conversation never leaves the machine.
+It calls `ws_status` and injects into the context: which spaces the token has
+rights to, with what role, how many entries they hold, **where a write with no
+space given will land**, and a reminder of the recall protocol. The point: an
+agent starts a session knowing where knowledge lives, instead of discovering its
+own permissions through failures.
 
-**`pre-compact`** — before the context is compacted, writes a summary of what
-was decided via `ws_diary_write`. It rescues conclusions that would otherwise
-evaporate along with the context.
+The injection uses the documented shape
+(`hookSpecificOutput.additionalContext`), because plain `stdout` goes to the log
+rather than into the context.
 
-### Privacy
+**The hook never interrupts work.** A missing token, no network, a dead server,
+an authentication error — the session starts normally, just without the injected
+paragraph. The exit code is always zero, and the time limit is 5 seconds against
+the hook's 10-second limit. Checked for each of those cases separately.
 
-Conversation transcripts stay **on the user's machine**, in their local palace.
-Only what somebody publishes reaches the shared base — manually, or through a
-mirror whose first run requires confirmation. There is no path by which a raw
-conversation leaves for the server, so there is nothing to secure.
+One thing here is subtle and was caught by a test: when the response filter
+gives up (a JSON-RPC error, a response that cannot be parsed), the hook **must
+not** inject an empty frame. An empty context looks to the agent like "the base
+holds nothing", which means it tells an untruth.
+
+### What the hook does not do
+
+**It does not read the transcript and does not send a single byte of the
+conversation.** The entire outgoing traffic is one `ws_status` call with no
+arguments — 91 bytes. Checked by recording the traffic: the hook was run with a
+substituted transcript and with input data containing control markers, after
+which the whole request was captured:
+
+```
+POST /mcp
+Content-Type: application/json
+Authorization: Bearer [hidden]
+Content-Length: 91
+
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ws_status","arguments":{}}}
+```
+
+None of the markers appeared in it.
+
+Mining the transcript **into the local palace** is handled by the MemPalace
+hook, which comes with the dependency — we do not duplicate it. Why there is no
+`pre-compact` hook and no `session-end` hook: D-034.
 
 ## Skills
 
-**`ws-memory-recall`** — the recall protocol: **search the base before you
-answer** about past decisions, people and projects. Never guess. Modelled on the
-`mempalace-recall` skill, but it queries `ws_search` and therefore respects
-permissions.
+All three are symlinks to files in `shared/`.
 
-**`ws-memory-document`** — how to write company documentation: document
-structure, language, where things belong (`documentation` vs `technical` vs
-`decisions`), when to create a new document and when to add a revision. It
-carries one rule: **if you write a document no human will verify, say so plainly
-in the session summary.**
+**`ws-memory-recall`** — the knowledge recall protocol: **search the base before
+you answer** about past findings, decisions, people and projects. It imposes an
+order: **the shared base first (`ws_search`), then the local palace
+(`mempalace_search`)** — a note is a record of somebody's thinking, a document
+is a settled matter. It ends with an instruction to write the conclusions down
+via `ws_diary_write`.
 
-**`ws-memory-setup`** — walks through issuing a token in the interface and
-configuring the client. Run once per machine.
+**`ws-memory-document`** — how to write company documentation: which of the
+three classes of knowledge this is, how to name the address, what to write in
+the change description, where it will land. It carries one rule: **if you write
+a document no human will verify, say so plainly in the session summary.**
+
+**`ws-memory-setup`** — the local palace, issuing a token, a table of symptoms
+for diagnostics. Run once per machine.
 
 ## Subagents
 
 | Agent | Task | When |
 |---|---|---|
-| **`ws-dokumentalista`** | writes up what a task produced into a canonical wiki document | after a task closes |
-| **`ws-archiwista`** | reviews a space, finds duplicates and contradictions, proposes merges | periodically, on demand |
-| **`ws-onboarding`** | answers a newcomer **solely** from the base, with links to sources; reports a missing answer as a gap | when onboarding someone |
-| **`ws-recall`** | deep digging through the base before a decision: every earlier finding on the topic | before an architectural change |
+| **`ws-dokumentalista`** | writes up the **result** of a closed task into a canonical document | after a task closes |
+| **`ws-archiwista`** | finds duplicates, contradictions and content that is out of date; **proposes**, does not execute | periodically, on demand |
+| **`ws-onboarding`** | answers a newcomer **solely** from the base, with links to sources | when onboarding someone |
+| **`ws-recall`** | deep digging before a decision, including **rejected alternatives** | before an architectural change |
 
 `ws-onboarding` carries a deliberate restriction: **it must not answer from
-general knowledge.** If the base holds no answer, it must say so and report the
-documentation gap — otherwise a newcomer could not tell company practice from a
-model's guess.
+general knowledge.** If the base holds no answer, it has to say so and name the
+gap — listing the words it searched for. The reason is concrete: somebody who
+knows the company will catch an invention, whereas **a newcomer will remember it
+and repeat it as an established rule**.
+
+The restriction is written into the prompt, **not into the list of allowed
+tools**. A tool list is a list of permissions, and a misspelt MCP tool name
+**silently drops it** instead of reporting an error — and it would not stop the
+model from answering out of its own knowledge anyway, because that is not a
+tool.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/ws-status` | who this token is: spaces, roles, where a write will land |
+| `/ws-search <what>` | `ws_search` first, then `mempalace_search`, with sources given |
+| `/ws-doc <what>` | check whether the document exists; then `ws_doc_write` by the rules |
+
+`/ws-publish` will come into being together with publication (`TODO-012`).
 
 ## How it works for the user
 
 **Configuration:** two MCP servers at once — `mempalace` (local, stdio) and
-`ws_memory` (shared, HTTP). The agent reads from both. The `ws-memory-recall`
-skill imposes the order: **shared base first, local second** — team knowledge
-takes precedence over private notes.
+`ws_memory` (shared, HTTP). The agent reads from both, in the order imposed by
+the `ws-memory-recall` skill.
 
-**Mining** you do yourself, locally, as before:
+**Mining** you do yourself, locally:
 
 ```bash
-mempalace init ~/projects/new-project
-mempalace mine ~/projects/new-project
+mempalace init ~/projekty/nowy-projekt
+mempalace mine ~/projekty/nowy-projekt
 ```
 
 Code never leaves the laptop. You need to ask nobody for anything.
 
-**By default: automatic transfer.** Everything that reaches the local palace
-travels to the server after a session ends or after local mining. Where it
-lands:
-
-| Local palace wing | Lands in |
-|---|---|
-| **mapped** to a team space | that space — the team sees it |
-| **unmapped** | your **private space on the server** |
-
-So everything is always on the server (backup, search, access from a second
-machine), yet nothing becomes visible to others until you map the wing. You
-confirm a mapping once — the mapping is what decides visibility.
-
-When a local wing's name matches an existing team space, the plugin **proposes
-the mapping**. Accepting is worthwhile: deduplication by content digest then
-works, and the same repository mined by three people does not sit in the base in
-triplicate.
-
-**Working offline is fully supported.** The local palace is primary and the
-server receives a copy, so a write never waits for the server and never fails
-because of it. On a train, with the server down, mid-upgrade: you mine and write
-normally, and unsent drawers wait in a queue and catch up on their own once
-connectivity returns (D-015).
-
-**Manual mode** — an emergency brake, not the main way of working. The
-`auto_publish` switch in the plugin settings; then nothing leaves on its own and
-you publish with `/ws-publish`: pick a wing, a topic or a date range, review the
-preview, confirm. Useful when you deliberately do not want a particular piece of
-work copied.
-
-**Safeguards**, since the transfer runs unattended:
-
-- **mapping onto a team space requires confirmation** — without it the content
-  stays in your private space;
-- **topic exclusions** in the mapping (e.g. a project wing without the diary);
-- **a secret filter on both sides** — the client does not send, and the server
-  checks anyway; since D-014 it sits on *every* path, which makes it critical;
-- **a batch log** filterable by space, with **one-action undo** — you can always
-  see what went where;
-- **pause and off switches** — global and per mapping.
+**Working offline is fully supported.** The local palace is primary (D-015), and
+when the server is unreachable the start-up hook simply stays silent.
 
 What the hybrid does not give you: a single query spanning both stores. They are
 two indexes, so the agent asks twice.
@@ -227,27 +272,41 @@ tokens and audit behave identically, because **none of them lives in the
 plugin**.
 
 **Portable cheaply:** the instructions. Their content has one source in
-`shared/` and is also exposed as **MCP resources**
-(`ws-memory://protokol-recall`, `ws-memory://jak-dokumentowac`) and in tool
-descriptions — which every MCP client reads. A valuable side effect: changing an
-instruction means **deploying the server, not updating a plugin on everyone's
-machine**.
+`shared/` and is exposed as **MCP resources** as well — and every MCP client
+reads those.
 
-**Non-portable and duplicated:** hooks, skills, commands, subagents. Looking at
-MemPalace, which maintains four packagings at once, the cost is known:
-`.codex-plugin` has the same `hooks.json` shape as Claude (SessionStart / Stop /
-PreCompact) and differs in the path variable name; `.cursor-plugin` is just
-`mcp.json`, because Cursor has no hooks. That is rewriting manifests, not logic.
-
-Packagings for other clients are **not built ahead of need** — only once
-somebody actually uses them.
+**Non-portable and duplicated:** the manifests, the event-to-hook mapping, the
+skill wrappers. Packagings for other clients are **not built ahead of need** —
+only once somebody actually uses them.
 
 ## Installing on a developer machine
 
 ```bash
-claude plugin marketplace add https://git.your-domain.example/ws-memory-plugin
+pip install "mempalace[extract]" && mempalace init
+
+claude plugin marketplace add MemPalace/mempalace
+claude plugin marketplace add DragonKing026/Websystems --sparse .claude-plugin plugin
 claude plugin install ws-memory
 ```
 
-The installer pulls in the MemPalace plugin, installs the package and asks for
-the URL and token (`userConfig`). No environment variables to set by hand.
+The MemPalace marketplace is added **separately**, because that is where the
+dependency comes from. `--sparse` limits the download to the plugin's
+directories — you do not pull the whole application in order to get the plugin
+(D-033). The installer will ask for the URL and the token. No environment
+variables to set by hand.
+
+**The token enters neither the repository nor any file of the plugin.** Checked
+after installation: it lands in `~/.claude/.credentials.json`, because
+`userConfig` marks it as `sensitive`. All that appears in the project directory
+is `.claude/settings.local.json` holding the plugin name and the path to the
+marketplace — without the token, and ignored by git.
+
+Checking whether it worked:
+
+```bash
+claude plugin details ws-memory@web-systems   # 3 skills, 4 subagents, 1 hook
+claude mcp list                               # plugin:ws-memory:ws_memory … ✔ Connected
+```
+
+You issue a token in WS_Memory → **Settings → Agent tokens**. It is shown once.
+A token issued for a one-off piece of work is revoked once that work is done.
