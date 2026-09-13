@@ -8,7 +8,9 @@ tags: [ws-memory, dokumentacja, mcp, uprawnienia, agenci-ai, bezpieczenstwo]
 
 Stan: **działa** (2026-09-12, `TODO-004` i `TODO-005`). Jedenaście narzędzi,
 tokeny agentów, limit tempa i audyt każdego wywołania. Zestaw jest kompletny —
-kolejne narzędzia dojdą dopiero z mostkiem do lokalnych pałaców (`TODO-012`).
+kolejne narzędzia dojdą dopiero z mostkiem do lokalnych pałaców (`TODO-012`). Od
+`TODO-009` gateway wystawia dodatkowo **zasoby MCP** z treścią instrukcji dla
+agentów — patrz „Zasoby".
 
 Backend wystawia pod `/mcp` serwer MCP po HTTP (JSON-RPC 2.0) z **kurowanym
 zestawem narzędzi firmowych** — nie przepuszcza 44 narzędzi MemPalace na wylot
@@ -17,8 +19,9 @@ zestawem narzędzi firmowych** — nie przepuszcza 44 narzędzi MemPalace na wyl
 ## Protokół
 
 `POST /mcp`, JSON-RPC 2.0, nagłówek `Authorization: Bearer <token agenta>`.
-Obsługiwane metody: `initialize`, `tools/list`, `tools/call`, `ping` oraz
-notyfikacje `notifications/initialized` i `notifications/cancelled`.
+Obsługiwane metody: `initialize`, `tools/list`, `tools/call`, `resources/list`,
+`resources/read`, `ping` oraz notyfikacje `notifications/initialized`
+i `notifications/cancelled`.
 
 Deklarowana wersja protokołu: **2025-06-18**. Klient proszący o znaną starszą
 (`2025-03-26`, `2024-11-05`) dostaje swoją — odmowa zablokowałaby klienty, które
@@ -106,6 +109,65 @@ Zignorowany `wing` znaczyłby, że agent **uwierzy, iż zawęził wyszukiwanie**
 choć go nie zawęził. Usłyszenie „nie ma takiego parametru" kosztuje jedno
 ponowienie; przemilczenie kosztuje błędny wniosek o tym, co agent właśnie
 przeczytał.
+
+## Zasoby — instrukcje dla agentów
+
+Gateway wystawia jako **zasoby MCP** treść instrukcji dla agentów: protokół
+recall, zasady dokumentowania, konfigurację i opisy czterech podagentów. Czyta je
+każdy klient MCP, nie tylko Claude Code.
+
+| URI | Co to jest |
+|---|---|
+| `ws-memory://protokol-recall` | szukaj w bazie, **zanim** odpowiesz o przeszłych ustaleniach |
+| `ws-memory://jak-dokumentowac` | co jest notatką, co dokumentem, jak nazwać adres i opisać zmianę |
+| `ws-memory://konfiguracja` | wystawienie tokena agenta i sprawdzenie połączenia |
+| `ws-memory://agenci/ws-recall` | podagent: całość wcześniejszych ustaleń przed decyzją |
+| `ws-memory://agenci/ws-dokumentalista` | podagent: spisanie wyniku zamkniętego zadania |
+| `ws-memory://agenci/ws-archiwista` | podagent: duplikaty i sprzeczności, przez propozycje |
+| `ws-memory://agenci/ws-onboarding` | podagent: odpowiedzi **wyłącznie** z firmowej bazy |
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"ws-memory://protokol-recall"}}
+```
+
+Odpowiedź ma kształt z protokołu: `resources/list` zwraca listę wpisów
+`{uri, name, title, description, mimeType}`, a `resources/read` —
+`{"contents":[{"uri","mimeType","text"}]}`. `mimeType` to zawsze `text/markdown`.
+Nieznany adres jest **błędem JSON-RPC** `-32002` (kod z samej specyfikacji MCP),
+nie pustym dokumentem — D-023.
+
+### Skąd pochodzi treść
+
+Z katalogu `plugin/shared/`, który jest jej **jedynym** źródłem (D-013). Ta sama
+treść jest podłączana przez wtyczkę jako skille i podagenci; pakowania jej nie
+kopiują. Konsekwencja praktyczna: zmiana instrukcji jest **deployem serwera**,
+a nie aktualizacją wtyczki u każdej osoby — i port na Codeksa, Cursora czy Zeda
+nie wymaga przepisywania instrukcji.
+
+Mapowanie adresu na plik jest **jawną tablicą w kodzie**
+(`Infrastructure\Instruction\FileInstructionLibrary`), nie skanem katalogu: skan
+opublikowałby każdemu agentowi cokolwiek, co do tego katalogu wpadnie. Pliki mają
+frontmatter YAML z polami `name` i `description` — to metadane opakowania, więc
+**nie wchodzą do treści zasobu**, a `description` służy za opis na liście.
+Katalog wskazuje `WS_INSTRUCTIONS_DIR` (`docs/05-deployment.md`); brakujący plik
+jest błędem, nie pustym zasobem.
+
+### Odczytu zasobu nie zapisujemy w dzienniku audytu
+
+Wywołanie narzędzia zostawia wpis, odczyt zasobu — **nie**, i jest to decyzja,
+nie przeoczenie. Zasób to statyczny tekst, identyczny dla każdego tokena, a klient
+MCP odpytuje listę zasobów przy **każdym** połączeniu. Wpis mówiłby więc „ktoś się
+podłączył", a nie „ktoś coś zrobił".
+
+Ten dokładny mechanizm — zdarzenie zapisywane przy każdym żądaniu zamiast przy
+realnej czynności — zapłaciliśmy już raz: dał **20 335** fałszywych wpisów
+`user.login`, czyli połowę dziennika w dniu, w którym pierwszy raz otwarto ekran
+audytu (`Infrastructure\Security\LoginAuditSubscriber`). Dziennik, którego
+większość jest fikcją, jest gorszy od krótkiego, bo prawdziwe wpisy gdzieś w nim
+są i nikt ich nie znajdzie.
+
+**Limit tempa obejmuje te metody tak samo jak resztę** i tak zostaje: pętla po
+katalogu zasobów obciąża serwer identycznie jak pętla po wyszukiwaniach.
 
 ## Jak egzekwowane są uprawnienia
 
@@ -221,6 +283,8 @@ nie znalazłem" (D-023).
 | MemPalace niedostępny | `-32010`, „pamięć chwilowo niedostępna — nie znaczy, że nic nie znaleziono" |
 | nieznany parametr, zły typ, brak wymaganego | `-32602` z listą dozwolonych parametrów |
 | nieznane narzędzie albo metoda | `-32601` z podpowiedzią `tools/list` |
+| nieznany adres zasobu (`resources/read`) | `-32002` z podpowiedzią `resources/list` |
+| zadeklarowanej instrukcji nie da się odczytać | `-32603` — nigdy pusty dokument; szczegóły w dzienniku serwera |
 | ciało nie jest JSON-em | `-32700` |
 | żądanie wsadowe albo bez `jsonrpc: "2.0"` | `-32600` |
 | błąd wewnętrzny | `-32603`, celowo bez szczegółów — te idą do dziennika serwera |

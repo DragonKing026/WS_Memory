@@ -20,6 +20,12 @@ final class McpError extends \RuntimeException
     public const METHOD_NOT_FOUND = -32601;
     public const INVALID_PARAMS = -32602;
 
+    /**
+     * An MCP resource URI that is not published. The code is the specification's
+     * own for this case, so a client recognises it without reading our docs.
+     */
+    public const RESOURCE_NOT_FOUND = -32002;
+
     /** Write attempted without the writer role in that space. */
     public const WRITE_DENIED = -32003;
 

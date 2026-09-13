@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Presentation\Mcp;
 
 use App\Domain\Identity\Actor;
+use App\Domain\Instruction\Instruction;
+use App\Domain\Instruction\InstructionLibrary;
+use App\Domain\Instruction\InstructionUnavailable;
+use App\Domain\Instruction\UnknownInstruction;
 use App\Domain\Memory\MemoryAccessDenied;
 use App\Domain\Memory\MemoryUnavailable;
 use Psr\Log\LoggerInterface;
@@ -15,6 +19,10 @@ use Psr\Log\LoggerInterface;
  * Kept apart from the controller so that HTTP — status codes, headers, the token
  * — and the protocol are two separate problems. Everything here is testable by
  * handing it an array.
+ *
+ * Two surfaces: **tools**, which act on memory in the caller's name, and
+ * **resources**, which are the instruction texts from `plugin/shared/` — the same
+ * bytes for everybody, read-only, and not audited (see listResources).
  *
  * **Tool failures are answered as JSON-RPC errors, not as successful results
  * carrying an error field.** The MCP specification suggests the opposite
@@ -38,6 +46,7 @@ final readonly class McpServer
 
     public function __construct(
         private McpToolRegistry $tools,
+        private InstructionLibrary $instructions,
         private LoggerInterface $logger,
     ) {
     }
@@ -92,6 +101,10 @@ final readonly class McpServer
             'initialize' => $this->initialize($params),
             'tools/list' => $this->listTools(),
             'tools/call' => $this->callTool($params, $actor),
+            // The instruction texts from plugin/shared. Read-only and the same for
+            // everybody, which is why they need no actor.
+            'resources/list' => $this->listResources(),
+            'resources/read' => $this->readResource($params),
             // Liveness and the client's "I am ready". Both must be answered
             // rather than refused, or a client treats the server as broken.
             'ping' => [],
@@ -119,7 +132,7 @@ final readonly class McpServer
             // stdClass, not an empty array: PHP would serialise [] as `[]`, and
             // `capabilities.tools` has to be an object. Clients that validate the
             // handshake reject the array form.
-            'capabilities' => ['tools' => new \stdClass()],
+            'capabilities' => ['tools' => new \stdClass(), 'resources' => new \stdClass()],
             'serverInfo' => ['name' => 'ws_memory', 'version' => self::SERVER_VERSION],
         ];
     }
@@ -136,6 +149,110 @@ final readonly class McpServer
                 'inputSchema' => $tool->inputSchema(),
             ], $this->tools->all()),
         ];
+    }
+
+    /**
+     * The instructions the gateway publishes: the recall protocol, the
+     * documentation rules, the subagent briefs.
+     *
+     * Served from the server rather than copied into every plugin packaging
+     * (D-013), so changing an instruction is a deployment instead of an update
+     * everybody has to install — and a client that is not Claude Code reads the
+     * same text.
+     *
+     * **Neither listing nor reading a resource is written to the audit journal,
+     * and that is a decision rather than an omission.** These are static texts,
+     * identical for every token, and an MCP client asks for the catalogue on every
+     * connection — so the entry would say "somebody connected", not "somebody did
+     * something". We have paid for exactly this mechanism once already: an event
+     * recorded per request instead of per real action put **20 335** fictitious
+     * `user.login` rows into this system's journal, half of everything it held on
+     * the day the audit screen was first opened
+     * (`src/Infrastructure/Security/LoginAuditSubscriber.php`). A journal whose
+     * majority is noise is worse than a short one, because the real entries are
+     * somewhere inside it and nobody will find them.
+     *
+     * The rate limit in McpController does cover these methods like every other
+     * one, and it stays that way: a client looping over the catalogue costs the
+     * server just as much as one looping over searches.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws McpError
+     */
+    private function listResources(): array
+    {
+        return [
+            'resources' => array_map(static fn (Instruction $instruction): array => [
+                'uri' => $instruction->uri,
+                'name' => $instruction->name,
+                'title' => $instruction->title,
+                'description' => $instruction->description,
+                'mimeType' => $instruction->mimeType,
+            ], $this->published()),
+        ];
+    }
+
+    /**
+     * @param array<array-key, mixed> $params
+     *
+     * @return array<string, mixed>
+     *
+     * @throws McpError
+     */
+    private function readResource(array $params): array
+    {
+        $uri = $params['uri'] ?? null;
+        if (!\is_string($uri) || '' === $uri) {
+            throw McpError::invalidParams('Brak adresu zasobu w „params.uri".');
+        }
+
+        try {
+            $read = $this->instructions->read($uri);
+        } catch (UnknownInstruction $e) {
+            throw McpError::of(McpError::RESOURCE_NOT_FOUND, $e->getMessage());
+        } catch (InstructionUnavailable $e) {
+            throw $this->instructionsBroken($e);
+        }
+
+        return [
+            'contents' => [[
+                'uri' => $read->instruction->uri,
+                'mimeType' => $read->instruction->mimeType,
+                'text' => $read->text,
+            ]],
+        ];
+    }
+
+    /**
+     * @return list<Instruction>
+     *
+     * @throws McpError
+     */
+    private function published(): array
+    {
+        try {
+            return $this->instructions->all();
+        } catch (InstructionUnavailable $e) {
+            throw $this->instructionsBroken($e);
+        }
+    }
+
+    /**
+     * A published instruction that cannot be read is our fault, not the caller's.
+     *
+     * Answered as an error and never as an empty document: an instruction served
+     * as empty text reads to a model like "there is no protocol", and it carries
+     * on. The detail goes to the log, where somebody can see that a container was
+     * started without the mount.
+     */
+    private function instructionsBroken(InstructionUnavailable $cause): McpError
+    {
+        $this->logger->error('Nie udało się odczytać instrukcji wystawianych jako zasoby MCP.', [
+            'reason' => $cause->getMessage(),
+        ]);
+
+        return McpError::of(-32603, 'Nie udało się odczytać instrukcji. Szczegóły są w dzienniku serwera.');
     }
 
     /**
