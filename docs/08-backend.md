@@ -87,6 +87,8 @@ mieszkają w `Domain/`.
 | `AgentToken/IssueAgentToken.php` | Wystawia poświadczenie agenta. Sekret losowy, w bazie skrót, jawna wartość raz. Sprawdza żądany zakres wobec **bieżących** uprawnień właściciela — nie dlatego, że to egzekwuje regułę 4 (to robi resolver na każdym żądaniu), ale żeby pomyłka zgłosiła się teraz, człowiekowi, a nie zamieniła w token, który nic nie czyta i nie da się tego zdiagnozować od strony agenta. |
 | `AgentToken/RevokeAgentToken.php` | Unieważnia — natychmiast i tylko własny, również dla administratora globalnego. Cudzy token odpowiada identycznie jak nieistniejący, inaczej dałoby się enumerować cudze poświadczenia. |
 | `AgentToken/IssuedAgentToken.php` | Wynik z jawnym tokenem i gotowym `claude mcp add`. **Nie jest usługą.** |
+| `Identity/PasswordPolicy.php` | **Jedyna reguła hasła w tej instalacji** — i jedyny generator, który ją spełnia. Powstała, kiedy pojawiły się drugie drzwi: hasło ustawia `POST /api/invitations/accept` i `ws:user:password`, a reguła zapisana dwa razy staje się dwiema regułami w chwili, gdy ktoś rozluźni jedną, wierząc, że druga nadal obowiązuje. Dwanaście znaków, bez wymagań co do składu (długość bije klasy znaków, a wymagania pchają ludzi w stronę `Haslo123!`) i odmowa dla haseł znanych z publicznych wycieków. |
+| `Identity/ResetUserPassword.php` | Ustawia nowe hasło istniejącemu kontu. **Wpis w audycie nie ma aktora** i to jest fakt, który on zapisuje: z konsoli nikt nie jest zalogowany, a wpisanie samego konta czytałoby się jak „sam sobie zmienił hasło" — tak samo jak wpis `space.member_added` bez aktora w `AcceptInvitation`. Konta wyłączonego **nie odrzuca**: hasło nie nadaje mu żadnego dostępu, więc wpis nie może skłamać o dostępie — inaczej niż przy nadaniu roli, które dlatego jest odrzucane. Hasła nie waliduje; walidacja jest na brzegu, tą samą regułą. |
 | `Document/DocumentService.php` | **Jedyne wejście do wiki.** Dokument w przestrzeni bez prawa odczytu jest NIEZNALEZIONY, nigdy zabroniony (reguła 7). `verify()` przyjmuje `User`, nie `Actor` — agenta nie da się przekazać (D-005). `rollback()` **dopisuje** rewizję o starej treści; historia nigdy się nie skraca. Publikacja jest wysyłana do kolejki po `flush`, nie przed: zlecenie dla rewizji, która się nie zapisała, kazałoby pracownikowi opublikować treść, której nikt nie przeczyta. |
 | `Document/ProposalService.php` | Kolejka propozycji. Złożenie wymaga roli **czytającego** (D-026), przyjęcie idzie **przez `DocumentService`** — druga droga do wiki kiedyś ominęłaby sprawdzenie uprawnień, publikację albo wpis w audycie. |
 | `Document/PublishDocument.php` | Zlecenie „opublikuj rewizję N". Niesie numer rewizji i to właśnie czyni je bezpiecznym przy dowolnej kolejności dostarczenia. |
@@ -134,6 +136,15 @@ mieszkają w `Domain/`.
 | `GET/POST /api/agent-tokens`, `DELETE /api/agent-tokens/{id}` | `Api/AgentTokenController.php` | Wyłącznie **własne** tokeny, również dla administratora globalnego (D-016). Jawna wartość w jednej odpowiedzi — tej, która token utworzyła. |
 | `ws:user:invite` | `Console/InviteUserCommand.php` | Jedyna droga do pierwszego konta. Wypisuje link, bo pierwsze zaproszenie powstaje zwykle przed konfiguracją poczty. |
 | `ws:agent:token` | `Console/IssueAgentTokenCommand.php` | Jedyna droga do podłączenia agenta, dopóki nie ma ekranów (TODO-008). Wypisuje gotowe `claude mcp add`, bo alternatywą jest odtwarzanie polecenia z dokumentacji i mylenie nagłówka. |
+| `ws:user:password` | `Console/SetUserPasswordCommand.php` | Droga powrotna do instancji, do której nikt nie umie się zalogować. **Domyślnie generuje** hasło i wypisuje je raz; `--password` jest wyjątkiem, bo hasło z argumentu zostaje w historii powłoki. Mówi wprost dwie rzeczy, których operator sam nie zobaczy: wydane tokeny JWT działają do wygaśnięcia (D-017), a wyłączone konto nie zaloguje się samym hasłem. |
+| `ws:agent:list` | `Console/ListAgentTokensCommand.php` | Identyfikatory, etykiety, ostatnie użycie i stan tokenów konta — nigdy sam token, bo w bazie jest wyłącznie jego skrót. **Osobne polecenie** od odwoływania: jedno, które z flagą czyta, a bez niej niszczy, jest o jedną literówkę od zdjęcia agenta z pracy. |
+| `ws:agent:revoke` | `Console/RevokeAgentTokenCommand.php` | Woła `RevokeAgentToken` — ten sam przypadek użycia co `DELETE /api/agent-tokens/{id}`. Druga ścieżka odwoływania (a do tej pory był nią `UPDATE` wprost w bazie) omija audyt i regułę „tylko własny token". Cudzy token odpowiada identycznie jak nieistniejący. |
+
+Cztery polecenia przyjmują adres e-mail jako pierwszy argument i rozwiązuje go
+`Console/AccountLookup.php` — jedno miejsce na normalizację adresu i jeden
+komunikat o nieistniejącym koncie. Rozpisana przy każdym z osobna, rozjechałaby
+się właśnie normalizacja: adres z wielkiej litery działałby w jednym poleceniu,
+a w następnym nie, i nikt nie podejrzewałby wyszukiwania konta.
 
 ### `Presentation/Mcp/` — gateway dla agentów
 
