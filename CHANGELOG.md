@@ -15,6 +15,46 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 16:32 — Ekrany administracyjne; TODO-008 zamknięte
+
+Cztery ekrany pod `/admin`: konta, zaproszenia, przestrzenie i dziennik audytu.
+Zaproszenia da się wreszcie wystawić z panelu, a nie tylko z konsoli — link
+pokazuje się **raz**, tak jak token agenta.
+
+**Ekran audytu udowodnił, po co istnieje, w minutę po otwarciu.** Pokazał 40 889
+wpisów, z czego **20 335 to `user.login`** — połowa dziennika opisująca
+logowania, których nie było. Firewalle są bezstanowe, więc token jest sprawdzany
+przy **każdym** żądaniu i zdarzenie logowania leciało za każdym razem. Jedna
+osoba klikająca po aplikacji dopisywała wiersz na każde żądanie HTTP; przy okazji
+„ostatnie logowanie" pokazywało „przed chwilą" każdemu z ważnym tokenem, a każdy
+odczyt wykonywał zapis do bazy.
+
+Istniejący test sprawdzał, że dziennik **nie jest pusty** — co było prawdą i przed
+zepsuciem, i po, więc nie łapał niczego. Nowy liczy. Trzy testy świeżego ekranu
+audytu miały tę usterkę zakodowaną jako oczekiwanie i poprawka je wywróciła —
+dokładnie tak, jak powinna.
+
+Dziennik audytu, w którym większość wpisów to fikcja, jest gorszy od krótkiego:
+prawdziwe wpisy w nim są, tylko nikt ich nie znajdzie.
+
+Druga rzecz z tej samej rodziny: nadawanie dostępu do przestrzeni żyło pod inną
+trasą niż zmiana roli, więc ta sama reguła odpowiadała dwoma kodami, a ta sama
+operacja zapisywała się w audycie raz jako „dodano", raz jako „zmieniono rolę".
+To unieważnia pytanie, dla którego D-016 w ogóle istnieje: czy ta osoba wtedy
+dostała dostęp, czy tylko awansowała. Ujednolicone. Przy okazji nadanie roli
+wyłączonemu kontu jest teraz odrzucane — udałoby się, nic by nie dało, a w
+dzienniku zostałby wpis mówiący, że ktoś dostał dostęp.
+
+Poza tym `vue-tsc` wywracał się w kontenerze na braku pamięci (Node dobiera
+stertę od limitu kontenera; przy 1 GB wychodziło 549 MB) — objaw wygląda jak błąd
+typów i blokował też skrypt wypychający.
+
+Praca szła przez czterech podagentów, każdy commitował **własne ścieżki**. To
+poprawka po wcześniejszej sesji, w której trzy równoległe podagenty w jednym
+drzewie dały jeden commit na czterdzieści plików — czyli dokładnie to, czego
+zakazuje `AGENTS.md`.
+
+---
 ## 2026-09-13 15:29 — Domyślna wersja MemPalace w repozytorium to 3.9.0
 
 Aktualizacja na działającej instalacji zmieniła tylko `.env`, którego w

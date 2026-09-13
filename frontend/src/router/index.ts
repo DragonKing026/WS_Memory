@@ -96,9 +96,35 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
       {
+        // Accounts rather than dependencies: administration is opened about a person far
+        // more often than about an image version.
         path: '',
         name: 'admin',
-        redirect: { name: 'admin-dependencies' },
+        redirect: { name: 'admin-users' },
+      },
+      {
+        path: 'uzytkownicy',
+        name: 'admin-users',
+        component: () => import('@/pages/AdminUsersPage.vue'),
+        meta: { title: 'Konta' },
+      },
+      {
+        path: 'zaproszenia',
+        name: 'admin-invitations',
+        component: () => import('@/pages/AdminInvitationsPage.vue'),
+        meta: { title: 'Zaproszenia' },
+      },
+      {
+        path: 'przestrzenie',
+        name: 'admin-spaces',
+        component: () => import('@/pages/AdminSpacesPage.vue'),
+        meta: { title: 'Przestrzenie' },
+      },
+      {
+        path: 'audyt',
+        name: 'admin-audit',
+        component: () => import('@/pages/AdminAuditPage.vue'),
+        meta: { title: 'Dziennik audytu' },
       },
       {
         path: 'zaleznosci',
