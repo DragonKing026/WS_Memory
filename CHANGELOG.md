@@ -15,6 +15,57 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 21:39 — Instalator sprawdzony pełnym przebiegiem: trzy błędy, których przegląd nie znajdzie
+
+Postawiłem **osobną instancję obok** — świeży klon, własna nazwa projektu
+Compose, własne wolumeny, port 18099 — i przeszedłem nią całą drogę: instalacja
+od zera, potem deinstalacja. Stos główny nietknięty, sprawdzone po każdym kroku.
+
+Wynik instalacji: pięć sprawdzeń na pięć, z **wyszukiwaniem znaczeniem**
+włącznie, i logowanie hasłem, które instalator sam wypisał. Świeża baza: jedno
+konto, dwie przestrzenie, **5 wpisów audytu i 1 szuflada w pałacu** — dla
+porównania instancja rozwojowa ma 40 922 wpisy i 1822 szuflady po testach.
+Deinstalacja: kopia zapasowa, zero kontenerów, zero wolumenów poza modelem.
+
+Przebieg znalazł **trzy błędy, których nie znalazłby żaden przegląd kodu**.
+
+**Świeży klon nie ma `vendor/`.** Instalator wywracał się na kluczach JWT
+komunikatem „Dependencies are missing". `docker-compose.yml` montuje
+`./backend` z hosta, więc nawet obraz produkcyjny dostaje swoje zależności
+przysłonięte tym montowaniem. Teraz uruchamia `composer install` — **jako UID
+człowieka, który go uruchomił**, bo obraz dev działa jako root, a `vendor`
+założony rootem w bind moncie to katalog, którego właściciel maszyny nie może
+ani zmienić, ani skasować.
+
+**Instalator nie umiał dokończyć instalacji, którą sam przerwał.** Port trzymał
+jego własny nginx z poprzedniego przebiegu, więc kontrola portów meldowała
+konflikt i kazała podać inny. Port zajęty przez kontener tego samego projektu
+nie jest już konfliktem.
+
+**Sprawdzenia startowały przed pobraniem modelu.** Trzy pozycje na czerwono na
+instancji, która była w trakcie startu — czyli instalator kłamał w drugą stronę
+niż zwykle: mówił „nie działa" o czymś, co za chwilę zadziała. Zmierzone: 346
+sekund na same wagi ONNX. Czeka teraz na pałac i na serwer embeddingów, a brak
+tego drugiego nie przerywa instalacji, bo reszta działa.
+
+Do tego jeszcze jeden błąd w deinstalatorze, znaleziony po drodze: **umierał bez
+słowa** na instancji bez `.env` — czyli dokładnie w stanie po przerwanej
+instalacji, który miał umieć posprzątać. `docker compose ps` bez `.env` kończy
+się błędem, a przy `set -e` całe podstawienie ubijało skrypt. Liczy teraz
+kontenery po etykiecie projektu, a nazwę projektu ustala łańcuchem, który
+**odmawia zamiast zgadywać**.
+
+Ustalanie nazwy projektu przeniosłem do `scripts/wspolne/projekt.sh`, wspólnego
+dla obu skryptów. Ta akurat logika ma już na koncie jeden błąd z kasowaniem
+danych w tle; druga jej kopia byłaby drugą szansą na ten sam błąd.
+
+Doszła **maszyna testowa dla drogi systemowej** (`docker/proba-systemowa/`):
+Debian 13 z systemd jako PID 1, PHP 8.4, Postgresem z pgvector, nginxem
+i Node'em. Bez celu testowego jedynym wyjściem byłoby napisanie kilkuset linii
+instalujących usługi i **nieuruchomienie ich ani razu**.
+
+
+---
 ## 2026-09-13 21:19 — Instalator i deinstalator
 
 `./scripts/instaluj.sh` pyta o to, czego nie da się zgadnąć, **generuje

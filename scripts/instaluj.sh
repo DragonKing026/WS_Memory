@@ -51,6 +51,9 @@ set -euo pipefail
 KORZEN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${KORZEN}"
 
+# shellcheck source=scripts/wspolne/projekt.sh
+. "${KORZEN}/scripts/wspolne/projekt.sh"
+
 # ─── Argumenty ───────────────────────────────────────────────────────────────
 
 DROGA=''
@@ -164,7 +167,18 @@ sprawdz_wspolne() {
 }
 
 sprawdz_porty() {
-  local port="$1"
+  local port="$1" projekt
+
+  # Port trzymany przez kontener TEGO projektu nie jest konfliktem — to nasz
+  # własny nginx z poprzedniego przebiegu. Bez tego rozróżnienia instalator nie
+  # umie dokończyć instalacji, którą sam przerwał: melduje zajęty port i każe
+  # podać inny. Znalezione przebiegiem, nie przeglądem.
+  projekt="$(ustal_projekt_compose "${KORZEN}" || true)"
+  if [ -n "${projekt}" ] && port_naszego_projektu "${projekt}" "${port}"; then
+    ostrzez "Port ${port} trzyma kontener tej instancji (${projekt}) — to nie konflikt."
+    return 0
+  fi
+
   case "$(port_zajety "${port}"; echo $?)" in
     0) brak "Port ${port} jest już zajęty. Podaj inny (NGINX_PORT) albo zwolnij ten." ;;
     2) ostrzez "Nie ma polecenia 'ss', więc nie sprawdziłem, czy port ${port} jest wolny." ;;
@@ -328,12 +342,9 @@ zapisz_slad() {
   {
     printf 'droga=%s\n' "${DROGA}"
     printf 'katalog=%s\n' "${KORZEN}"
-    # Nazwę projektu podaje Compose — `docker-compose.yml` ustawia `name:`,
-    # więc katalog nazywa się inaczej. Wpisanie tu nazwy katalogu dałoby ślad
-    # wskazujący na projekt, którego nie ma.
-    printf 'projekt_compose=%s\n' "$(docker compose config --format json 2>/dev/null \
-      | python3 -c 'import json,sys; print(json.load(sys.stdin)["name"])' 2>/dev/null \
-      || basename "${KORZEN}" | tr '[:upper:]' '[:lower:]')"
+    # Nazwa projektu ze wspólnej funkcji — deinstalator czyta ten ślad, więc
+    # obie strony muszą rozumieć ją tak samo.
+    printf 'projekt_compose=%s\n' "$(ustal_projekt_compose "${KORZEN}" || echo nieznany)"
     printf 'zaczeto=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     printf 'stan=%s\n' "$1"
   } >"${SLAD}"
@@ -363,6 +374,35 @@ czekaj_na_zdrowie() {
 
 w_backendzie() { docker compose exec -T backend "$@"; }
 
+# Serwer embeddingów nie ma healthchecka w compose (nie mierzy go nic poza tym,
+# czy odpowiada), więc pytamy go wprost — z wnętrza sieci Compose, bo na hosta
+# nie wychodzi żadnym portem. Pytamy przez mempalace, bo tamten obraz ma curl.
+#
+# Czekanie jest tu konieczne, a nie ostrożnościowe: przy pierwszej instalacji
+# ten kontener POBIERA MODEL. Zmierzone na świeżej instancji: 346 sekund na same
+# wagi ONNX plus rozgrzewka. Bez czekania sprawdzenia po instalacji padały na
+# trzech pozycjach na systemie, który był po prostu w trakcie startu — czyli
+# instalator kłamał w drugą stronę niż zwykle: mówił „nie działa" o czymś, co
+# za chwilę zadziała.
+czekaj_na_embeddingi() {
+  local limit="${1:-900}" czekano=0
+
+  powiedz "Czekam na serwer embeddingów (do $((limit / 60)) min)."
+  powiedz "Przy pierwszej instalacji pobiera model ~2,3 GB — zmierzone: ok. 6 minut."
+
+  while [ "${czekano}" -lt "${limit}" ]; do
+    if docker compose exec -T mempalace curl -sf -o /dev/null --max-time 5 \
+         http://embeddings/health >/dev/null 2>&1; then
+      udalo "Serwer embeddingów odpowiada."
+      return 0
+    fi
+    sleep 10
+    czekano=$((czekano + 10))
+  done
+
+  return 1
+}
+
 instaluj_docker() {
   naglowek "Podnoszę stos"
   if [ "${NA_SUCHO}" -eq 1 ]; then
@@ -373,6 +413,31 @@ instaluj_docker() {
     # start_period 120 s, więc pięć minut to minimum, nie zapas.
     czekaj_na_zdrowie postgres 180 || przerwij "Baza nie wstała."
     czekaj_na_zdrowie backend 300 || przerwij "Backend nie wstał."
+  fi
+
+  naglowek "Zależności PHP"
+  if [ "${NA_SUCHO}" -eq 1 ]; then
+    powiedz "(na sucho) pominięte: composer install"
+  elif w_backendzie test -f vendor/autoload_runtime.php 2>/dev/null; then
+    udalo "Już są."
+  else
+    # Świeży klon nie ma katalogu `vendor`, a `docker-compose.yml` montuje
+    # `./backend` z hosta — więc nawet obraz produkcyjny, który ma zależności
+    # w środku, dostaje je przysłonięte tym montowaniem. Bez tego kroku
+    # instalator wywracał się dopiero przy kluczach JWT, komunikatem
+    # „Dependencies are missing", i to jest błąd znaleziony przebiegiem na
+    # czystym klonie, nie przeglądem kodu.
+    #
+    # Jako UID człowieka, który uruchomił instalator, bo obraz dev działa jako
+    # root: `vendor` założony rootem w bind moncie to katalog, którego właściciel
+    # maszyny nie może ani zmienić, ani skasować. COMPOSER_HOME musi być
+    # zapisywalny, a katalog domowy roota dla obcego UID-u nie jest.
+    powiedz "Świeży klon — instaluję zależności PHP (to potrwa)."
+    docker compose exec -T --user "$(id -u):$(id -g)" \
+      -e COMPOSER_HOME=/tmp/composer -e COMPOSER_CACHE_DIR=/tmp/composer/cache \
+      backend composer install --no-interaction --no-progress \
+      || przerwij "Nie udało się zainstalować zależności PHP."
+    udalo "Zainstalowane."
   fi
 
   naglowek "Klucze JWT"
@@ -397,6 +462,19 @@ instaluj_docker() {
 
   naglowek "Konto administratora"
   zaloz_administratora
+
+  naglowek "Pamięć i embeddingi"
+  if [ "${NA_SUCHO}" -eq 1 ]; then
+    powiedz "(na sucho) pominięte: czekanie na pałac i embeddingi"
+    return 0
+  fi
+
+  czekaj_na_zdrowie mempalace 600 || przerwij "Pałac nie wstał. Zobacz: docker compose logs mempalace"
+
+  # Brak embeddingów NIE przerywa instalacji: wszystko poza wyszukiwaniem
+  # znaczeniem działa, a sprawdzenie niżej i tak to zgłosi. Przerwanie tutaj
+  # kazałoby zaczynać od nowa z powodu, który mija sam.
+  czekaj_na_embeddingi 900 || ostrzez "Serwer embeddingów jeszcze nie odpowiada — wyszukiwanie znaczeniem będzie puste, dopóki nie wstanie."
 }
 
 zaloz_administratora() {
