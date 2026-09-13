@@ -171,6 +171,23 @@ function signOut(): void {
           Surowa pamięć
         </RouterLink>
 
+        <!-- Administration appears only for a global administrator. A menu item that
+             leads to a refusal is worse than no menu item: it teaches everybody else
+             that parts of the application are closed to them, every time they look at
+             the sidebar. -->
+        <template v-if="auth.user?.isGlobalAdmin === true">
+          <p class="text-xs uppercase tracking-wide text-muted px-2 mt-4 mb-1">
+            Administracja
+          </p>
+          <RouterLink
+            :to="{ name: 'admin-dependencies' }"
+            class="block px-2 py-1.5 rounded text-sm hover:bg-elevated"
+            active-class="bg-elevated font-medium"
+          >
+            Zależności
+          </RouterLink>
+        </template>
+
         <template v-if="privateSpace !== null">
           <p class="text-xs uppercase tracking-wide text-muted px-2 mt-4 mb-1">Prywatne</p>
           <RouterLink

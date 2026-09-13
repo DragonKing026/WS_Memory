@@ -80,6 +80,17 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/TokensPage.vue'),
         meta: { title: 'Tokeny agentów' },
       },
+      {
+        // Administration. Deliberately **not** guarded here, although the page is for
+        // global administrators only: a guard can only send somebody away, and being
+        // bounced to the home page is how a person concludes they mistyped the address.
+        // The page itself refuses in words, and the API refuses with a 403 — which is
+        // where the boundary actually is. See `AdminDependenciesPage.vue`.
+        path: 'admin/zaleznosci',
+        name: 'admin-dependencies',
+        component: () => import('@/pages/AdminDependenciesPage.vue'),
+        meta: { title: 'Zależności' },
+      },
     ],
   },
   {
