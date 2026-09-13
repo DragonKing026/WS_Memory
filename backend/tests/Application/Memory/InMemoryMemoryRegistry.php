@@ -100,10 +100,25 @@ final class InMemoryMemoryRegistry implements MemoryRegistry
         unset($this->rows[$from->value]);
     }
 
-    public function bindingForSource(string $sourceReplica, string $sourceDrawerId): ?SourceBinding
-    {
+    /**
+     * Scoped to the owner exactly as the real one is.
+     *
+     * Left unscoped, this double would keep every service-level test green while
+     * the database refused what they describe — and the thing being scoped here is
+     * an authorisation boundary: without the owner, naming somebody else's replica
+     * and drawer id hands back their row to be overwritten.
+     */
+    public function bindingForSource(
+        string $ownerUserId,
+        string $sourceReplica,
+        string $sourceDrawerId,
+    ): ?SourceBinding {
         foreach ($this->rows as $id => $row) {
-            if ($row->sourceReplica === $sourceReplica && $row->sourceDrawerId === $sourceDrawerId) {
+            if (
+                $row->author->userId === $ownerUserId
+                && $row->sourceReplica === $sourceReplica
+                && $row->sourceDrawerId === $sourceDrawerId
+            ) {
                 return new SourceBinding(new DrawerId($id), $row->space);
             }
         }

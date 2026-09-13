@@ -1486,7 +1486,6 @@ cokolwiek znaczyć.
 
 ---
 
-<<<<<<< HEAD
 ## D-036 — Kształt serwerowej strony mostka: partia na przestrzeń, filtr w Domain, jeden wyjątek w firewallu
 
 **Data:** 2026-09-13 18:40 · **Stan:** Przyjęta · **Doprecyzowuje D-010, D-014, D-015**
@@ -1637,7 +1636,9 @@ odmawia wydania szuflady, której skrzydło w pałacu nie zgadza się z
 autoryzowaną przestrzenią. Zmiana widoczności ma osobny klucz w dzienniku
 audytu (`movedFrom`), bo to jedyna rzecz w tym przepływie, o którą ktoś może
 chcieć zapytać audyt po fakcie.
-=======
+
+---
+
 ## D-037 — Testy integracyjne kasują z pałaca to, co zapisały, po rejestrze
 
 **Data:** 2026-09-13 18:56 · **Stan:** Przyjęta
@@ -1696,4 +1697,3 @@ zostawałaby na zawsze.
 **Jak to się sprawdza.** `mempalace_status` przed przebiegiem grupy i po nim ma
 podać tę samą liczbę `total_drawers`. Zmierzone: 1689 → 1689 (przed zmianą ten
 sam przebieg dokładał 14 szuflad).
->>>>>>> main

@@ -431,7 +431,7 @@ final readonly class MemoryService
         $wing = $this->wingOf($target);
         $hash = $drawer->contentHash();
 
-        $binding = $this->registry->bindingForSource($sourceReplica, $drawer->sourceDrawerId);
+        $binding = $this->registry->bindingForSource($actor->userId, $sourceReplica, $drawer->sourceDrawerId);
 
         if (null !== $binding) {
             return $this->refreshFromReplica($actor, $target, $wing, $sourceReplica, $drawer, $publishBatchId, $binding);
@@ -521,7 +521,7 @@ final readonly class MemoryService
     ): AcceptedMemory {
         $target = $this->writableSpace($actor, $space);
 
-        $binding = $this->registry->bindingForSource($sourceReplica, $drawer->sourceDrawerId);
+        $binding = $this->registry->bindingForSource($actor->userId, $sourceReplica, $drawer->sourceDrawerId);
         if (null !== $binding) {
             return new AcceptedMemory($binding->drawer, $target, AcceptOutcome::Updated);
         }

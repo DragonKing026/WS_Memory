@@ -114,13 +114,13 @@ final class DoctrinePublishBridgeTest extends KernelTestCase
     {
         $this->registry->register($this->fromReplica('drawer_alfa_1', 'alfa', 'drawer_lokalny_1'));
 
-        $binding = $this->registry->bindingForSource(self::REPLICA, 'drawer_lokalny_1');
+        $binding = $this->registry->bindingForSource($this->ownerId(), self::REPLICA, 'drawer_lokalny_1');
 
         self::assertNotNull($binding);
         self::assertSame('drawer_alfa_1', $binding->drawer->value);
         self::assertSame('alfa', $binding->space->value);
         self::assertNull(
-            $this->registry->bindingForSource('inny-laptop', 'drawer_lokalny_1'),
+            $this->registry->bindingForSource($this->ownerId(), 'inny-laptop', 'drawer_lokalny_1'),
             'ta sama szuflada z innej repliki to inna treść',
         );
     }
@@ -350,6 +350,88 @@ final class DoctrinePublishBridgeTest extends KernelTestCase
     }
 
     // ---------------------------------------------------------------- helpers
+
+    // ------------------------------------------- the source pair belongs to its owner
+
+    /**
+     * Naming somebody else's replica and drawer finds nothing.
+     *
+     * This is the hole the pair used to have, reported by code scanning before the
+     * endpoint had a caller: the lookup matched on two values the publisher supplies
+     * in full, so anyone could name another person's replica and one of their local
+     * drawer ids, be handed **their** row, and have the republication path rewrite
+     * that drawer with their own text and move its registry row into their own space.
+     * Destroying somebody's content and taking their entry, through the ordinary
+     * publishing endpoint.
+     *
+     * The owner is now part of the question, so the answer for a stranger is "there
+     * is no such binding" and publication continues down the new-drawer path.
+     */
+    public function testAStrangerCannotReachSomebodyElsesSourcePair(): void
+    {
+        $this->registry->register($this->fromReplica('drawer_1', 'alfa', 'drawer_lokalny_1'));
+
+        $stranger = new User('obcy@web-systems.pl', 'Obcy');
+        $stranger->setPasswordHash('nieistotny');
+        $this->em->persist($stranger);
+        $this->em->flush();
+
+        self::assertNull(
+            $this->registry->bindingForSource(
+                $stranger->getId()->toRfc4122(),
+                self::REPLICA,
+                'drawer_lokalny_1',
+            ),
+            'a pair the caller supplies in full must not reach another person\'s row',
+        );
+
+        // And the owner still finds their own, so the narrowing did not simply
+        // break republication for everybody.
+        self::assertNotNull(
+            $this->registry->bindingForSource($this->ownerId(), self::REPLICA, 'drawer_lokalny_1'),
+        );
+    }
+
+    /**
+     * Two people may hold the same pair, because nothing coordinates replica names.
+     *
+     * A replica name is chosen on the machine that generates it. Two laptops picking
+     * the same one is not misuse, and under the old index the first publisher would
+     * have blocked the second for ever — a failure that looks like data loss and is
+     * nearly impossible to read from the error.
+     */
+    public function testTwoOwnersMayHoldTheSamePairWithoutCollidingS(): void
+    {
+        $this->registry->register($this->fromReplica('drawer_1', 'alfa', 'drawer_lokalny_1'));
+
+        $second = new User('druga@web-systems.pl', 'Druga');
+        $second->setPasswordHash('nieistotny');
+        $this->em->persist($second);
+        $this->em->flush();
+
+        $this->registry->register(MemoryWrite::fromReplica(
+            new DrawerId('drawer_2'),
+            new SpaceId('alfa'),
+            Actor::human($second->getId()->toRfc4122()),
+            self::REPLICA,
+            'drawer_lokalny_1',
+            $this->givenBatch('alfa'),
+            'treść drugiej osoby',
+        ));
+
+        self::assertSame(
+            2,
+            (int) $this->connection->fetchOne(
+                'SELECT count(*) FROM ws.memory_entries WHERE source_drawer_id = :d',
+                ['d' => 'drawer_lokalny_1'],
+            ),
+        );
+    }
+
+    private function ownerId(): string
+    {
+        return $this->author->getId()->toRfc4122();
+    }
 
     private function actor(): Actor
     {

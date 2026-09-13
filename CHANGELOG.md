@@ -15,6 +15,42 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:33 — Dało się przejąć cudzą szufladę przez publikację
+
+Zgłoszone przez skanowanie kodu na pull requeście, zanim endpoint miał
+kogokolwiek, kto mógłby go zawołać — i było prawdziwe.
+
+`bindingForSource()` szukał wiersza po parze **(replika, szuflada źródłowa)**,
+czyli po dwóch wartościach, które nadawca podaje **w całości sam**. Nic nie
+wiązało tej pary z tym, kto publikuje. Wystarczyło więc podać cudzą nazwę repliki
+i jeden z cudzych identyfikatorów szuflad, żeby dostać **cudzy wiersz** — a
+ścieżka powtórnej publikacji nadpisywała wtedy zawartość szuflady w pałacu własnym
+tekstem i przenosiła wiersz rejestru do własnej przestrzeni. Zniszczenie cudzej
+treści i zabranie cudzego wpisu, zwykłym endpointem do publikowania.
+
+Właściciel jest teraz **częścią pytania, nie kontekstem**: stoi w `WHERE`, a nie
+w sprawdzeniu po fakcie, i indeks `uniq_entries_source` obejmuje go kolumna
+w kolumnę (`Version20260913000006`). Skutek uboczny jest sam w sobie poprawką
+błędu: dwie osoby mogą mieć **tę samą parę**. Nazwy replik wybiera się lokalnie
+i nic ich nie uzgadnia, więc pod starym indeksem dwa laptopy o tej samej nazwie
+oznaczały, że pierwszy publikujący blokuje drugiego na zawsze — awaria wyglądająca
+jak utrata danych i praktycznie nie do odczytania z komunikatu.
+
+Atrapa rejestru w testach dostała **to samo zawężenie**. Bez tego testy na
+poziomie usługi świeciłyby na zielono, opisując zachowanie, którego baza już nie
+dopuszcza — a rzecz, o którą chodzi, jest granicą uprawnień, nie szczegółem
+zapytania.
+
+Oba testy sprawdzone sabotażem: bez warunku w zapytaniu pada test przejęcia, bez
+zawężonego indeksu druga osoba nie może opublikować własnej szuflady. 508 testów
+zielonych, PHPStan czysty.
+
+Przy okazji: do `docs/06-decyzje.md` trafiły **markery konfliktu scalania**.
+Sprawdzałem po scaleniu liczbę markerów w pliku angielskim, a w polskim tylko
+nagłówki decyzji — i przepuściłem trzy. Też zgłoszone przez skaner.
+
+
+---
 ## 2026-09-13 19:21 — Serwer przyjmuje publikację z lokalnego pałaca (TODO-012, punkty 1–4)
 
 `POST /api/publish` to jedyna droga, którą wiedza z lokalnego pałaca wchodzi do

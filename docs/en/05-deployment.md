@@ -326,7 +326,12 @@ local palace goes through `/v1/embeddings`.
 Two mechanisms reduce that up front, and both are in this migration:
 
 - **the source pair** (`uniq_entries_source`) — resending the same local drawer
-  updates the row, so the outbox can retry indefinitely;
+  updates the row, so the outbox can retry indefinitely. The index covers the
+  **owner of the entry**, not the pair alone (`Version20260913000006`), and that
+  is not a detail: the pair comes entirely from the sender, so without the owner
+  it was enough to name somebody else's replica to be handed their row to
+  overwrite. It also lets two people hold the same pair — replica names are
+  chosen locally and nothing reconciles them;
 - **screening by content digest** (`idx_entries_dedup`) — three people mining the
   same repository pay for the vector once **within the target space**. Three
   private spaces will still hold three copies; one confirmed mapping brings them

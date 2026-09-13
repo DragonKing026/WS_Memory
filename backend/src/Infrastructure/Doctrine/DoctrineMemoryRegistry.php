@@ -222,16 +222,23 @@ final readonly class DoctrineMemoryRegistry implements MemoryRegistry
         }
     }
 
-    public function bindingForSource(string $sourceReplica, string $sourceDrawerId): ?SourceBinding
-    {
+    public function bindingForSource(
+        string $ownerUserId,
+        string $sourceReplica,
+        string $sourceDrawerId,
+    ): ?SourceBinding {
+        // The owner is in the WHERE clause, not merely checked afterwards, and it
+        // matches uniq_entries_source column for column so the index answers this.
         $row = $this->connection->fetchAssociative(
             <<<'SQL'
                 SELECT e.drawer_id, s.slug
                 FROM ws.memory_entries e
                 JOIN ws.spaces s ON s.id = e.space_id
-                WHERE e.source_replica = :replica AND e.source_drawer_id = :sourceDrawer
+                WHERE e.author_user_id = :owner
+                  AND e.source_replica = :replica
+                  AND e.source_drawer_id = :sourceDrawer
                 SQL,
-            ['replica' => $sourceReplica, 'sourceDrawer' => $sourceDrawerId],
+            ['owner' => $ownerUserId, 'replica' => $sourceReplica, 'sourceDrawer' => $sourceDrawerId],
         );
 
         if (false === $row) {
