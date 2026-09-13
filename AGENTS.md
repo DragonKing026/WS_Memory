@@ -191,6 +191,16 @@ Struktura `frontend/src/` jak w 2.0: `pages/` (routing plikowy), `features/<dome
   starej (starą oznaczamy jako zastąpioną).
 - **`TODO/`** — ponumerowane zadania. Jeden plik = jedno zadanie, z sekcjami:
   **Powód**, **Analiza**, **Rozwiązanie**, **Kryteria ukończenia**.
+  **Rozwiązanie i Kryteria to listy z polami wyboru** (`- [ ]` / `- [x]`),
+  odhaczane **na bieżąco**, w commicie, który daną rzecz dowozi. Kryterium
+  odhacza się dopiero wtedy, gdy jest **sprawdzone**, a nie gdy kod istnieje.
+- **Zadanie zrobione w części dostaje stan `🔵 W TOKU — punkty A–B z N`
+  i sekcję **Postęp**** z tabelą: co gotowe, co zostało i czego brakuje.
+  Bez tego zadanie w połowie wygląda na liście dokładnie tak samo jak nietknięte,
+  a jedyne miejsce, gdzie widać różnicę, to `CHANGELOG.md` i historia gita —
+  czyli nie tam, gdzie ktoś patrzy, planując następny krok. Zdarzyło się to
+  2026-09-13 z TODO-012: serwerowa połowa mostka była scalona w `main`, a plik
+  zadania nadal mówił „do zrobienia".
 - **`TODO/DONE/`** — po ukończeniu **przenosisz** tam plik zadania (`git mv`)
   i dopisujesz sekcję **Co zostało zrobione** z datą, godziną i faktami:
   co powstało, co przetestowano, co odłożono i dlaczego.
