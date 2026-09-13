@@ -15,6 +15,14 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 17:47 — Anulowane TODO-010 zeszło z listy zadań
+
+Zadanie jest anulowane od 2026-09-12 (decyzja D-012 zabrała mielenie po stronie
+serwera w całości), ale leżało dalej w `TODO/` i wyglądało na zaległe — na tyle,
+że padło pytanie, czemu nie robimy go przed 011. Przeniesione do `TODO/DONE/`,
+gdzie skrypt sprawdzający i tak akceptuje stan `ANULOWANE`.
+
+---
 ## 2026-09-13 17:46 — Nowy dokument da się wreszcie zacząć z przeglądarki
 
 Edytor **od początku** umiał tworzyć dokumenty — otwarcie nieistniejącego adresu
