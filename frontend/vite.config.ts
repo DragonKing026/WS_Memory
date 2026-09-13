@@ -32,6 +32,32 @@ export const baseConfig: ViteUserConfig = {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // Dependencies reachable only from a lazily loaded page have to be named here.
+  //
+  // Vite pre-bundles dependencies once at start-up and stamps the result with a hash
+  // that goes into every import URL it serves. A dependency it did not include in
+  // that pass is discovered the moment somebody first opens the page importing it —
+  // and re-optimising changes the hash, so the requests already in flight for the old
+  // one are answered `504 Outdated Optimize Dep`. The dynamic import rejects and the
+  // page renders **nothing**.
+  //
+  // Found in CI, where the nightly end-to-end run went red on a blank editor screen.
+  // The trace named the casualties exactly: five `@codemirror/*` packages and
+  // `markdown-it` — precisely the set no screen but the editor imports. It does not
+  // reproduce on a developer's machine, where the start-up scan wins the race, which
+  // is what makes it worth pinning down here rather than leaving to chance.
+  //
+  // `router.onError` recovers if this happens anyway; see `src/router/index.ts`.
+  optimizeDeps: {
+    include: [
+      '@codemirror/commands',
+      '@codemirror/lang-markdown',
+      '@codemirror/language-data',
+      '@codemirror/state',
+      '@codemirror/view',
+      'markdown-it',
+    ],
+  },
   server: {
     port: 5173,
     // Proxy for running Vite directly, without nginx in front. In Docker nginx

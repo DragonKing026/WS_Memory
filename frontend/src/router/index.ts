@@ -131,3 +131,83 @@ router.afterEach((to) => {
   const title = typeof to.meta.title === 'string' ? to.meta.title : null
   document.title = title === null ? 'WS_Memory' : `${title} · WS_Memory`
 })
+
+/**
+ * Recognises the one failure mode that leaves the application showing nothing:
+ * the browser could not fetch a lazily loaded page.
+ *
+ * Matched on the message because there is no error type to match on — the browser
+ * throws a plain `TypeError`, and the wording differs between engines.
+ */
+export function isModuleLoadFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  return /dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(
+    error.message,
+  )
+}
+
+/**
+ * A page whose code will not load is recovered by loading the page again, once.
+ *
+ * Pages are lazy, so navigating to one fetches a module. When that fetch fails the
+ * navigation is abandoned mid-flight and the person is left looking at a blank
+ * screen — no error, no layout, nothing to click.
+ *
+ * There are two ways to get here, and both are ordinary rather than exotic:
+ *
+ * - in development, Vite finds a dependency it had not pre-bundled, re-optimises, and
+ *   answers the in-flight request with `504 Outdated Optimize Dep`;
+ * - in production, a deployment replaces the built files while somebody has the old
+ *   page open, and the chunk their copy asks for is no longer there.
+ *
+ * In both cases a fresh load of the same address fixes it, because the newly served
+ * `index.html` points at files that exist. Hence a reload rather than an error screen.
+ *
+ * It happens **once** per address. If the second attempt fails too, the cause is not
+ * a stale file and reloading again would only spin — so the error is left to the
+ * console, where it can be diagnosed.
+ */
+const RELOAD_MARKER = 'ws:przeladowanie-po-bledzie-modulu'
+
+function alreadyRetried(target: string): boolean {
+  try {
+    return window.sessionStorage.getItem(RELOAD_MARKER) === target
+  } catch {
+    // Storage can be unavailable (private mode, blocked cookies). Without it we
+    // cannot remember the attempt, so we do not make one: a reload we cannot count
+    // is a reload that could repeat forever.
+    return true
+  }
+}
+
+function rememberRetry(target: string): void {
+  try {
+    window.sessionStorage.setItem(RELOAD_MARKER, target)
+  } catch {
+    // Handled by `alreadyRetried` returning true when storage does not work.
+  }
+}
+
+router.onError((error, to) => {
+  if (!isModuleLoadFailure(error) || alreadyRetried(to.fullPath)) {
+    return
+  }
+
+  rememberRetry(to.fullPath)
+  window.location.assign(to.fullPath)
+})
+
+router.afterEach(() => {
+  // A navigation finished, so whatever went wrong is over. Forgetting the attempt
+  // means somebody who meets the problem again later — after the next deployment,
+  // say — gets the same single automatic recovery, instead of being told they have
+  // already had their turn.
+  try {
+    window.sessionStorage.removeItem(RELOAD_MARKER)
+  } catch {
+    // Nothing to forget if storage does not work.
+  }
+})

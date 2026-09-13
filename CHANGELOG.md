@@ -15,6 +15,48 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 12:17 — Pusty ekran edytora: 504 z optymalizatora Vite
+
+Przebieg nocny poszedł na czerwono, a oba testy E2E przewróciły się na tym samym:
+na ekranie edytora nie było **niczego**. Nie błędu, nie układu strony — pustej
+bieli. Zrzut z przebiegu i zapis sieciowy nie zostawiły miejsca na domysły:
+
+```
+504 (Outdated Optimize Dep)
+TypeError: Failed to fetch dynamically imported module: …/DocumentEditPage.vue
+[VUE_ROUTER_R0010] Uncaught error during route navigation
+```
+
+Poległo dokładnie sześć żądań: pięć pakietów `@codemirror/*` i `markdown-it` —
+czyli dokładnie ten zbiór, którego nie importuje żaden ekran poza edytorem.
+
+Mechanizm jest taki: Vite pakuje zależności raz, przy starcie, i znaczy wynik
+skrótem, który wchodzi do każdego adresu modułu. Zależność pominięta w tym
+przebiegu zostaje odkryta dopiero wtedy, gdy ktoś **pierwszy raz** otworzy stronę,
+która ją importuje. Ponowne pakowanie zmienia skrót, więc żądania będące w locie
+dostają 504, dynamiczny import odrzuca, a vue-router nie miał obsługi błędu —
+i nawigacja kończyła się niczym.
+
+Dwie poprawki, bo to dwa różne problemy:
+
+1. **`optimizeDeps.include`** w `vite.config.ts` — te sześć zależności wchodzi do
+   pierwszego przebiegu pakowania i nie ma czego odkrywać później.
+2. **`router.onError`** — gdy kod strony nie chce się wczytać, aplikacja ładuje ten
+   sam adres jeszcze raz, **jeden raz**, i zapamiętuje próbę w `sessionStorage`,
+   żeby nie wpaść w pętlę. To nie jest łatka na powyższe: dokładnie tak samo psuje
+   się **produkcja** po wdrożeniu, gdy ktoś ma otwartą starą stronę i prosi o plik,
+   którego już nie ma. Dotąd taki człowiek zobaczyłby białą stronę.
+
+Warte odnotowania: **u mnie to się nie odtwarza.** Wyczyściłem pamięć podręczną
+Vite, wystartowałem kontener na zimno i puściłem E2E trzy razy — za każdym razem
+zielono, bo skanowanie przy starcie wygrywa tu wyścig, którego na maszynie
+przebiegu nie wygrywa. Dowodem na skuteczność poprawki jest więc CI, nie moja
+maszyna, i tak to trzeba czytać.
+
+Przy okazji: `codemirror` (pakiet zbiorczy) siedzi w zależnościach, choć nie jest
+nigdzie importowany — importujemy pakiety składowe. Do usunięcia osobno.
+
+---
 ## 2026-09-13 11:59 — Testy E2E i usterka, którą znalazły od razu
 
 Playwright w `frontend/e2e/`, uruchamiany przeciwko **działającemu stosowi**:
