@@ -24,6 +24,11 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Index(name: 'idx_audit_created_at', columns: ['created_at'])]
 #[ORM\Index(name: 'idx_audit_actor', columns: ['actor_user_id'])]
 #[ORM\Index(name: 'idx_audit_action', columns: ['action'])]
+// The two below serve the administration screen's filters (TODO-008). The measurements
+// that justify them are in Version20260913000003; the short version is that filtering by
+// space or by agent token was a sequential scan of a table that grows without bound.
+#[ORM\Index(name: 'idx_audit_space', columns: ['space_slug', 'created_at'])]
+#[ORM\Index(name: 'idx_audit_actor_token', columns: ['actor_agent_token_id'])]
 class AuditLog
 {
     #[ORM\Id]
