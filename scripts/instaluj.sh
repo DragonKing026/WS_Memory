@@ -286,6 +286,17 @@ print(re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", tekst.lower())).strip("-"))
 '
 }
 
+# Wartość domyślna pytania bierze się z `.env.example`, a nie z tego skryptu.
+#
+# To jest ta sama reguła, co przy liście zmiennych: instalator nie może być
+# drugim opisem prawdy. Wpisana tutaj „3.9.0" znaczy, że podbicie wersji
+# w `.env.example` nie zmienia tego, co instalator proponuje — i nikt się o tym
+# nie dowie, bo obie wartości wyglądają wiarygodnie. To samo dotyczy portu,
+# adresu nasłuchu i nazwy wspólnej przestrzeni.
+domyslna_z_przykladu() {
+  sed -n "s/^$1=//p" "${KORZEN}/.env.example" | head -1 | sed 's/^"//; s/"$//'
+}
+
 # ─── Sekrety ─────────────────────────────────────────────────────────────────
 
 losowy_sekret() { openssl rand -base64 33 | tr -d '/+=\n' | cut -c1-32; }
@@ -726,15 +737,18 @@ naglowek "Kilka pytań"
 powiedz "Sekretów nie pytam — wygeneruję je sam."
 powiedz ""
 
-zapytaj NGINX_PORT "Port, pod którym aplikacja ma być widoczna" "8080"
+zapytaj NGINX_PORT "Port, pod którym aplikacja ma być widoczna" "$(domyslna_z_przykladu NGINX_PORT)"
 sprawdz_porty "${ODP[NGINX_PORT]}"
 if [ "${#BRAKI[@]}" -gt 0 ]; then
   for b in "${BRAKI[@]}"; do zawiedz "${b}"; done
   exit 3
 fi
 
-zapytaj NGINX_BIND "Adres, na którym nasłuchiwać (127.0.0.1 = tylko ta maszyna)" "127.0.0.1"
-zapytaj WS_PUBLIC_URL "Publiczny adres instancji ze schematem (linki w mailach)" "http://127.0.0.1:${ODP[NGINX_PORT]}"
+zapytaj NGINX_BIND "Adres, na którym nasłuchiwać (127.0.0.1 = tylko ta maszyna)" "$(domyslna_z_przykladu NGINX_BIND)"
+# Ten jeden NIE pochodzi z `.env.example`: leży tam adres przykładowy
+# (`https://wiedza.example.com`), czyli nie wartość domyślna, tylko wzór do
+# zastąpienia. Podpowiadamy więc adres wyliczony z podanego przed chwilą portu.
+zapytaj WS_PUBLIC_URL "Publiczny adres instancji ze schematem (linki w mailach)" "http://${ODP[NGINX_BIND]}:${ODP[NGINX_PORT]}"
 
 zapytaj TRYB "Tryb: prod (produkcja) czy dev (praca nad kodem)" "prod"
 if [ "${ODP[TRYB]}" = 'prod' ]; then
@@ -748,10 +762,10 @@ zapytaj ADMIN_NAME "Nazwa widoczna w interfejsie" "" 1
 
 naglowek "Poczta wychodząca"
 powiedz "Bez tego zaproszenia trzeba przekazywać ręcznie — instancja działa, ale nie wysyła nic."
-zapytaj MAILER_DSN "DSN serwera poczty (Enter = na razie bez wysyłki)" "null://null"
+zapytaj MAILER_DSN "DSN serwera poczty (Enter = na razie bez wysyłki)" "$(domyslna_z_przykladu MAILER_DSN)"
 if [ "${ODP[MAILER_DSN]}" != 'null://null' ]; then
   zapytaj MAIL_FROM "Adres nadawcy" ""
-  zapytaj MAIL_FROM_NAME "Nazwa nadawcy" "Baza wiedzy"
+  zapytaj MAIL_FROM_NAME "Nazwa nadawcy" "$(domyslna_z_przykladu MAIL_FROM_NAME)"
 else
   ODP[MAIL_FROM]="baza-wiedzy@localhost"
   ODP[MAIL_FROM_NAME]="Baza wiedzy"
@@ -760,7 +774,7 @@ fi
 
 naglowek "Wspólna przestrzeń"
 powiedz "Każde nowe konto trafia do niej od razu — bez tego pierwszą rzeczą, jaką widzi nowa osoba, jest „nie należysz do żadnej przestrzeni”."
-zapytaj WS_DEFAULT_SPACE_NAME "Nazwa wspólnej przestrzeni (pusta = wyłącz mechanizm)" "Baza wiedzy" 1
+zapytaj WS_DEFAULT_SPACE_NAME "Nazwa wspólnej przestrzeni (pusta = wyłącz mechanizm)" "$(domyslna_z_przykladu WS_DEFAULT_SPACE_NAME)" 1
 # Identyfikator PO nazwie i domyślnie z niej wyliczony: pytanie o „identyfikator"
 # przed pytaniem o nazwę zaprasza do wpisania nazwy w to pierwsze pole — i tak
 # się właśnie stało przy pierwszej prawdziwej instalacji.
@@ -782,7 +796,7 @@ if [ -n "${ODP[WS_DEFAULT_SPACE_SLUG]}" ]; then
   fi
 fi
 
-zapytaj MEMPALACE_VERSION "Wersja MemPalace" "3.9.0"
+zapytaj MEMPALACE_VERSION "Wersja MemPalace" "$(domyslna_z_przykladu MEMPALACE_VERSION)"
 
 if [ -n "${ZAPISZ_ODPOWIEDZI}" ]; then
   # Bez sekretów — to jest plik do powtórzenia instalacji, nie kopia poświadczeń.
