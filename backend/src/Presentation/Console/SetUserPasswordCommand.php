@@ -24,7 +24,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * reading that mailbox, and the case this command is for is the one where neither is
  * true.
  *
- * **Generating is the default and `--haslo` is the exception**, which is the opposite
+ * **Generating is the default and `--password` is the exception**, which is the opposite
  * of what a convenience flag usually looks like. A password passed as an argument is
  * written into the shell history of the machine it was typed on, and a recovery
  * password in `~/.bash_history` outlives every reason it was set.
@@ -48,7 +48,7 @@ final class SetUserPasswordCommand extends Command
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Adres e-mail konta')
             ->addOption(
-                'haslo',
+                'password',
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Ustaw podane hasło zamiast wygenerowanego. Uwaga: zostaje w historii powłoki.',
@@ -62,7 +62,7 @@ final class SetUserPasswordCommand extends Command
         /** @var string $email */
         $email = $input->getArgument('email');
         /** @var string|null $given */
-        $given = $input->getOption('haslo');
+        $given = $input->getOption('password');
 
         try {
             $user = $this->accounts->byEmail($email);
@@ -82,7 +82,7 @@ final class SetUserPasswordCommand extends Command
                 // not touched, and a script that branches on the code should be able
                 // to tell that apart from "there is no such account".
                 $io->error($violations);
-                $io->note('Bez opcji --haslo polecenie wygeneruje hasło, które tę regułę spełnia.');
+                $io->note('Bez opcji --password polecenie wygeneruje hasło, które tę regułę spełnia.');
 
                 return Command::INVALID;
             }

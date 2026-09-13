@@ -69,7 +69,7 @@ docker compose exec backend php bin/console <command>
 | Command | When it is used |
 |---|---|
 | `ws:user:invite <email> [--admin]` | the first account in an installation and every one after it; it prints the link, because the first invitation is usually issued before the mailer is configured |
-| `ws:user:password <email> [--haslo=…]` | **regaining access to an installation** — the password of an account nobody remembers |
+| `ws:user:password <email> [--password=…]` | **regaining access to an installation** — the password of an account nobody remembers |
 | `ws:agent:token <email> <label> [--space=…] [--expires=…]` | connecting an AI agent; prints a ready `claude mcp add` together with the token, once |
 | `ws:agent:list <email>` | what this account has to revoke: identifier, label, last use, state |
 | `ws:agent:revoke <email> <identifier>` | **cleaning up after a token** issued for one piece of console work |
@@ -90,10 +90,10 @@ beside it.
 
 Four things the invocation does not show:
 
-- **Without `--haslo` the command generates the password** and prints it once.
+- **Without `--password` the command generates the password** and prints it once.
   That is protection rather than convenience: a password passed as an argument
   stays in the shell history of the machine it was typed on and outlives every
-  reason it was set. `--haslo` exists, but as the exception — and the command
+  reason it was set. `--password` exists, but as the exception — and the command
   then says out loud that the history needs cleaning.
 - **The password rule is the same one as when accepting an invitation**: at least
   12 characters and nothing known from a public breach. One class enforces it

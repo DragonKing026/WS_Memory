@@ -127,7 +127,7 @@ final class UserPasswordCommandTest extends WebTestCase
     {
         $tester = $this->invoke('ws:user:password', [
             'email' => self::EMAIL,
-            '--haslo' => 'Krotkie1!',
+            '--password' => 'Krotkie1!',
         ]);
 
         self::assertSame(Command::INVALID, $tester->getStatusCode());
@@ -142,7 +142,7 @@ final class UserPasswordCommandTest extends WebTestCase
     {
         $tester = $this->invoke('ws:user:password', [
             'email' => self::EMAIL,
-            '--haslo' => 'ZupelnieNoweDlugieHaslo1',
+            '--password' => 'ZupelnieNoweDlugieHaslo1',
         ]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode());

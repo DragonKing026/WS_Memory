@@ -15,6 +15,39 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:04 — Konsola umie ustawić hasło i odwołać token agenta
+
+Do dziś z konsoli dało się konto **stworzyć**, ale nie **naprawić**. Konta
+administratora bez hasła nie odzyskiwało się w ogóle — jedynym wyjściem było
+zaproszenie na inny adres, po którym stare konto zostawało zablokowane, a obok
+niego powstawało drugie. `ws:user:password` kończy ten stan: **domyślnie
+generuje** hasło i wypisuje je raz, bo hasło podane w argumencie zostaje
+w historii powłoki i przeżywa każdy powód, dla którego je ustawiono. Reguła hasła
+przestała przy tym istnieć w dwóch kopiach — dwanaście znaków i odrzucanie haseł
+znanych z publicznych wycieków mieszkają w jednej klasie `PasswordPolicy`,
+z której korzysta i przyjmowanie zaproszenia, i to polecenie.
+
+Druga luka była gorsza, bo miała obejście: token agenta wystawiony do
+jednorazowej pracy odwoływało się **zapisem wprost w bazie**, czyli z pominięciem
+audytu i reguły „tylko własny token". Zrobiłem tak dziś sam, bo nie było innej
+drogi. `ws:agent:revoke` woła tę samą usługę co `DELETE /api/agent-tokens/{id}`,
+więc obie drogi mają jedną regułę i jeden ślad, a cudzy token odpowiada dokładnie
+jak nieistniejący. Towarzyszy mu `ws:agent:list` — **osobne polecenie, nie flaga**,
+bo takie, które z flagą czyta, a bez niej niszczy, jest o jedną literówkę od
+zdjęcia agenta z pracy w jej trakcie.
+
+Dwie rzeczy polecenie hasła **mówi wprost**, bo inaczej nikt by ich nie
+podejrzewał. Wydane tokeny JWT działają do wygaśnięcia — JWT jest bezstanowe
+(D-017), więc reset hasła brzmi jak odcięcie dostępu, a nim nie jest; odcina
+wyłączenie konta. I konto wyłączone hasło dostaje, ale się nim nie zaloguje:
+odmowa byłaby tu gorsza, bo hasło nie nadaje żadnego dostępu, więc wpis w audycie
+nie ma o czym skłamać — inaczej niż przy nadaniu roli, które dlatego odrzucamy.
+Sam wpis `user.password_reset` **nie ma aktora**: z konsoli nikt nie jest
+zalogowany, a wpisanie konta czytałoby się jak „sam sobie zmienił hasło".
+
+Dwanaście testów poleceń, każdy sprawdzony, że pada bez poprawki.
+
+---
 ## 2026-09-13 18:30 — Slug testowej przestrzeni wpisany, a nie brany ze środowiska
 
 Testy dostawały nazwę wspólnej przestrzeni z `backend/.env.test`. Lokalnie

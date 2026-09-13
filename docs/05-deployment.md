@@ -68,7 +68,7 @@ docker compose exec backend php bin/console <polecenie>
 | Polecenie | Kiedy się go używa |
 |---|---|
 | `ws:user:invite <email> [--admin]` | pierwsze konto w instancji i każde następne; wypisuje link, bo pierwsze zaproszenie powstaje zwykle przed konfiguracją poczty |
-| `ws:user:password <email> [--haslo=…]` | **odzyskanie dostępu do instancji** — hasło konta, którego nikt już nie pamięta |
+| `ws:user:password <email> [--password=…]` | **odzyskanie dostępu do instancji** — hasło konta, którego nikt już nie pamięta |
 | `ws:agent:token <email> <etykieta> [--space=…] [--expires=…]` | podłączenie agenta AI; wypisuje gotowe `claude mcp add` razem z tokenem, jeden raz |
 | `ws:agent:list <email>` | co to konto ma do odwołania: identyfikator, etykieta, ostatnie użycie, stan |
 | `ws:agent:revoke <email> <identyfikator>` | **sprzątanie po tokenie** wystawionym do jednorazowej pracy z konsoli |
@@ -88,10 +88,10 @@ inny adres — stare konto zostawało zablokowane, a obok niego powstawało drug
 
 Cztery rzeczy, których nie widać z samego wywołania:
 
-- **Bez `--haslo` polecenie hasło generuje** i wypisuje je jeden raz. To nie
+- **Bez `--password` polecenie hasło generuje** i wypisuje je jeden raz. To nie
   wygoda, a zabezpieczenie: hasło podane w argumencie zostaje w historii powłoki
   maszyny, na której je wpisano, i przeżywa każdy powód, dla którego je ustawiono.
-  `--haslo` istnieje, ale jest wyjątkiem — polecenie mówi wtedy wprost, że trzeba
+  `--password` istnieje, ale jest wyjątkiem — polecenie mówi wtedy wprost, że trzeba
   posprzątać historię.
 - **Reguła hasła jest ta sama co przy przyjmowaniu zaproszenia**: co najmniej
   12 znaków i hasło nieznane z publicznych wycieków. Pilnuje jej jedna klasa
