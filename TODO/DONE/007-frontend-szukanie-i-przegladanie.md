@@ -6,7 +6,7 @@ tags: [ws-memory, todo, frontend, wyszukiwanie, ui]
 
 # TODO-007 — Frontend: wyszukiwanie i przeglądanie bazy
 
-**Utworzono:** 2026-09-12 16:03 · **Ukończono:** 2026-09-13 11:17 · **Stan:** zrobione · **Zależności:** 006, 003
+**Utworzono:** 2026-09-12 16:03 · **Stan:** ✅ **UKOŃCZONE 2026-09-13 11:17** · **Zależności:** 006, 003
 
 ## Powód
 

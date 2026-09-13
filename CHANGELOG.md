@@ -15,6 +15,26 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 11:25 — Skrypt, który sprawdza lokalnie i czeka na CI
+
+**Szybkie sprawdzenie padło na moim własnym przeoczeniu:** w rozliczeniu
+TODO-007 wpisałem `**Stan:** zrobione`, a `sprawdz-zadania.py` wymaga słowa
+`UKOŃCZONE` albo `ANULOWANE`. Reguła projektu zadziałała — tylko że o czerwonym
+przebiegu dowiedział się człowiek, nie ja, bo wypchnąłem i poszedłem dalej.
+
+Stąd `scripts/wypchnij.sh`: uruchamia **lokalnie to samo**, co „Szybkie
+sprawdzenie” w CI, pcha dopiero po komplecie zieleni, a potem czeka na wynik
+i przy porażce pokazuje ogon logu kroku, który padł. Sprawdza też plik compose,
+którego CI nie rusza — zepsuty compose raz już poszedł na `main`.
+
+To trzeci raz tego dnia, gdy czerwony przebieg zauważył ktoś inny: raz ta
+literówka, dwa razy chwilowe awarie GitHuba (CodeQL i push do wiki). Skrypt nie
+naprawi awarii GitHuba, ale sprawi, że zobaczę je od razu — i to jest cała
+różnica między „wiem i czekam” a „nie wiem”.
+
+Reguła dopisana do `AGENTS.md` i `AGENTS.en.md`.
+
+---
 ## 2026-09-13 11:17 — TODO-007 ukończone: baza wiedzy da się przeszukać
 
 Zadanie rozliczone i przeniesione do `TODO/DONE/`. Wszystkie siedem kryteriów

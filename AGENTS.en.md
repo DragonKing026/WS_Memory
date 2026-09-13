@@ -245,6 +245,30 @@ once stops being read. And this particular documentation is input for AI agents
 — an out-of-date description does not merely mislead a person, it is taken as
 fact by a model and propagated into further decisions.
 
+### Pushing — `./scripts/wypchnij.sh`, not a bare `git push`
+
+The script runs **locally the same checks** that "Szybkie sprawdzenie" runs in CI
+(PHP syntax, PHPUnit, PHPStan, `lint:yaml`, frontend types and tests, the build,
+documentation consistency, task write-ups, workflow and compose syntax), pushes only
+once all of them are green, then **waits for CI** and, on failure, prints the tail of
+the step that broke.
+
+```bash
+./scripts/wypchnij.sh                   # check, push, wait
+./scripts/wypchnij.sh --tylko-lokalnie  # check only
+./scripts/wypchnij.sh --bez-czekania    # check and push, do not wait
+```
+
+**Why this is a rule rather than a convenience:** pushing and moving on means somebody
+else finds out about the red run, several commits later — by which point it is no
+longer obvious which commit broke it. It happened three times in one session on
+2026-09-13: once on a typo in a task's state (`zrobione` instead of `UKOŃCZONE`), twice
+on transient GitHub outages. Every time it was a human who noticed, not the author of
+the change.
+
+The script also checks the **compose file**, which CI never touches — a broken compose
+once reached `main` because the commands around it had their errors silenced.
+
 ### Git — we commit every closed step
 
 A change that is not committed does not exist. The rules:

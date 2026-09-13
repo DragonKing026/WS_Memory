@@ -233,6 +233,30 @@ raz skłamie, przestaje być czytana. A ta konkretna dokumentacja jest wsadem dl
 agentów AI — nieaktualny opis nie tylko wprowadza w błąd człowieka, ale zostaje
 przez model potraktowany jako fakt i powielony w kolejnych decyzjach.
 
+### Wypychanie — `./scripts/wypchnij.sh`, nie samo `git push`
+
+Skrypt uruchamia **lokalnie to samo**, co „Szybkie sprawdzenie” w CI (składnia
+PHP, PHPUnit, PHPStan, `lint:yaml`, typy i testy frontendu, budowanie, spójność
+dokumentacji, rozliczenia zadań, składnia workflowów i pliku compose), pcha
+dopiero po komplecie zieleni, a potem **czeka na CI** i przy porażce pokazuje
+ogon logu tego kroku, który padł.
+
+```bash
+./scripts/wypchnij.sh                   # sprawdź, wypchnij, poczekaj
+./scripts/wypchnij.sh --tylko-lokalnie  # sam sprawdź
+./scripts/wypchnij.sh --bez-czekania    # sprawdź i wypchnij, bez czekania
+```
+
+**Dlaczego to reguła, a nie wygoda:** wypchnięcie i przejście do następnej
+rzeczy oznacza, że o czerwonym przebiegu dowiaduje się ktoś inny, kilka commitów
+później — i wtedy nie wiadomo już, który commit go zepsuł. Zdarzyło się to
+2026-09-13 trzy razy w jednej sesji: raz na literówce w stanie zadania
+(`zrobione` zamiast `UKOŃCZONE`), dwa razy na chwilowych awariach GitHuba. Za
+każdym razem zauważył to człowiek, nie autor zmiany.
+
+Skrypt sprawdza też **plik compose**, którego CI nie rusza — zepsuty compose raz
+już poszedł na `main`, bo polecenia wokół niego miały wyciszone błędy.
+
 ### Git — commitujemy każdy zamknięty krok
 
 Zmiana bez commita nie istnieje. Zasady:
