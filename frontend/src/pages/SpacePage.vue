@@ -2,17 +2,24 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
+import DocumentTree from '@/components/documents/DocumentTree.vue'
 import type { DocumentListItem } from '@/features/documents/schemas'
 import { documentService } from '@/features/documents/service'
+import { buildTree } from '@/features/documents/tree'
 import { useAuthStore } from '@/stores/auth'
 
 /**
- * A space: what is written down in it, newest first.
+ * A space: what is written down in it, as a tree.
  *
- * Ordered by last change rather than alphabetically, because the question people
- * actually arrive with is "what moved" — an alphabetical list answers "what exists",
- * which they can get from search. The AI and verification marks are in the list, not
- * only on the page: deciding what to open is exactly when that matters.
+ * A tree rather than a list, because a slug carries a path — `umowy/najem`,
+ * `procedury/kadry/urlopy` — and that path is the only structure the wiki has.
+ * Flattened, it is invisible, and a space with two hundred documents becomes a wall
+ * of titles nobody scans.
+ *
+ * Inside a folder, documents are ordered by last change rather than alphabetically:
+ * the question people arrive with is "what moved", and "what exists" is what search
+ * is for. The AI and verification marks are on every row, not only on the document
+ * page — deciding what to open is exactly when they matter.
  *
  * Access is judged from the store's list, which came from the server. Nothing here
  * decides permissions; a menu assembled locally would eventually offer a space the
@@ -35,6 +42,19 @@ const showArchived = ref(false)
 const visible = computed(() =>
   showArchived.value ? documents.value : documents.value.filter((item) => !item.archived),
 )
+
+const tree = computed(() => buildTree(visible.value))
+
+/** Folder paths the reader has collapsed. Held here rather than in the tree component
+ *  so that loading another page does not spring every folder back open. */
+const collapsed = ref(new Set<string>())
+
+function toggle(path: string): void {
+  // A new Set rather than mutating: Vue does not track Set membership on its own.
+  const next = new Set(collapsed.value)
+  next.has(path) ? next.delete(path) : next.add(path)
+  collapsed.value = next
+}
 
 const archivedCount = computed(() => documents.value.filter((item) => item.archived).length)
 
@@ -69,14 +89,6 @@ async function load(): Promise<void> {
   } finally {
     busy.value = false
   }
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value)
-
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 watch(
@@ -151,46 +163,14 @@ watch(
           </p>
         </UCard>
 
-        <ul v-else class="divide-y divide-default border-y border-default">
-          <li v-for="item in visible" :key="item.slug" class="py-3">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <RouterLink
-                  :to="{ name: 'document', params: { space: item.space, slug: item.slug } }"
-                  class="font-medium hover:underline break-words"
-                >
-                  {{ item.title }}
-                </RouterLink>
-
-                <div class="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                  <UBadge v-if="item.authoredByAi" color="warning" variant="subtle" icon="i-lucide-bot">
-                    AI
-                  </UBadge>
-                  <UBadge v-else color="neutral" variant="subtle" icon="i-lucide-user">
-                    Człowiek
-                  </UBadge>
-                  <UBadge
-                    v-if="item.verified"
-                    color="success"
-                    variant="subtle"
-                    icon="i-lucide-badge-check"
-                  >
-                    Zweryfikowane
-                  </UBadge>
-                  <UBadge v-if="item.archived" color="error" variant="subtle">Archiwum</UBadge>
-                  <UBadge v-if="item.status === 'draft'" color="neutral" variant="outline">
-                    Szkic
-                  </UBadge>
-                </div>
-              </div>
-
-              <div class="shrink-0 text-right text-xs text-muted">
-                <div>{{ formatDate(item.updatedAt) }}</div>
-                <div v-if="item.currentRevision !== null">rew. {{ item.currentRevision }}</div>
-              </div>
-            </div>
-          </li>
-        </ul>
+        <div v-else class="border-y border-default py-2">
+          <DocumentTree
+            :folder="tree"
+            :space="slug"
+            :collapsed="collapsed"
+            @toggle="toggle"
+          />
+        </div>
 
         <UButton
           v-if="hasMore"

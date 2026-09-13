@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    DocumentTree: typeof import('./src/components/documents/DocumentTree.vue')['default']
     MarkdownView: typeof import('./src/components/documents/MarkdownView.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
@@ -23,6 +24,7 @@ declare module 'vue' {
     UCard: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Card.vue')['default']
     UCheckbox: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Checkbox.vue')['default']
     UFormField: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/FormField.vue')['default']
+    UIcon: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/vue/components/Icon.vue')['default']
     UInput: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Input.vue')['default']
     USelect: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Select.vue')['default']
     USelectMenu: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/SelectMenu.vue')['default']

@@ -15,6 +15,32 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 10:57 — Drzewo dokumentów zamiast płaskiej listy
+
+Ekran przestrzeni pokazywał dokumenty jednym ciągiem. TODO-007 wymaga **drzewa**
+i słusznie: adres dokumentu niesie ścieżkę (`umowy/najem`,
+`procedury/kadry/urlopy`), a to jedyna struktura, jaką wiki ma. Spłaszczona jest
+niewidoczna, więc przestrzeń z dwustoma dokumentami zamienia się w ścianę
+tytułów, której nikt nie przegląda.
+
+Foldery zwijalne, z licznikiem tego, co pod nimi leży, wcięcie rysowane
+krawędzią (przy czwartym poziomie sam odstęp przestaje mówić, do którego rodzica
+należy wiersz). Foldery alfabetycznie, dokumenty w środku od najnowszej zmiany —
+i ta różnica jest celowa: folder to miejsce, a stałe uporządkowanie ułatwia
+znajdowanie miejsc; dokument to zdarzenie, a przy zdarzeniach liczy się, które
+było ostatnie.
+
+Budowanie drzewa siedzi poza komponentem i ma dziewięć testów, bo ciekawe
+przypadki nie są wizualne: adres bez folderu, dwie ścieżki różniące się dopiero
+głębiej, pusty odcinek po podwójnym ukośniku i licznik, który musi sumować całe
+poddrzewo, a nie tylko własny poziom.
+
+**Czerwony przebieg CodeQL to nie nasz kod.** GitHub zgłasza: „attempted to run
+with improved incremental analysis but it did not complete successfully… possible
+reason is disk space constraints". Awaria maszyny GitHuba przy analizie
+przyrostowej, zapisana w cache Actions — następny przebieg leci bez niej.
+
+---
 ## 2026-09-13 10:45 — Dwie usterki znalezione bazą testową
 
 Zasilanie bazy do pomiaru wydajności wywlokło dwa realne błędy. Oba są na
