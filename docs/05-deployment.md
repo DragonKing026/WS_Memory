@@ -39,10 +39,42 @@ dopiero potem myślimy o GPU.
 
 ```bash
 git clone <repo> ws-memory && cd ws-memory
+./scripts/instaluj.sh
+```
+
+Instalator (TODO-018) robi wszystko, co niżej opisane ręcznie: pyta o adres,
+port, konto administratora i pocztę, **generuje sekrety**, zapisuje `.env`,
+podnosi stos, wykonuje migracje, generuje klucze JWT, zakłada konto i sprawdza,
+czy instancja odpowiada — łącznie z wyszukiwaniem znaczeniem.
+
+| Opcja | Do czego |
+|---|---|
+| `--tylko-sprawdzenie` | czy ta maszyna się nadaje; **niczego nie zmienia** |
+| `--na-sucho` | cała ścieżka z pytaniami, zero zmian |
+| `--tylko-konfiguracja` | zapisz `.env` i zostaw podnoszenie stosu komu innemu (CI, Ansible) |
+| `--plik-odpowiedzi=PLIK` | instalacja bez człowieka; `--zapisz-odpowiedzi=PLIK` tworzy taki plik |
+| `--zachowaj-env` | dokończ instalację na istniejącym `.env` (po przerwaniu) |
+
+**Uruchomiony drugi raz nie niszczy danych.** Zastany `.env` nie jest
+nadpisywany — nowe hasła do bazy, w której dane już są, oznaczałyby instancję,
+która przestaje wstawać. Zastane konto administratora zostaje nietknięte;
+hasła instalator nie zmienia, bo od tego jest `ws:user:password` wywołane
+świadomie.
+
+**Droga „w systemie"** (bez Dockera) na razie **tylko sprawdza wymagania**
+i mówi, czego brakuje — instalacja jednostek systemd i konfiguracji nginxa
+jeszcze nie powstała. Skrypt mówi to wprost i kończy się kodem 3, zamiast
+zacząć i przerwać w połowie.
+
+### Ręcznie, gdyby instalator nie pasował
+
+```bash
 cp .env.example .env
 ./docker/wygeneruj-sekrety.sh    # losowe hasła i tokeny
 make start                       # pierwszy start ~3 min (pobranie modelu)
 make migracje
+docker compose exec backend php bin/console lexik:jwt:generate-keypair
+docker compose exec backend php bin/console ws:user:create ty@firma.pl --admin
 ```
 
 Weryfikacja, że wszystko żyje:
@@ -52,8 +84,20 @@ make test-semantyka              # polskie zapytanie znajduje polską treść
 curl http://127.0.0.1:8080/api/health
 ```
 
-Pierwsze konto administratora zakłada się z konsoli:
-`ws:user:invite ty@firma.pl --admin` — patrz niżej.
+## Odinstalowanie
+
+```bash
+./scripts/odinstaluj.sh
+```
+
+Potwierdzenie polega na **wpisaniu nazwy instancji**, nie na naciśnięciu `t`:
+klawisz naciska się odruchowo, nazwę trzeba przeczytać i przepisać. Przed
+usunięciem powstaje zrzut bazy w `kopie/`.
+
+Domyślnie **zostają** kopie zapasowe (`--z-kopiami` je usuwa) i wolumen modelu
+embeddingów (`--z-modelem`; ~2,3 GB pobierane godzinami, a Twoich danych w nim
+nie ma). `--z-obrazami` usuwa zbudowane obrazy, `--wszystko` to trzy powyższe
+naraz. `--na-sucho` wypisuje, co by zniknęło.
 
 ## Operacje administracyjne z konsoli
 
@@ -67,6 +111,7 @@ docker compose exec backend php bin/console <polecenie>
 
 | Polecenie | Kiedy się go używa |
 |---|---|
+| `ws:user:create <email> [nazwa] [--admin]` | **zakłada konto od razu**, bez chodzenia po linku — tak robi to instalator; hasło generowane i pokazane raz |
 | `ws:user:invite <email> [--admin]` | pierwsze konto w instancji i każde następne; wypisuje link, bo pierwsze zaproszenie powstaje zwykle przed konfiguracją poczty |
 | `ws:user:password <email> [--password=…]` | **odzyskanie dostępu do instancji** — hasło konta, którego nikt już nie pamięta |
 | `ws:agent:token <email> <etykieta> [--space=…] [--expires=…]` | podłączenie agenta AI; wypisuje gotowe `claude mcp add` razem z tokenem, jeden raz |

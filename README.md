@@ -55,11 +55,39 @@ wiki jest dostępna przez API i przez agentów. Kolejne zadania w `TODO/`.
 ## Szybki start
 
 ```bash
+./scripts/instaluj.sh
+```
+
+Instalator pyta o to, czego nie da się zgadnąć (adres, port, konto
+administratora, poczta), **sam generuje sekrety**, zapisuje `.env`, podnosi
+stos, wykonuje migracje, zakłada konto i **sprawdza, czy to naprawdę działa** —
+z wyszukiwaniem znaczeniem włącznie, bo jego awaria jest cicha. Hasło
+administratora ląduje w pliku o prawach `600` i instalator mówi w którym.
+
+Do sprawdzenia bez zmieniania czegokolwiek:
+
+```bash
+./scripts/instaluj.sh --tylko-sprawdzenie   # czy ta maszyna się nadaje
+./scripts/instaluj.sh --na-sucho            # cała ścieżka, zero zmian
+```
+
+Odinstalowanie: `./scripts/odinstaluj.sh` — potwierdzenie przez **wpisanie nazwy
+instancji**, kopia zapasowa przed usunięciem, a kopie i model embeddingów
+zostają, dopóki nie poprosisz o ich usunięcie osobno.
+
+<details>
+<summary>Ręcznie, krok po kroku (to samo, co robi instalator)</summary>
+
+```bash
 cp .env.example .env
 ./docker/wygeneruj-sekrety.sh   # losowe hasła i tokeny
 make start                      # pierwszy start ~3 min: pobranie modelu embeddingów
 make migracje
+docker compose exec backend php bin/console lexik:jwt:generate-keypair
+docker compose exec backend php bin/console ws:user:create ty@firma.pl --admin
 ```
+
+</details>
 
 Sprawdzenie, czy fundament działa:
 
@@ -69,11 +97,11 @@ make test             # testy backendu
 curl http://127.0.0.1:8080/api/health
 ```
 
-Aplikacja: <http://127.0.0.1:8080>. Pierwsze konto zakłada się z wiersza poleceń,
-bo rejestracji nie ma:
+Aplikacja: <http://127.0.0.1:8080>. Rejestracji nie ma — konta zakłada się
+z konsoli albo zaproszeniem z panelu:
 
 ```bash
-docker compose exec backend php bin/console ws:user:invite ty@firma.pl --admin
+docker compose exec backend php bin/console ws:user:create ktos@firma.pl
 docker compose exec backend php bin/console ws:agent:token ty@firma.pl "laptop"
 ```
 

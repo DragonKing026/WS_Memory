@@ -4,7 +4,7 @@ tags: [ws-memory, todo, instalacja, docker, deployment, operacje]
 
 # TODO-018 — Instalator i deinstalator
 
-**Utworzono:** 2026-09-13 19:45 · **Stan:** do zrobienia · **Zależności:** 017
+**Utworzono:** 2026-09-13 19:45 · **Stan:** 🔵 **W TOKU — punkty 1–6 i 8 z 8** (2026-09-13 21:25) · **Zależności:** 017
 
 ## Powód
 
@@ -68,39 +68,66 @@ własną kopię.
 
 ## Rozwiązanie
 
-- [ ] **1.** `scripts/instaluj.sh` — pyta o drogę (Docker / w systemie), zbiera dane,
+- [x] **1.** `scripts/instaluj.sh` — pyta o drogę (Docker / w systemie), zbiera dane,
       generuje sekrety, zapisuje `.env`, stawia i sprawdza.
-- [ ] **2.** Sprawdzenie **przed** czymkolwiek: wersje narzędzi, wolne porty, miejsce na
+- [x] **2.** Sprawdzenie **przed** czymkolwiek: wersje narzędzi, wolne porty, miejsce na
       dysku, uprawnienia do Dockera. Braki wypisane naraz, nie po jednym.
-- [ ] **3.** **Tryb nieinteraktywny** (`--plik-odpowiedzi`) — instalacja bez człowieka
+- [x] **3.** **Tryb nieinteraktywny** (`--plik-odpowiedzi`) — instalacja bez człowieka
       i możliwość powtórzenia dokładnie tej samej instalacji.
-- [ ] **4.** Konto administratora zakładane poleceniem konsoli, hasło pokazane raz
+- [x] **4.** Konto administratora zakładane poleceniem konsoli, hasło pokazane raz
       i zapisane w pliku o prawach `600` z jawną informacją, gdzie leży.
-- [ ] **5.** **Sprawdzenie po instalacji**: logowanie działa, `/mcp` odpowiada, pałac
+- [x] **5.** **Sprawdzenie po instalacji**: logowanie działa, `/mcp` odpowiada, pałac
       odpowiada, wyszukiwanie semantyczne zwraca sensowny wynik
       (`test/semantyka.sh`). Instalator, który kończy się „gotowe" bez sprawdzenia,
       przenosi porażkę na pierwszego użytkownika.
-- [ ] **6.** `scripts/odinstaluj.sh` — potwierdzenie nazwą instancji, kopia zapasowa przed
+- [x] **6.** `scripts/odinstaluj.sh` — potwierdzenie nazwą instancji, kopia zapasowa przed
       usunięciem, wypisanie **co dokładnie** zostanie usunięte i co zostanie.
 - [ ] **7.** Instalacja w systemie: wykrycie składników, jednostki systemd, konfiguracja
       nginxa, użytkownik systemowy — na istniejącym Postgresie i PHP.
-- [ ] **8.** `README.md` i `docs/05-deployment.md` opisują obie drogi, z jawnym
+- [x] **8.** `README.md` i `docs/05-deployment.md` opisują obie drogi, z jawnym
       powiedzeniem, która jest wspierana.
+
+## Postęp
+
+Droga **dockerowa** jest zrobiona i sprawdzona w tym, co da się sprawdzić bez
+drugiej maszyny: wymagania wstępne (z zajętym portem włącznie), rozmowa, plik
+odpowiedzi w obie strony, wygenerowany `.env` (prawa 600, sześć sekretów po 32
+znaki, komentarze z `.env.example` zachowane, plik daje się sourceować) oraz
+odmowa nadpisania istniejącej konfiguracji.
+
+**Czego nie sprawdziłem i dlaczego:** pełnego przebiegu na czystej maszynie.
+Wymagałby postawienia drugiego stosu obok działającego — a na tej maszynie jest
+10 GB wolnej pamięci przy potrzebnych ~8 GB na sam drugi komplet usług. To
+zostaje do zrobienia na osobnej maszynie albo w oknie, w którym można zatrzymać
+tutejszy stos.
+
+**Punkt 7 (instalacja w systemie) nie jest zrobiony** i skrypt mówi to wprost:
+sprawdza wymagania, wypisuje braki i kończy się kodem 3. Kod instalujący
+jednostki systemd i konfigurację nginxa, którego nie da się na niczym uruchomić,
+byłby dokładnie tym, przed czym ostrzega analiza tego zadania — zawiódłby
+w połowie i zostawił stan, którego nikt nie umie opisać.
+
+Po drodze złapany błąd, który sam w sobie uzasadnia pisanie deinstalatora
+ostrożnie: pierwsza wersja brała nazwę projektu Compose z nazwy katalogu,
+a `docker-compose.yml` ustawia `name: ws-memory`. Filtr wolumenów po złej nazwie
+nie znajdował **żadnego**, więc deinstalator wypisywał „wolumeny danych: nie ma
+żadnego" i kończył słowem „odinstalowane", zostawiając całą bazę wiedzy na
+dysku. Nazwę podaje teraz `docker compose config`.
 
 ## Kryteria ukończenia
 
 - [ ] Na czystej maszynie z Dockerem `./scripts/instaluj.sh` daje **działającą
   instancję**, do której da się zalogować danymi, które wypisał.
-- [ ] Instalator uruchomiony drugi raz na istniejącej instancji **nie niszczy
+- [x] Instalator uruchomiony drugi raz na istniejącej instancji **nie niszczy
   danych** — mówi, co zastał, i pyta.
 - [ ] Przerwanie instalatora w połowie (Ctrl+C) nie zostawia stanu, którego
   deinstalator nie umie posprzątać.
-- [ ] Brakujący składnik jest zgłoszony **przed** pierwszą zmianą w systemie.
+- [x] Brakujący składnik jest zgłoszony **przed** pierwszą zmianą w systemie.
 - [ ] `./scripts/odinstaluj.sh` usuwa wszystko, co instalator utworzył, a `docker
   ps -a`, `docker volume ls` i katalog projektu nie zawierają po nim śladów
   poza tym, co jawnie zostawił.
-- [ ] Deinstalator **nie usuwa kopii zapasowych** bez jawnej opcji.
-- [ ] Hasło administratora jest zapisane w pliku o prawach `600`, poza
+- [x] Deinstalator **nie usuwa kopii zapasowych** bez jawnej opcji.
+- [x] Hasło administratora jest zapisane w pliku o prawach `600`, poza
   repozytorium, i instalator mówi gdzie.
-- [ ] Żaden sekret nie trafia do `.env.example` ani do historii powłoki.
-- [ ] Plik odpowiedzi pozwala powtórzyć instalację bez pytań.
+- [x] Żaden sekret nie trafia do `.env.example` ani do historii powłoki.
+- [x] Plik odpowiedzi pozwala powtórzyć instalację bez pytań.

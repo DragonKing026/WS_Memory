@@ -65,11 +65,40 @@ through the API and through agents. Remaining tasks live in `TODO/`.
 ## Quick start
 
 ```bash
+./scripts/instaluj.sh
+```
+
+The installer asks for what cannot be guessed (address, port, administrator
+account, mail), **generates the secrets itself**, writes `.env`, brings the
+stack up, runs the migrations, creates the account and **checks that it all
+actually works** — semantic search included, because its failure is silent. The
+administrator's password lands in a file with `600` permissions and the
+installer says which one.
+
+To check without changing anything:
+
+```bash
+./scripts/instaluj.sh --tylko-sprawdzenie   # is this machine suitable
+./scripts/instaluj.sh --na-sucho            # the whole path, no changes
+```
+
+Uninstalling: `./scripts/odinstaluj.sh` — confirmed by **typing the instance
+name**, takes a backup before deleting, and leaves the backups and the embedding
+model alone until you ask for those separately.
+
+<details>
+<summary>By hand, step by step (the same thing the installer does)</summary>
+
+```bash
 cp .env.example .env
 ./docker/wygeneruj-sekrety.sh   # random passwords and tokens
 make start                      # first start ~3 min: downloads the embedding model
 make migracje
+docker compose exec backend php bin/console lexik:jwt:generate-keypair
+docker compose exec backend php bin/console ws:user:create you@company.com --admin
 ```
+
+</details>
 
 Checking that the foundation works:
 

@@ -15,6 +15,82 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 21:19 — Instalator i deinstalator
+
+`./scripts/instaluj.sh` pyta o to, czego nie da się zgadnąć, **generuje
+sekrety**, zapisuje `.env`, podnosi stos, wykonuje migracje, generuje klucze
+JWT, zakłada konto administratora i **sprawdza, czy to naprawdę działa**.
+Ostatnie sprawdzenie to wyszukiwanie znaczeniem, bo jego awaria jest cicha:
+aplikacja odpowiada 200 i po prostu nic nie znajduje (D-003). Instalator, który
+kończy się słowem „gotowe" bez sprawdzenia, przenosi porażkę na pierwszego
+użytkownika.
+
+**Sekretów nie pyta.** Sekret wpisany z palca jest słaby albo zapisany
+w drugim miejscu. Hasło administratora ląduje w pliku o prawach `600` — i to
+jest bezpośrednia odpowiedź na dzisiejszą sytuację, w której hasła nie znał
+nikt, bo zniknęło razem z terminalem.
+
+**Nie jest drugim opisem prawdy.** Lista zmiennych to `.env.example`: instalator
+kopiuje ten plik (z komentarzami, które są dokumentacją) i podstawia wartości.
+Zmienna, której nie zna, daje **ostrzeżenie** — sprawdzone przez dopisanie takiej
+zmiennej. Bez tego pierwsza nowa zmienna po cichu zostałaby z wartością
+przykładową.
+
+Uruchomiony drugi raz **nie niszczy danych**: zastanego `.env` nie nadpisuje
+(nowe hasła do bazy, w której dane już są, to instancja, która przestaje
+wstawać), zastanego konta nie rusza. Sprawdzone: `APP_SECRET` po drugim
+przebiegu ten sam.
+
+Deinstalator jest **trudniejszy niż instalator**, bo kasuje bazę wiedzy.
+Potwierdzenie to **wpisanie nazwy instancji**, nie klawisz `t` — klawisz naciska
+się odruchowo. Przed usunięciem robi zrzut bazy. Kopie zapasowe i wolumen modelu
+embeddingów **zostają**, dopóki nie poprosisz osobno.
+
+Po drodze złapany błąd, który sam uzasadnia ostrożność przy takim skrypcie:
+pierwsza wersja brała nazwę projektu Compose z nazwy katalogu, a
+`docker-compose.yml` ustawia `name: ws-memory`. Filtr wolumenów po złej nazwie
+nie znajdował **żadnego** — deinstalator wypisywał „wolumeny danych: nie ma
+żadnego" i kończył słowem „odinstalowane", zostawiając całą bazę na dysku.
+Zobaczyłem to tylko dlatego, że uruchomiłem `--na-sucho` na prawdziwym stosie
+i policzyłem, co wypisał.
+
+**Czego nie sprawdziłem:** pełnego przebiegu na czystej maszynie — wymagałby
+drugiego kompletu usług obok działającego, a wolnej pamięci jest tu 10 GB przy
+potrzebnych ~8 GB. **Punkt 7 (instalacja w systemie) nie jest zrobiony**:
+skrypt sprawdza wymagania, mówi wprost, że dalej nie pojedzie, i kończy się
+kodem 3, zamiast zacząć i przerwać w połowie.
+
+
+---
+## 2026-09-13 21:07 — `ws:user:create`: konto od razu, bez chodzenia po linku
+
+Pierwszy kawałek TODO-018, bo instalator potrzebuje czegoś, czego nie było.
+`ws:user:invite` wypisuje link, który ktoś musi otworzyć w przeglądarce — to
+właściwe przy zapraszaniu kolegi i **niewłaściwe przy pierwszym koncie świeżej
+instalacji**: w tej chwili może nie być jeszcze osiągalnego adresu, a osoba
+uruchamiająca skrypt jest tą samą, która będzie z konta korzystać. Dwa kroki
+z przeglądarką pośrodku to dokładnie ta droga, na której końcu **nikt nie znał
+hasła administratora** — co się tu już raz zdarzyło.
+
+Polecenie idzie **przez** `IssueInvitation` i `AcceptInvitation`, a nie obok:
+te same odmowy przy istniejącym adresie, ta sama przestrzeń prywatna, ta sama
+wspólna (D-035), te same wpisy w audycie. Skrót prosto do `new User` byłby drugą
+definicją tego, czym jest konto, i pierwszą rzeczą, o której by zapomniał, jest
+przynależność do przestrzeni. Test tego pilnuje — sprawdza dwie przestrzenie,
+nie sam fakt istnienia wiersza.
+
+Jedno odstępstwo: **nie wysyła maila**. Zaproszenie jest przyjmowane w tej samej
+chwili, więc wiadomość zapraszałaby do założenia konta, które już istnieje,
+linkiem już zużytym — a na instancji bez SMTP zostawiłaby wpis „nieudany" jako
+pierwszą rzecz w dzienniku maili. `IssueInvitation` dostało parametr `announce`,
+którego używa wyłącznie to jedno miejsce; osobny test pilnuje, że
+`ws:user:invite` nadal zawiadamia.
+
+Hasło generowane domyślnie, `--password` jako wyjątek — z tego samego powodu, co
+przy `ws:user:password`: hasło podane w argumencie zostaje w historii powłoki.
+
+
+---
 ## 2026-09-13 20:56 — Ekrany maili w panelu, TODO-017 zamknięte
 
 Dwa ekrany: **szablony** i **dziennik maili**. Obejrzane w przeglądarce, nie
