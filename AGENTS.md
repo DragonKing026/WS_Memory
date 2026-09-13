@@ -233,19 +233,51 @@ raz skłamie, przestaje być czytana. A ta konkretna dokumentacja jest wsadem dl
 agentów AI — nieaktualny opis nie tylko wprowadza w błąd człowieka, ale zostaje
 przez model potraktowany jako fakt i powielony w kolejnych decyzjach.
 
+### Gałąź na zadanie — na `main` nie pchamy nic
+
+Jedno zadanie = jedna gałąź = jeden pull request = jeden merge. Nazwa gałęzi
+idzie za zadaniem: `todo-015-aktualizacja-mempalace`. Dla zmiany bez zadania —
+krótki, opisowy slug.
+
+`main` jest chroniony rulesetem i **tej ochrony się nie omija**. Przez pewien
+czas omijaliśmy: skrypt wypychający pchał prosto na `main` rolą administratora,
+a w jego wyjściu przy każdym commicie stało `Bypassed rule violations for
+refs/heads/main`. Reguła omijana przy każdym użyciu nie chroni przed niczym.
+
+**Dlaczego gałąź na zadanie, a nie stałe gałęzie warstwowe** (`frontend`,
+`backend`, `docs`) — bo zmiany w tym repozytorium nie dzielą się po warstwach,
+i wymuszają to jego własne reguły. Każda zmiana ma wpis w `CHANGELOG.md`,
+a dokumentacja idzie w tym samym commicie w dwóch językach, więc niemal każda
+zmiana jest przekrojowa. Do tego `CHANGELOG.md` dopisuje się na górze pliku —
+w miejscu, w którym równolegle żyjące gałęzie konfliktują zawsze. Pełne
+uzasadnienie: D-031.
+
+Gałąź ma żyć godziny, nie tygodnie. Im dłużej żyje, tym bardziej zbliża się do
+wariantu, który właśnie odrzuciliśmy.
+
 ### Wypychanie — `./scripts/wypchnij.sh`, nie samo `git push`
 
-Skrypt uruchamia **lokalnie to samo**, co „Szybkie sprawdzenie” w CI (składnia
-PHP, PHPUnit, PHPStan, `lint:yaml`, typy i testy frontendu, budowanie, spójność
-dokumentacji, rozliczenia zadań, składnia workflowów i pliku compose), pcha
-dopiero po komplecie zieleni, a potem **czeka na CI** i przy porażce pokazuje
-ogon logu tego kroku, który padł.
+Skrypt prowadzi **całą drogę od gałęzi do scalenia**: uruchamia lokalnie to samo,
+co „Szybkie sprawdzenie” w CI (składnia PHP, PHPUnit, PHPStan, `lint:yaml`, typy
+i testy frontendu, budowanie, spójność dokumentacji, rozliczenia zadań, składnia
+workflowów i pliku compose), wypycha gałąź dopiero po komplecie zieleni, zakłada
+pull request, czeka na **wszystkie** jego checki i scala je przy zielonym
+świetle. Przy porażce nie scala i pokazuje ogon logu tego kroku, który padł.
 
 ```bash
-./scripts/wypchnij.sh                   # sprawdź, wypchnij, poczekaj
-./scripts/wypchnij.sh --tylko-lokalnie  # sam sprawdź
-./scripts/wypchnij.sh --bez-czekania    # sprawdź i wypchnij, bez czekania
+./scripts/wypchnij.sh                       # sprawdź, wypchnij, PR, poczekaj, scal
+./scripts/wypchnij.sh todo-015-aktualizacja # jw., z jawną nazwą gałęzi
+./scripts/wypchnij.sh --tylko-lokalnie      # sam sprawdź
+./scripts/wypchnij.sh --bez-czekania        # sprawdź, wypchnij, załóż PR i zostaw
 ```
+
+Stojąc na `main` z lokalnymi commitami skrypt **zdejmie je na gałąź zadania**
+i cofnie `main` do `origin/main`, wypisując głośno, co zrobił. Jest to bezpieczne,
+bo dotyczy wyłącznie commitów, które nigdy nie były wypchnięte.
+
+Scalanie idzie przez **merge commit**, nie squash — commity po każdym zamkniętym
+kroku mają zostać w historii, bo taki jest sens ich robienia. Skrypt **nigdy nie
+używa `--admin`**: omijanie rulesetu to dokładnie to, z czym zerwaliśmy w D-031.
 
 **Dlaczego to reguła, a nie wygoda:** wypchnięcie i przejście do następnej
 rzeczy oznacza, że o czerwonym przebiegu dowiaduje się ktoś inny, kilka commitów

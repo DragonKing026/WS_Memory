@@ -9,9 +9,17 @@ import { defineConfig, devices } from '@playwright/test'
  * through nginx, Vite, the API and the database — which is the only sequence a person
  * ever performs.
  *
- * No `webServer` here on purpose: the stack is brought up by `docker compose` (in the
- * nightly workflow, or by hand), and having Playwright start its own would test a
+ * No `webServer` here on purpose: the stack is brought up by `docker compose` (by the
+ * full-check workflow, or by hand), and having Playwright start its own would test a
  * different arrangement than the one that ships.
+ *
+ * In CI the frontend runs as `FRONTEND_TARGET=prod` — the built `dist/` behind nginx,
+ * which is the artefact that actually ships. Running these against the dev server
+ * instead was a mistake worth remembering: Vite pre-bundles dependencies on the fly,
+ * and the ones only the editor imports were discovered on first visit, re-bundled, and
+ * served `504 Outdated Optimize Dep` to the requests already in flight. The editor
+ * screen came up blank in CI and nowhere else, because a developer's machine wins that
+ * race. Testing the built artefact removes the optimiser from the picture entirely.
  */
 export default defineConfig({
   testDir: './e2e',

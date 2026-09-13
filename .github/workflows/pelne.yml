@@ -1,30 +1,38 @@
-# Przebieg nocny — pełny stos, łącznie z modelem embeddingów.
+# Pełne sprawdzenie — cały stos, łącznie z modelem embeddingów i testami E2E.
 #
 # Odpowiada na pytanie, którego szybki przebieg celowo nie zadaje: czy cały
 # system wstaje i czy polskie zapytanie znajduje polską treść. To założenie
 # stoi u podstaw projektu (D-003) i jego złamanie jest CICHE — wyszukiwanie
 # nadal działa, tylko przestaje trafiać.
 #
-# Nocą, a nie przy każdym pushu, bo pobranie bge-m3 to ~2 GB i kilka minut,
-# a założenie zmienia się raz na kwartał, nie przy każdej literówce.
+# Chodzi przy KAŻDYM pushu, nie tylko nocą. Wcześniej było odwrotnie, bo
+# pobranie modelu to ~2,3 GB i kilka minut — ale to była konsekwencja
+# zepsutego cache'u, który zapisywał pusty katalog (patrz krok niżej).
+# Z działającym cache'em pełny przebieg mieści się w kilku minutach, więc nie
+# ma powodu, żeby odpowiedź „czy to w ogóle wstaje" czekała do rana.
+#
+# Harmonogram zostaje mimo to: raz na dobę przebieg ma się odbyć nawet bez
+# commita. Zależności zewnętrzne psują się same — obraz znika, model przestaje
+# być dostępny, PyPI się zmienia — a o takiej awarii lepiej wiedzieć rano niż
+# przy najbliższej zmianie.
 
-name: Nocne sprawdzenie pełnego stosu
+name: Pełne sprawdzenie
 
 on:
+  push:
+    # Tylko main, czyli po scaleniu pull requesta. Pełny stos jest odpowiedzią
+    # na pytanie „czy to wszystko razem wstaje", a to pytanie ma sens dla stanu,
+    # który faktycznie obowiązuje — nie dla każdej gałęzi zadania z osobna.
+    #
+    # Skutek uboczny jest realny i trzeba go znać: usterka integracyjna trafia
+    # na main i dowiadujemy się o niej kilka minut po scaleniu, a nie przed nim.
+    # Przy gałęzi zadania da się ją sprawdzić wcześniej ręcznie:
+    #   gh workflow run pelne.yml --ref <gałąź>
+    branches: [main]
   schedule:
     # 03:17 UTC — nie o pełnej godzinie, bo wtedy kolejki GitHuba są najdłuższe.
     - cron: '17 3 * * *'
   workflow_dispatch:
-  push:
-    # Zmiana konfiguracji embeddingów albo obrazu pamięci musi być sprawdzona
-    # od razu, nie następnej nocy: to jedyne miejsca, które mogą po cichu
-    # zepsuć trafność wyszukiwania.
-    paths:
-      - 'docker-compose.yml'
-      - 'docker/mempalace/**'
-      - '.env.example'
-      - 'test/semantyka.sh'
-      - '.github/workflows/nocne.yml'
 
 permissions:
   contents: read
@@ -33,7 +41,7 @@ concurrency:
   # Gałąź w nazwie grupy: bez niej przebieg dla pull requesta Dependabota
   # kasuje przebieg dla main i odwrotnie, a wtedy nie wiadomo, która zmiana
   # tak naprawdę przeszła.
-  group: nocne-${{ github.ref }}
+  group: pelne-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -49,6 +57,9 @@ jobs:
       # umie zapamiętać. Na poziomie zadania, bo czyta to każde wywołanie
       # `docker compose`, także `down -v` przy sprzątaniu.
       EMBEDDING_CACHE_DIR: /tmp/model-embeddingow
+      # Frontend zbudowany, nie serwer deweloperski — patrz krok „Frontend
+      # w wersji produkcyjnej".
+      FRONTEND_TARGET: prod
 
     steps:
       - uses: actions/checkout@v7
@@ -75,15 +86,24 @@ jobs:
         # embeddingów chodzi jako root, więc o prawa nie ma sporu.
         run: mkdir -p /tmp/model-embeddingow
 
-      - name: Cache modelu embeddingów
-        # Bez tego każdy przebieg pobiera ~2,3 GB z Hugging Face.
+      - name: Wagi modelu z poprzedniego przebiegu
+        # Odczyt i zapis są tu ROZDZIELONE (`cache/restore` + `cache/save`
+        # zamiast `cache`), i to nie jest kosmetyka — bez tego cache nie działa
+        # wcale.
         #
-        # Krok istniał już wcześniej i **nie działał**: wskazywał katalog hosta,
-        # a model lądował w wolumenie nazwanym Dockera, którego `actions/cache`
-        # nie widzi. Zapisywał więc pusty katalog przez cały czas — w liście
-        # cache'ów repozytorium nie było ani jednego wpisu dla embeddingów.
-        # Teraz `EMBEDDING_CACHE_DIR` niżej montuje ten katalog do kontenera.
-        uses: actions/cache@v6
+        # `actions/cache` zapisuje dopiero w kroku końcowym i **tylko gdy
+        # zadanie skończyło się sukcesem**. Nasze zadanie padało na testach E2E,
+        # więc zapis nie następował nigdy. Powstała pułapka, która sama się
+        # nakręca: jeden czerwony test blokuje cache na zawsze, a każdy kolejny
+        # przebieg znowu pobiera 2,3 GB — i wygląda to dokładnie tak samo jak
+        # cache, który działa. W liście cache'ów repozytorium nie było ani
+        # jednego wpisu dla embeddingów przy 46 innych.
+        #
+        # (Wcześniej był jeszcze drugi błąd: krok wskazywał katalog hosta, a
+        # model lądował w wolumenie nazwanym Dockera. Rozwiązuje to
+        # `EMBEDDING_CACHE_DIR`.)
+        id: cache-modelu
+        uses: actions/cache/restore@v6
         with:
           path: /tmp/model-embeddingow
           key: embeddings-${{ steps.model.outputs.klucz }}-v2
@@ -96,6 +116,11 @@ jobs:
       - name: Test polskiej semantyki
         # Sedno tego przebiegu. Zapisuje zdanie po polsku i szuka go frazą bez
         # wspólnych słów; przechodzi tylko wtedy, gdy wektory rozumieją polski.
+        #
+        # Identyfikator jest tu po to, żeby zapis cache'u niżej mógł się na nim
+        # oprzeć: ten krok kończy się powodzeniem wyłącznie wtedy, gdy model
+        # naprawdę się wczytał i liczy sensowne wektory.
+        id: semantyka
         run: ./test/semantyka.sh
 
       - name: Backend i sprawdzenie zdrowia
@@ -123,12 +148,26 @@ jobs:
       - name: Testy backendu na pełnym stosie
         run: make test
 
-      - name: Frontend na pełnym stosie
-        # Frontend nie startuje razem z backendem, bo szybki przebieg go nie
-        # potrzebuje. Tutaj jest niezbędny: testy E2E chodzą przez nginxa,
-        # dokładnie tą drogą, którą chodzi człowiek.
+      - name: Frontend w wersji produkcyjnej
+        # `FRONTEND_TARGET: prod`, czyli statyczne `dist/` serwowane przez nginx,
+        # a nie serwer deweloperski Vite. Dwa powody, oba istotne.
+        #
+        # Po pierwsze, to jest artefakt, który naprawdę jedzie na serwer. Testy
+        # E2E mają sprawdzać to, co wdrażamy.
+        #
+        # Po drugie, serwer deweloperski wnosił do przebiegu usterkę, której nie
+        # ma na produkcji: Vite dopakowuje zależności w locie, a gdy odkrywał
+        # `@codemirror/*` przy pierwszym wejściu na edytor, przepakowywał je,
+        # zmieniał skrót w adresach i odpowiadał `504 Outdated Optimize Dep` na
+        # żądania będące w locie. Ekran edytora był wtedy pusty. Na maszynie
+        # dewelopera nie da się tego odtworzyć — skanowanie przy starcie wygrywa
+        # wyścig — więc czerwone światło pojawiało się wyłącznie tutaj.
+        #
+        # Budowanie obrazu jest przy okazji sprawdzeniem samym w sobie: zawiera
+        # `vue-tsc`, więc niezgodny typ zatrzymuje przebieg zamiast wyjść na
+        # produkcji jako pusty ekran.
         run: |
-          docker compose up -d --wait --wait-timeout 300 frontend
+          docker compose up -d --build --wait --wait-timeout 600 frontend
           docker compose up -d --wait --wait-timeout 120 nginx
 
       - name: Node 22 dla testów E2E
@@ -176,6 +215,23 @@ jobs:
       - name: Dzienniki przy niepowodzeniu
         if: failure()
         run: docker compose logs --tail 100
+
+      - name: Zapisz wagi modelu na przyszłość
+        # `always()`, bo zapis ma być NIEZALEŻNY od wyniku całego zadania —
+        # w tym właśnie tkwił poprzedni błąd.
+        #
+        # Ale nie bezwarunkowo: zapisujemy tylko wtedy, gdy test semantyki
+        # przeszedł. Wtedy wiadomo, że model wczytał się w całości. Zapisanie
+        # cache'u po przerwanym pobieraniu utrwaliłoby uszkodzone pliki pod tym
+        # samym kluczem i psuło każdy następny przebieg.
+        #
+        # Pomijamy też przy trafieniu, bo zapis pod istniejący klucz i tak by
+        # się nie udał — a niepotrzebny błąd w dzienniku uczy ignorować dziennik.
+        if: always() && steps.semantyka.conclusion == 'success' && steps.cache-modelu.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: /tmp/model-embeddingow
+          key: embeddings-${{ steps.model.outputs.klucz }}-v2
 
       - name: Sprzątanie
         if: always()

@@ -15,6 +15,83 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 13:01 — Gałąź na zadanie; koniec omijania ochrony main-a (D-031)
+
+Ruleset „Ochrona gałęzi głównej" istniał i wymagał pull requesta oraz zielonych
+checków. I był łamany **przy każdym commicie** — skrypt wypychający pchał prosto
+na `main` rolą administratora, co wypisywał zresztą sam:
+
+```
+remote: Bypassed rule violations for refs/heads/main:
+remote: - Changes must be made through a pull request.
+```
+
+Reguła omijana przy każdym użyciu nie chroni przed niczym. Od teraz: **jedno
+zadanie = jedna gałąź = jeden pull request = jeden merge**, nazwa gałęzi za
+zadaniem (`todo-015-aktualizacja-mempalace`).
+
+Rozważane były stałe gałęzie warstwowe (`frontend`, `backend`, `docs`) i zostały
+odrzucone, bo zmiany w tym repozytorium nie dzielą się po warstwach — wymuszają
+to jego własne reguły. Każda zmiana ma wpis w CHANGELOGU, a dokumentacja idzie
+w tym samym commicie po polsku i po angielsku. Dzisiejsza poprawka cache'u
+dotknęła sześciu plików w czterech „warstwach" naraz. Do tego CHANGELOG dopisuje
+się **na górze pliku**, czyli w miejscu, w którym równolegle żyjące gałęzie
+konfliktują zawsze.
+
+`scripts/wypchnij.sh` przepisany: prowadzi całą drogę od gałęzi do scalenia —
+sprawdzenia lokalne, push gałęzi, założenie pull requesta, oczekiwanie na
+**wszystkie** jego checki, scalenie przez merge commit. Bez `--admin`. Stojąc na
+`main` z lokalnymi commitami sam zdejmuje je na gałąź zadania.
+
+Sprawdzenia będą zawężone ścieżkami — zmiana w samym frontendzie nie ma budzić
+PHPUnita ani PHPStana. Wchodzi tu pułapka warta zapamiętania: **pominięte
+zadanie nie zgłasza się jako zielone, tylko jako wiecznie oczekujące**, więc
+wymaganie go wprost zablokowałoby każdy pull request, którego nie dotyczy.
+Dlatego doszło jedno zadanie-bramka „Wynik sprawdzenia": wykonuje się zawsze,
+zbiera wyniki pozostałych i traktuje pominięcie jako w porządku, a porażkę jako
+błąd. To ono — i tylko ono — jest wymagane przez ruleset.
+
+Przy okazji domknięta druga przyczyna pobierania 2,3 GB przy każdym przebiegu.
+`actions/cache` zapisuje **tylko gdy zadanie skończyło się sukcesem**, a nasze
+padało na E2E — więc poprawiona ścieżka i tak by nie pomogła. Pułapka nakręca
+się sama: jeden czerwony test blokuje cache na zawsze. Odczyt i zapis są teraz
+rozdzielone, zapis ma `if: always()`, ale pod warunkiem, że **test semantyki
+przeszedł** — bo dopiero on dowodzi, że model wczytał się w całości, a zapisanie
+przerwanego pobierania utrwaliłoby uszkodzone pliki pod tym samym kluczem.
+
+---
+## 2026-09-13 12:46 — E2E na buildzie produkcyjnym; „Nocne” staje się „Pełnym”
+
+Poprzednia poprawka pustego ekranu edytora **nie wystarczyła** i widać to w danych.
+`router.onError` zadziałał — błąd `R0010` zniknął, a w śladzie widać, że strona
+faktycznie się przeładowała — ale po przeładowaniu przeglądarka wzięła przetworzony
+moduł z własnej pamięci podręcznej, trafiła w ten sam nieaktualny skrót
+(`v=58af5a6d`) i 504 wrócił. Drugiego przeładowania blokuje zapora przed pętlą,
+więc kończyło się białą stroną.
+
+Właściwe rozwiązanie okazało się prostsze niż walka z optymalizatorem: **testy E2E
+chodzą teraz po buildzie produkcyjnym** (`FRONTEND_TARGET=prod`, statyczne `dist/`
+za nginxem). Build nie ma optymalizatora, więc problem znika u źródła — a przy
+okazji testujemy artefakt, który naprawdę jedzie na serwer. Lokalnie: 5,1 s zamiast
+8,9 s.
+
+Obie wcześniejsze poprawki zostają, bo mają wartość poza CI: `optimizeDeps.include`
+oszczędza to samo deweloperowi, a `router.onError` dotyczy **produkcji** — po
+wdrożeniu ktoś ma otwartą starą stronę i prosi o plik, którego już nie ma.
+
+Druga rzecz z tego samego przebiegu: cache modelu **nadal się nie zapisał**, mimo
+poprawionej ścieżki. Przyczyna jest w logu: `save-always: false` i brak kroku
+„Post Cache”. `actions/cache` zapisuje **tylko gdy zadanie kończy się sukcesem**,
+a zadanie padało na E2E. To pułapka, która sama się nakręca: jeden czerwony test
+blokuje cache na zawsze, więc każdy kolejny przebieg znowu pobiera 2,3 GB.
+
+Przy okazji przebieg „Nocne sprawdzenie pełnego stosu” zmienia się w **„Pełne
+sprawdzenie”** (`nocne.yml` → `pelne.yml`). Rusza po scaleniu na main, a nie raz
+na dobę — nocna pora była konsekwencją zepsutego cache'u, nie prawem natury.
+Harmonogram dobowy zostaje, bo łapie to, czego push nie złapie: zależność
+zewnętrzną psującą się **bez naszego commita**.
+
+---
 ## 2026-09-13 12:22 — Cache modelu, który od początku zapisywał pustkę
 
 Pytanie brzmiało, czy przebieg nocny musi pobierać 2 GB za każdym razem.

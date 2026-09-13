@@ -2,7 +2,7 @@
 #
 # Celowo NIE stawia serwera embeddingów: pobranie modelu bge-m3 to ~2 GB i
 # 6-8 minut, a sprawdza założenie zmieniające się raz na kwartał. Robi to
-# przebieg nocny (nocne.yml). Tutaj liczy się czas odpowiedzi — poniżej pięciu
+# pełne sprawdzenie (pelne.yml). Tutaj liczy się czas odpowiedzi — poniżej pięciu
 # minut, żeby wynik przyszedł, zanim autor zdąży przełączyć kontekst.
 
 name: Szybkie sprawdzenie
@@ -234,3 +234,49 @@ jobs:
                   bledy += 1
           sys.exit(1 if bledy else 0)
           PY
+
+  wynik:
+    # Jedno zadanie, które zbiera wyniki pozostałych — i jedyne, którego ruleset
+    # gałęzi głównej wymaga.
+    #
+    # Powód jest nieoczywisty i kosztowałby pół dnia szukania. Sprawdzenia mają
+    # być zawężone ścieżkami: zmiana w samym frontendzie nie ma uruchamiać
+    # PHPUnita ani PHPStana. Ale **pominięte zadanie nie zgłasza się jako
+    # zielone** — z punktu widzenia reguły ochrony jest wiecznie oczekujące,
+    # więc wymaganie go wprost zablokowałoby każdy pull request, który go nie
+    # dotyczy. Bramka wykonuje się zawsze i sama decyduje, że pominięcie jest
+    # w porządku, a porażka nie.
+    name: Wynik sprawdzenia
+    if: always()
+    needs: [backend, frontend, porzadek]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Zbierz wyniki
+        env:
+          WYNIKI: |
+            Testy backendu=${{ needs.backend.result }}
+            Testy frontendu=${{ needs.frontend.result }}
+            Dokumentacja i zadania=${{ needs.porzadek.result }}
+        run: |
+          bledy=0
+          while IFS='=' read -r nazwa wynik; do
+            [ -n "$nazwa" ] || continue
+            case "$wynik" in
+              success)  echo "OK       $nazwa" ;;
+              # Pominięte znaczy „ta zmiana tego nie dotyczy”, a nie „nie
+              # sprawdziliśmy”. Zakres rozstrzyga zadanie wyznaczające zmiany.
+              skipped)  echo "POMINIĘTE $nazwa (poza zakresem zmiany)" ;;
+              *)        echo "BŁĄD     $nazwa: $wynik"; bledy=$((bledy + 1)) ;;
+            esac
+          done <<< "$WYNIKI"
+
+          if [ "$bledy" -gt 0 ]; then
+            echo
+            echo "Nieudanych sprawdzeń: $bledy"
+            exit 1
+          fi
+
+          echo
+          echo "Wszystko, co dotyczyło tej zmiany, przeszło."
