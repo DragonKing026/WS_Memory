@@ -15,6 +15,20 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:46 — Zadanie zrobione w połowie ma to po sobie widać
+
+TODO-012 miało serwerową połowę scaloną w `main` i **nadal stało na liście jako
+„do zrobienia"**, nieodróżnialne od zadania, którego nikt nie tknął. Różnicę
+widać było wyłącznie w `CHANGELOG.md` i w historii gita — czyli nie tam, gdzie
+ktoś patrzy, planując następny krok. Zauważył to człowiek, nie ja.
+
+Nowy stan `🔵 W TOKU — punkty A–B z N` plus sekcja **Postęp** z tabelą: co
+gotowe, co zostało, czego brakuje. TODO-012 dostało ją jako pierwsze: punkty 1–4
+z 12 zrobione, punkty 5–10 to strona klienta, bez której **endpointu nie ma kto
+zawołać poza testami**.
+
+
+---
 ## 2026-09-13 19:44 — Dwa nowe zadania: wysyłka maili i instalator
 
 **TODO-017** — system nie wysyła ani jednego maila i nigdy nie wysyłał; brakuje

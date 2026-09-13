@@ -203,6 +203,13 @@ The structure of `frontend/src/` follows 2.0: `pages/` (file-based routing),
 - **`TODO/`** — numbered tasks. One file = one task, with the sections
   **Powód** (Reason), **Analiza** (Analysis), **Rozwiązanie** (Solution),
   **Kryteria ukończenia** (Completion criteria).
+- **A task done in part gets the state `🔵 W TOKU — punkty A–B z N`
+  (in progress) and a **Postęp** (Progress) section** with a table: what is done,
+  what is left, what is missing. Without it a half-finished task looks exactly
+  like an untouched one on the list, and the only places the difference shows are
+  `CHANGELOG.md` and the git history — not where anybody looks when planning the
+  next step. It happened on 2026-09-13 with TODO-012: the server half of the
+  bridge was merged into `main` while the task file still read "do zrobienia".
 - **`TODO/DONE/`** — once finished you **move** the task file there (`git mv`)
   and add a **Co zostało zrobione** (What was done) section with the date, time
   and facts: what was built, what was tested, what was deferred and why.

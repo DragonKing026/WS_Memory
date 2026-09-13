@@ -6,7 +6,7 @@ tags: [ws-memory, todo, hybryda, mempalace, publikacja, lustro]
 
 # TODO-012 — Mostek: lokalny pałac → wspólna baza (hybryda)
 
-**Utworzono:** 2026-09-12 16:39 · **Stan:** do zrobienia · **Zależności:** 004, 009 · **Przejmuje zakres anulowanego** TODO-010
+**Utworzono:** 2026-09-12 16:39 · **Stan:** 🔵 **W TOKU — punkty 1–4 z 12** (2026-09-13 19:33) · **Zależności:** 004, 009 · **Przejmuje zakres anulowanego** TODO-010
 
 ## Powód
 
@@ -97,6 +97,38 @@ audyt — odrzucone w D-010.
    `ws_search` (wspólna baza), potem lokalny `mempalace_search`.
 12. Dokumentacja dla dewelopera: jak postawić lokalny pałac i podłączyć oba
    serwery MCP naraz.
+
+## Postęp
+
+**Zrobione — strona serwera** (2026-09-13, scalone w `main`, PR #17 i #18):
+
+| Punkt | Stan |
+|---|---|
+| 1. Encje i migracja (`mirrors`, `publish_batches`, `publish_settings`) | ✅ `Version20260913000005` |
+| 2. `POST /api/publish` z trybem `preview` | ✅ |
+| 3. `POST /api/publish/{batch}/revert` | ✅ |
+| 4. Filtr sekretów jako osobny serwis w `Domain` | ✅ 24 testy |
+
+Po drodze zamknięta **dziura bezpieczeństwa** zgłoszona przez skanowanie kodu:
+para źródłowa nie była związana z właścicielem, więc podanie cudzej nazwy repliki
+pozwalało nadpisać cudzą szufladę i przenieść jej wiersz do własnej przestrzeni
+(`Version20260913000006`). Rozstrzygnięcia projektowe: **D-036**.
+
+**Do zrobienia — strona klienta i interfejs:**
+
+| Punkt | Czego brakuje |
+|---|---|
+| 5. Wysyłka automatyczna po sesji i po mieleniu | całość |
+| 6. Kolejka wyjściowa w `~/.ws-memory/outbox/` | całość |
+| 7. Komenda `/ws-publish` | całość |
+| 8. Propozycja mapowania po zbieżnej nazwie skrzydła | wymaga ekranu |
+| 9. Lustra: CRUD w `/api` i ekran w interfejsie | wymaga ekranu |
+| 10. Agent wysyłki we wtyczce (hook `SessionEnd`) | całość |
+| 11. `ws-memory-recall` o kolejności dwóch źródeł | **już jest** — dopisane w TODO-009 |
+| 12. Dokumentacja stawiania lokalnego pałaca | częściowo w `plugin/shared/konfiguracja.md` |
+
+Dopóki punkty 5–10 nie istnieją, **endpointu nie ma kto zawołać poza testami**,
+a wiedza z lokalnego pałaca nie jedzie nigdzie.
 
 ## Kryteria ukończenia
 
