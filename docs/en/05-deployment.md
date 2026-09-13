@@ -40,10 +40,43 @@ not occasional spikes. If the publication queue starts growing, add cores to
 
 ```bash
 git clone <repo> ws-memory && cd ws-memory
+./scripts/instaluj.sh
+```
+
+The installer (TODO-018) does everything described by hand below: it asks for
+the address, the port, the administrator account and the mail server,
+**generates the secrets**, writes `.env`, brings the stack up, runs the
+migrations, generates the JWT keys, creates the account and checks that the
+instance answers — semantic search included.
+
+| Option | What for |
+|---|---|
+| `--tylko-sprawdzenie` | is this machine suitable; **changes nothing** |
+| `--na-sucho` | the whole path with its questions, no changes |
+| `--tylko-konfiguracja` | write `.env` and leave bringing the stack up to somebody else (CI, Ansible) |
+| `--plik-odpowiedzi=FILE` | unattended installation; `--zapisz-odpowiedzi=FILE` produces such a file |
+| `--zachowaj-env` | finish an installation on an existing `.env` (after an interruption) |
+
+**Run a second time it destroys nothing.** An existing `.env` is not
+overwritten — new database passwords for a database that already holds data mean
+an instance that stops coming up. An existing administrator account is left
+alone; the installer does not change its password, because that is what
+`ws:user:password` is for, run deliberately.
+
+**The "in the system" path** (without Docker) currently **only checks the
+requirements** and says what is missing — installing systemd units and the nginx
+configuration does not exist yet. The script says so outright and exits with
+code 3 rather than starting and stopping halfway.
+
+### By hand, if the installer does not fit
+
+```bash
 cp .env.example .env
 ./docker/wygeneruj-sekrety.sh    # random passwords and tokens
 make start                       # first start ~3 min (model download)
 make migracje
+docker compose exec backend php bin/console lexik:jwt:generate-keypair
+docker compose exec backend php bin/console ws:user:create you@company.com --admin
 ```
 
 Verifying everything is alive:
@@ -53,8 +86,20 @@ make test-semantyka              # a Polish query finds Polish content
 curl http://127.0.0.1:8080/api/health
 ```
 
-The first administrator account is created from the console:
-`ws:user:invite you@company.com --admin` — see below.
+## Uninstalling
+
+```bash
+./scripts/odinstaluj.sh
+```
+
+Confirmation means **typing the instance name**, not pressing `y`: a key is
+pressed reflexively, a name has to be read and copied. A database dump is taken
+into `kopie/` before anything is deleted.
+
+By default the backups **stay** (`--z-kopiami` removes them) and so does the
+embedding model volume (`--z-modelem`; ~2.3 GB that takes hours to download, and
+none of your data is in it). `--z-obrazami` removes the built images,
+`--wszystko` is all three at once. `--na-sucho` prints what would disappear.
 
 ## Administrative operations from the console
 
@@ -68,6 +113,7 @@ docker compose exec backend php bin/console <command>
 
 | Command | When it is used |
 |---|---|
+| `ws:user:create <email> [name] [--admin]` | **creates an account outright**, with no link to follow — what the installer does; the password is generated and shown once |
 | `ws:user:invite <email> [--admin]` | the first account in an installation and every one after it; it prints the link, because the first invitation is usually issued before the mailer is configured |
 | `ws:user:password <email> [--password=…]` | **regaining access to an installation** — the password of an account nobody remembers |
 | `ws:agent:token <email> <label> [--space=…] [--expires=…]` | connecting an AI agent; prints a ready `claude mcp add` together with the token, once |
