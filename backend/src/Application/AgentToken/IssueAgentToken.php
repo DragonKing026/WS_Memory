@@ -18,7 +18,10 @@ use Doctrine\ORM\EntityManagerInterface;
  * The secret is random and stored hashed; the plain value is returned once. The
  * `wsm_` prefix is not decoration — it lets secret scanners and humans recognise
  * what they are looking at, which matters for a string that will be pasted into
- * shell commands and configuration files.
+ * shell commands and configuration files. Two parts of this system now rely on it:
+ * our own secret filter refuses content containing one (PatternSecretScanner), and
+ * AgentTokenAuthenticator uses it to tell an agent token from a JWT on /api/publish,
+ * the single route that accepts either.
  *
  * The requested scope is verified against the owner's **current** permissions and
  * a space they cannot reach is refused outright. That check is not what enforces
@@ -30,7 +33,16 @@ use Doctrine\ORM\EntityManagerInterface;
 final readonly class IssueAgentToken
 {
     private const TOKEN_BYTES = 32;
-    private const PREFIX = 'wsm_';
+
+    /**
+     * Public, because two other places have to recognise this shape.
+     *
+     * The secret filter refuses content carrying one (TODO-012), and the agent
+     * authenticator uses it to tell an agent token from a JWT on the one route that
+     * accepts both. Both of those would otherwise spell `wsm_` out for themselves,
+     * and a prefix spelled in three places is a prefix that will be changed in one.
+     */
+    public const PREFIX = 'wsm_';
 
     public function __construct(
         private EntityManagerInterface $entityManager,

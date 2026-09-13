@@ -49,6 +49,15 @@ security:
             # stays valid until it expires, so a deactivated account would keep
             # its access without this.
             user_checker: App\Infrastructure\Security\ActiveAccountChecker
+            # Two credentials on one firewall, and only one route where both are
+            # accepted: /api/publish. The sender there is an outbox running
+            # unattended on a laptop (D-015), which cannot hold an eight-hour JWT.
+            # The authenticator claims a request only when the path is that route
+            # AND the Bearer value carries the `wsm_` prefix, so it never answers
+            # for a signed-in person (D-036). Declared before `jwt` on purpose:
+            # authenticators are tried in order.
+            custom_authenticators:
+                - App\Infrastructure\Security\AgentTokenAuthenticator
             jwt: ~
 
     access_control:

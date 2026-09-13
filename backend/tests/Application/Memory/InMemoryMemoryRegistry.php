@@ -8,6 +8,7 @@ use App\Domain\Memory\DrawerId;
 use App\Domain\Memory\EntryFacts;
 use App\Domain\Memory\MemoryRegistry;
 use App\Domain\Memory\MemoryWrite;
+use App\Domain\Memory\SourceBinding;
 use App\Domain\Space\SpaceId;
 
 /**
@@ -97,6 +98,66 @@ final class InMemoryMemoryRegistry implements MemoryRegistry
 
         $this->rows[$to->value] = $this->rows[$from->value];
         unset($this->rows[$from->value]);
+    }
+
+    public function bindingForSource(string $sourceReplica, string $sourceDrawerId): ?SourceBinding
+    {
+        foreach ($this->rows as $id => $row) {
+            if ($row->sourceReplica === $sourceReplica && $row->sourceDrawerId === $sourceDrawerId) {
+                return new SourceBinding(new DrawerId($id), $row->space);
+            }
+        }
+
+        return null;
+    }
+
+    public function drawerWithContent(SpaceId $space, string $contentHash): ?DrawerId
+    {
+        foreach ($this->rows as $id => $row) {
+            if ($row->space->value === $space->value && $row->contentHash === $contentHash) {
+                return new DrawerId($id);
+            }
+        }
+
+        return null;
+    }
+
+    public function refresh(MemoryWrite $write): void
+    {
+        if ($this->failOnRegister) {
+            throw new \RuntimeException('registry write failed (test)');
+        }
+
+        if (!isset($this->rows[$write->drawer->value])) {
+            throw new \DomainException('Rejestr nie zna tej szuflady.');
+        }
+
+        $this->rows[$write->drawer->value] = $write;
+    }
+
+    public function drawersInBatch(string $batchId): array
+    {
+        $drawers = [];
+        foreach ($this->rows as $id => $row) {
+            if ($row->publishBatchId === $batchId) {
+                $drawers[] = new DrawerId($id);
+            }
+        }
+
+        return $drawers;
+    }
+
+    public function forget(array $drawers): int
+    {
+        $gone = 0;
+        foreach ($drawers as $drawer) {
+            if (isset($this->rows[$drawer->value])) {
+                unset($this->rows[$drawer->value]);
+                ++$gone;
+            }
+        }
+
+        return $gone;
     }
 
     public function countsFor(array $spaces): array

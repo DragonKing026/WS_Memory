@@ -206,10 +206,20 @@ final class Version20260913000005 extends AbstractMigration
         // history of a publication and a published drawer must outlive it: were
         // this CASCADE, tidying up the journal would silently delete registry
         // rows and with them the only record of which space that content is in.
+        //
+        // DEFERRABLE INITIALLY DEFERRED, checked at COMMIT rather than at each
+        // statement. Not a loosening — the constraint still holds at every moment
+        // anybody can observe — but it lets a publication write its drawers and
+        // then its batch row, with the counts the batch reports being the counts
+        // that actually happened. Checked immediately, the order would have to be
+        // reversed and the batch would be inserted claiming numbers it could not
+        // yet know, then corrected by a second UPDATE. One of those two shapes can
+        // lie after a crash; this is the other one.
         $this->addSql(<<<'SQL'
             ALTER TABLE ws.memory_entries
                 ADD CONSTRAINT fk_entries_batch FOREIGN KEY (publish_batch_id)
                 REFERENCES ws.publish_batches (id) ON DELETE SET NULL
+                DEFERRABLE INITIALLY DEFERRED
             SQL);
         $this->addSql(<<<'SQL'
             CREATE INDEX idx_entries_batch ON ws.memory_entries (publish_batch_id)

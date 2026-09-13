@@ -6,6 +6,8 @@ namespace App\Application\Memory;
 
 use App\Domain\Audit\AuditTrail;
 use App\Domain\Identity\Actor;
+use App\Domain\Memory\AcceptedMemory;
+use App\Domain\Memory\AcceptOutcome;
 use App\Domain\Memory\DrawerId;
 use App\Domain\Memory\KnowledgeFact;
 use App\Domain\Memory\LexicalIndex;
@@ -20,7 +22,9 @@ use App\Domain\Memory\MemoryStore;
 use App\Domain\Memory\MemoryWrite;
 use App\Domain\Memory\PalaceWing;
 use App\Domain\Memory\SearchMode;
+use App\Domain\Memory\SourceBinding;
 use App\Domain\Memory\StoredMemory;
+use App\Domain\Publishing\IncomingDrawer;
 use App\Domain\Search\SearchHit;
 use App\Domain\Space\SpaceAccessResolver;
 use App\Domain\Space\SpaceCatalog;
@@ -362,6 +366,222 @@ final readonly class MemoryService
     }
 
     /**
+     * Runs the given work as ONE publication: all of it is booked, or none is.
+     *
+     * A thin delegation to the registry's transaction, and it exists so that the
+     * bridge from a local palace can own the boundary without owning the registry.
+     * The alternative was a transaction per drawer, and that is not a smaller
+     * version of this: a batch is the unit of undoing (D-014), so a run that dies
+     * on its ninth drawer must leave nothing behind rather than eight rows and a
+     * batch nobody can revert as a whole.
+     *
+     * What it cannot promise is the palace, which speaks HTTP and does not roll
+     * back. The asymmetry forces a choice and we make the same one as everywhere
+     * else: the palace may end up holding drawers no row points at, never the
+     * reverse (D-020). Unreferenced drawers are invisible — the second filtering
+     * layer drops what the registry does not know — while unreferenced rows would
+     * be results nobody can open.
+     *
+     * @template T
+     *
+     * @param \Closure(): T $work
+     *
+     * @return T
+     */
+    public function asOnePublication(\Closure $work): mixed
+    {
+        return $this->registry->transactional($work);
+    }
+
+    /**
+     * Takes one drawer sent up from somebody's local palace (D-010, D-014).
+     *
+     * Runs INSIDE the caller's transaction — see self::asOnePublication() — and
+     * therefore opens none of its own. That is the one thing to remember about this
+     * method: called on its own it writes to the palace with no rollback around the
+     * bookkeeping.
+     *
+     * The space is decided before this point by the landing rule, not here, and is
+     * still checked here. Not defensive duplication: this is the class that owns
+     * "may this actor write there", and a second entry point to memory that skipped
+     * it would be a second permission model. A sender whose role was revoked
+     * between mapping a wing and sending to it is refused, not redirected.
+     *
+     * Three ways in, in the order they are asked:
+     *
+     *  1. the same local drawer arrived before — its row is refreshed, never
+     *     duplicated. That is what makes an outbox safe to retry forever (D-015);
+     *  2. different local drawer, content already in this space — dropped. Three
+     *     people mining one repository would otherwise file one text three times;
+     *  3. otherwise it is filed.
+     *
+     * There is no author parameter and there will not be one. Authorship comes from
+     * the token, which is the whole of inviolable rule 2 — and it bites hardest
+     * exactly here, on the one endpoint whose caller is a machine describing content
+     * it did not itself write.
+     */
+    public function acceptFromReplica(
+        Actor $actor,
+        SpaceId $space,
+        string $sourceReplica,
+        IncomingDrawer $drawer,
+        string $publishBatchId,
+    ): AcceptedMemory {
+        $target = $this->writableSpace($actor, $space);
+        $wing = $this->wingOf($target);
+        $hash = $drawer->contentHash();
+
+        $binding = $this->registry->bindingForSource($sourceReplica, $drawer->sourceDrawerId);
+
+        if (null !== $binding) {
+            return $this->refreshFromReplica($actor, $target, $wing, $sourceReplica, $drawer, $publishBatchId, $binding);
+        }
+
+        if (null !== $this->registry->drawerWithContent($target, $hash)) {
+            $this->audit->record('memory.publish', $actor, $target->value, [
+                'replica' => $sourceReplica,
+                'sourceDrawer' => $drawer->sourceDrawerId,
+                'batch' => $publishBatchId,
+                'outcome' => AcceptOutcome::Duplicate->value,
+            ]);
+
+            return new AcceptedMemory(null, $target, AcceptOutcome::Duplicate);
+        }
+
+        $filed = $this->store->store(
+            $wing,
+            MemoryKind::Transcript,
+            $drawer->content,
+            $this->palaceAuthor($actor),
+            $drawer->sourcePath,
+        );
+
+        // The palace merges identical content within a wing and may answer with a
+        // drawer we already hold — the same case self::remember() handles, and it
+        // arrives here for a different reason: two replicas of the same repository
+        // sending text our own hash check did not match because ours is over the
+        // whole drawer and the palace's is over what it chose to store. Booked
+        // already means booked; a second row for one drawer would give "which
+        // space is this in?" two answers.
+        $known = $this->registry->spaceFor($filed);
+        if (null !== $known) {
+            if (!$known->equals($target)) {
+                throw new \DomainException(\sprintf(
+                    'Szuflada %s jest już zaksięgowana w przestrzeni „%s" — publikacja do „%s" zostawiłaby dwie prawdy.',
+                    $filed->value,
+                    $known->value,
+                    $target->value,
+                ));
+            }
+
+            return new AcceptedMemory($filed, $target, AcceptOutcome::Duplicate);
+        }
+
+        $this->registry->register(MemoryWrite::fromReplica(
+            $filed,
+            $target,
+            $actor,
+            $sourceReplica,
+            $drawer->sourceDrawerId,
+            $publishBatchId,
+            $drawer->content,
+            $drawer->title,
+            $drawer->tags,
+            $drawer->filedAt,
+        ));
+
+        $this->audit->record('memory.publish', $actor, $target->value, [
+            'replica' => $sourceReplica,
+            'sourceDrawer' => $drawer->sourceDrawerId,
+            'drawer' => $filed->value,
+            'batch' => $publishBatchId,
+            'outcome' => AcceptOutcome::Filed->value,
+        ]);
+
+        return new AcceptedMemory($filed, $target, AcceptOutcome::Filed);
+    }
+
+    /**
+     * What self::acceptFromReplica() would do with this drawer, without doing it.
+     *
+     * Exists so that `preview=true` is a real answer rather than a plausible one.
+     * A preview that reported the landing but not the duplicates would tell somebody
+     * about to publish a hundred drawers that a hundred will be filed, and then file
+     * four — and the number they saw is the number they will remember.
+     *
+     * Permission is checked here too, which is the other half of a useful preview:
+     * being told beforehand that a wing maps onto a space you cannot write to beats
+     * discovering it from a 403 on the real run.
+     */
+    public function foreseeFromReplica(
+        Actor $actor,
+        SpaceId $space,
+        string $sourceReplica,
+        IncomingDrawer $drawer,
+    ): AcceptedMemory {
+        $target = $this->writableSpace($actor, $space);
+
+        $binding = $this->registry->bindingForSource($sourceReplica, $drawer->sourceDrawerId);
+        if (null !== $binding) {
+            return new AcceptedMemory($binding->drawer, $target, AcceptOutcome::Updated);
+        }
+
+        if (null !== $this->registry->drawerWithContent($target, $drawer->contentHash())) {
+            return new AcceptedMemory(null, $target, AcceptOutcome::Duplicate);
+        }
+
+        // No identifier: there is no drawer yet, and inventing one for a report
+        // would hand the caller something to record that will never exist.
+        return new AcceptedMemory(null, $target, AcceptOutcome::Filed);
+    }
+
+    /**
+     * Undoes one publication batch: drawers out of the palace, rows out of the registry.
+     *
+     * The order is the point. The palace is asked first and the rows go afterwards,
+     * which is the opposite of the order a write uses, and deliberately so. A
+     * deletion interrupted halfway leaves either rows pointing at drawers that are
+     * gone, or drawers nothing points at. The first is detectable — integrity rule 5
+     * reports exactly that — and a repeated revert finishes the job, because a
+     * palace asked to forget something twice says so and moves on. The second is
+     * invisible content sitting in a database somebody asked to have emptied, and
+     * nothing would ever notice it again.
+     *
+     * Deleting through the engine's own API and never with SQL against the `palace`
+     * schema is D-004 read in the other direction: our connection can read those
+     * tables, so a DELETE there would appear to work while leaving the vector and
+     * the graph behind it.
+     *
+     * Authorisation is the caller's, and it is ownership of the batch rather than a
+     * role in the space — see PublishService, which is the only thing that can see
+     * the journal. Requiring `writer` here would block the one person who most needs
+     * to undo: somebody whose access was revoked right after publishing by mistake.
+     *
+     * @return list<DrawerId> what was removed
+     */
+    public function forgetPublication(Actor $actor, SpaceId $space, string $publishBatchId): array
+    {
+        $drawers = $this->registry->drawersInBatch($publishBatchId);
+
+        if ([] === $drawers) {
+            return [];
+        }
+
+        foreach ($drawers as $drawer) {
+            $this->store->forget($drawer);
+        }
+
+        $this->registry->transactional(fn (): int => $this->registry->forget($drawers));
+
+        $this->audit->record('memory.publish_reverted', $actor, $space->value, [
+            'batch' => $publishBatchId,
+            'drawers' => \count($drawers),
+        ]);
+
+        return $drawers;
+    }
+
+    /**
      * A session diary entry — raw material, written by agents about their own work.
      */
     public function diaryWrite(
@@ -462,6 +682,76 @@ final readonly class MemoryService
 
             return null;
         });
+    }
+
+    /**
+     * A local drawer we already hold, arriving again.
+     *
+     * Updated in place rather than filed afresh, which is the mechanism behind the
+     * unique source pair: the outbox may resend the same drawer any number of times
+     * and the space keeps one copy of it (D-010, D-015).
+     *
+     * The space may have changed since last time, and that is handled rather than
+     * refused. A wing published while unmapped has its old drawers sitting in the
+     * sender's private space; confirming a mapping and resending moves them to the
+     * team space, because under D-014 the mapping is what decides visibility and
+     * leaving them behind would make a confirmed mapping half-apply. The move has to
+     * happen in both places at once — the wing in the palace and the space in the
+     * registry — or self::get() would stop handing the content out: it refuses any
+     * drawer whose palace wing disagrees with the space we authorised.
+     */
+    private function refreshFromReplica(
+        Actor $actor,
+        SpaceId $target,
+        PalaceWing $wing,
+        string $sourceReplica,
+        IncomingDrawer $drawer,
+        string $publishBatchId,
+        SourceBinding $binding,
+    ): AcceptedMemory {
+        $current = $this->store->replace(
+            $binding->drawer,
+            $wing,
+            MemoryKind::Transcript,
+            $drawer->content,
+            $this->palaceAuthor($actor),
+        );
+
+        if (!$current->equals($binding->drawer)) {
+            // The old drawer was gone — restored from an older backup, deleted by
+            // hand — and a fresh one was filed. Repointing the row is what keeps the
+            // content readable; without it the registry would name a drawer that no
+            // longer exists and the second filtering layer would drop every result
+            // for it (D-019).
+            $this->registry->rebind($binding->drawer, $current);
+        }
+
+        $this->registry->refresh(MemoryWrite::fromReplica(
+            $current,
+            $target,
+            $actor,
+            $sourceReplica,
+            $drawer->sourceDrawerId,
+            $publishBatchId,
+            $drawer->content,
+            $drawer->title,
+            $drawer->tags,
+            $drawer->filedAt,
+        ));
+
+        $this->audit->record('memory.publish', $actor, $target->value, [
+            'replica' => $sourceReplica,
+            'sourceDrawer' => $drawer->sourceDrawerId,
+            'drawer' => $current->value,
+            'batch' => $publishBatchId,
+            'outcome' => AcceptOutcome::Updated->value,
+            // Worth its own key: a drawer changing space changes who can read it,
+            // and that is the one thing in this flow a person may want to query the
+            // audit log for afterwards.
+            'movedFrom' => $binding->space->equals($target) ? null : $binding->space->value,
+        ]);
+
+        return new AcceptedMemory($current, $target, AcceptOutcome::Updated);
     }
 
     /**

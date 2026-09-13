@@ -37,6 +37,17 @@ final class InMemoryMemoryStore implements MemoryStore
     /** @var list<KnowledgeFact> */
     public array $facts = [];
 
+    /**
+     * Every drawer the palace was asked to forget, in order.
+     *
+     * Recorded rather than merely applied, because undoing a publication has to be
+     * proved to reach the palace at all: rows vanishing from the registry would
+     * make a test pass while the content stayed searchable (D-004).
+     *
+     * @var list<string>
+     */
+    public array $forgotten = [];
+
     public bool $unavailable = false;
 
     /** @var array<string, array<int, MemoryFragment>> keyed by wing */
@@ -118,6 +129,27 @@ final class InMemoryMemoryStore implements MemoryStore
         }
 
         return $drawer;
+    }
+
+    public function forget(DrawerId $drawer): bool
+    {
+        $this->guard();
+        $this->forgotten[] = $drawer->value;
+
+        if (!isset($this->drawers[$drawer->value])) {
+            return false;
+        }
+
+        unset($this->drawers[$drawer->value]);
+
+        foreach ($this->contents as $wing => $fragments) {
+            $this->contents[$wing] = array_values(array_filter(
+                $fragments,
+                static fn (MemoryFragment $fragment): bool => !$fragment->id->equals($drawer),
+            ));
+        }
+
+        return true;
     }
 
     public function queryFacts(string $entity, ?string $direction = null): array
