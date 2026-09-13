@@ -4,9 +4,11 @@ import { parseOrExplain } from '@/features/auth/schemas'
 import { PAGE_SIZE, withPaging } from './listing'
 import {
   adminSpaceListSchema,
+  spaceGrantSchema,
   spaceMemberAnswerSchema,
   spaceMemberListSchema,
   type AdminSpaceList,
+  type SpaceGrant,
   type SpaceMember,
   type SpaceMemberRole,
 } from './spaceSchemas'
@@ -34,6 +36,29 @@ export const adminSpaceService = {
     )
 
     return parseOrExplain(spaceMemberListSchema, answer, 'członków przestrzeni').members
+  },
+
+  /**
+   * Gives somebody a role in a space — the only operation here that widens a reach.
+   *
+   * Two things about it are unlike the rest of this file. It goes to the product's own
+   * `/spaces/{slug}/members`, not to an `/admin/…` route, because granting a role is what
+   * a space administrator does whether or not they administer the installation. And its
+   * subject is an **e-mail address**, not a user id: the person being let in is by
+   * definition not on the membership list yet, so there is no row to point at.
+   *
+   * It upserts. An address that is already a member has its role changed instead, which
+   * makes a repeated grant harmless rather than a conflict — and means the caller cannot
+   * tell from the answer whether anybody new appeared. Re-reading the membership is the
+   * only way to know, and it is what the screen does.
+   */
+  async grantAccess(slug: string, email: string, role: SpaceMemberRole): Promise<SpaceGrant> {
+    const answer = await useApi().post<unknown>(`/spaces/${encodeURIComponent(slug)}/members`, {
+      email: email.trim(),
+      role,
+    })
+
+    return parseOrExplain(spaceGrantSchema, answer, 'nadanie dostępu do przestrzeni')
   },
 
   /**

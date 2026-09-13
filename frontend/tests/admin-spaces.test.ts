@@ -14,6 +14,9 @@ import {
 } from '@/features/admin/spaceSchemas'
 import { adminSpaceService } from '@/features/admin/spaceService'
 import {
+  canGrantAccess,
+  grantConfirmationFor,
+  grantRefusalNeedsInvitation,
   isSpaceMemberRole,
   memberActionsAvailable,
   privacyExplanation,
@@ -125,6 +128,33 @@ describe('prywatność przestrzeni', () => {
   })
 })
 
+describe('formularz nadania dostępu', () => {
+  it('przy prywatnej przestrzeni nie ma go, tak samo jak pozostałych akcji', () => {
+    // Ten sam strażnik, nie druga opinia o prywatności: dwie by się kiedyś rozjechały.
+    expect(canGrantAccess(space({ isPrivate: true }), 'nowa@web-systems.pl')).toBe(false)
+    expect(canGrantAccess(space(), 'nowa@web-systems.pl')).toBe(true)
+  })
+
+  it('bez adresu nie ma czego wysłać', () => {
+    expect(canGrantAccess(space(), '')).toBe(false)
+    expect(canGrantAccess(space(), '   ')).toBe(false)
+  })
+
+  it('rola administratora przestrzeni wymaga potwierdzenia, węższe nie', () => {
+    // Potwierdzenie tylko tam, gdzie zasięg rośnie najbardziej. Pytanie przed każdym
+    // nadaniem to pytanie, którego za trzecim razem nikt nie czyta.
+    expect(grantConfirmationFor(space(), 'nowa@web-systems.pl', 'reader')).toBeNull()
+    expect(grantConfirmationFor(space(), 'nowa@web-systems.pl', 'writer')).toBeNull()
+
+    const confirmation = grantConfirmationFor(space(), ' nowa@web-systems.pl ', 'admin')
+
+    expect(confirmation?.title).toContain('nowa@web-systems.pl')
+    expect(confirmation?.title).toContain('Wiedza firmowa')
+    expect(confirmation?.title).toContain('administratora przestrzeni')
+    expect(confirmation?.confirmLabel).toContain('Tak')
+  })
+})
+
 describe('isSpaceMemberRole', () => {
   it('przepuszcza trzy role i nic poza nimi', () => {
     // Wartość z kontrolki jest luźno typowana i leci prosto do ciała żądania.
@@ -227,6 +257,61 @@ describe('adminSpaceService', () => {
     await expect(
       adminSpaceService.removeMember('wiedza', member().userId),
     ).resolves.toBeUndefined()
+  })
+
+  it('nadanie dostępu idzie trasą produktową, adresem i rolą', async () => {
+    // Nie `/admin/...`: nadawanie roli w przestrzeni robi jej administrator, niezależnie
+    // od tego, czy administruje instalacją. I adresem, nie identyfikatorem — wpuszczanej
+    // osoby jeszcze nie ma na liście składu.
+    mock.onPost(/\/spaces\/wiedza\/members$/).reply((config) => {
+      expect(config.url).toBe('/spaces/wiedza/members')
+      expect(JSON.parse(String(config.data))).toEqual({
+        email: 'nowa@web-systems.pl',
+        role: 'writer',
+      })
+
+      return [200, { space: 'wiedza', member: 'nowa@web-systems.pl', role: 'writer' }]
+    })
+
+    const granted = await adminSpaceService.grantAccess(
+      'wiedza',
+      '  nowa@web-systems.pl  ',
+      'writer',
+    )
+
+    expect(granted.member).toBe('nowa@web-systems.pl')
+    expect(granted.role).toBe('writer')
+  })
+
+  it('brak konta o tym adresie dochodzi treścią backendu i prowadzi do zaproszeń', async () => {
+    mock
+      .onPost(/\/spaces\/wiedza\/members$/)
+      .reply(422, { error: 'Nie ma konta o tym adresie. Najpierw wystaw zaproszenie.' })
+
+    try {
+      await adminSpaceService.grantAccess('wiedza', 'nikt@web-systems.pl', 'reader')
+      expect.unreachable('odmowa miała polecieć wyjątkiem')
+    } catch (cause) {
+      expect(describeAdminFailure(cause, 'zapasowy tekst')).toBe(
+        'Nie ma konta o tym adresie. Najpierw wystaw zaproszenie.',
+      )
+      // Rozpoznane po statusie, nie po zdaniu: zdanie jest backendu i jest cytowane.
+      expect(grantRefusalNeedsInvitation(cause)).toBe(true)
+    }
+  })
+
+  it('403 bez uprawnień nie wysyła do zaproszeń — tam nie ma czego załatwić', async () => {
+    mock
+      .onPost(/\/spaces\/wiedza\/members$/)
+      .reply(403, { error: 'Nadawanie ról w tej przestrzeni wymaga roli administratora.' })
+
+    try {
+      await adminSpaceService.grantAccess('wiedza', 'nowa@web-systems.pl', 'admin')
+      expect.unreachable('odmowa miała polecieć wyjątkiem')
+    } catch (cause) {
+      expect(describeAdminFailure(cause, 'zapasowy tekst')).toContain('administratora globalnego')
+      expect(grantRefusalNeedsInvitation(cause)).toBe(false)
+    }
   })
 
   it('odmowa 422 przy prywatnej przestrzeni dochodzi treścią backendu', async () => {

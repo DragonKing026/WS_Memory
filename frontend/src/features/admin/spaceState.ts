@@ -1,3 +1,5 @@
+import { ApiError } from '@/api/errors'
+
 import { pluralPl } from './format'
 import type { AdminSpace, SpaceMemberRole } from './spaceSchemas'
 import type { Badge } from './userState'
@@ -47,6 +49,66 @@ export function isSpaceMemberRole(value: unknown): value is SpaceMemberRole {
  */
 export function memberActionsAvailable(space: AdminSpace): boolean {
   return !space.isPrivate
+}
+
+/**
+ * Whether the grant form may be used at all, and whether it has anything to send.
+ *
+ * The privacy rule comes from `memberActionsAvailable`, the same function that decides
+ * whether the role picker and the removal button are drawn — granting access is a member
+ * action like the others, and a second opinion about privacy is how the two would one day
+ * disagree. The address is checked here too, because an empty one would travel to the
+ * backend only to come back as a refusal about nothing.
+ */
+export function canGrantAccess(space: AdminSpace, email: string): boolean {
+  return memberActionsAvailable(space) && email.trim() !== ''
+}
+
+/** A confirmation that says what is about to be handed out, or null when none is due. */
+export interface GrantConfirmation {
+  title: string
+  confirmLabel: string
+}
+
+/**
+ * Asks before the one role that widens somebody's reach beyond reading and writing.
+ *
+ * A space administrator can hand the space to anyone else, including themselves again
+ * after being removed, so granting that role is the point of no easy return — and the
+ * confirmation names what it gives rather than asking whether the reader is sure.
+ * `reader` and `writer` get none: they change what one person sees in one space, which is
+ * the everyday reason this screen is open, and a question in front of every grant is a
+ * question nobody reads by the third time.
+ */
+export function grantConfirmationFor(
+  space: AdminSpace,
+  email: string,
+  role: SpaceMemberRole,
+): GrantConfirmation | null {
+  if (role !== 'admin') {
+    return null
+  }
+
+  return {
+    title: `Nadać ${email.trim()} rolę administratora przestrzeni „${space.name}”?`,
+    confirmLabel: 'Tak, nadaj rolę administratora',
+  }
+}
+
+/**
+ * Whether a refused grant should point at the invitations screen.
+ *
+ * The backend refuses this route with 422 for two reasons — no account with that address,
+ * and a role it does not know — and only the first is reachable from here, because the
+ * picker cannot produce a fourth role. So a 422 means the address has nobody behind it,
+ * and the next step is issuing an invitation rather than retyping the address.
+ *
+ * Decided on the status, not on the sentence. The sentence is the backend's and is quoted
+ * as it came (see `refusals.ts`); matching on its wording would make a copy of it here
+ * that nothing would keep in step.
+ */
+export function grantRefusalNeedsInvitation(cause: unknown): boolean {
+  return cause instanceof ApiError && cause.status === 422
 }
 
 /** Said on the row itself, where the missing buttons are, rather than in a footnote. */

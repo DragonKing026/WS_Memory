@@ -4,9 +4,12 @@ import { computed, onMounted, ref } from 'vue'
 import { describePage, formatDateTimeOr } from '@/features/admin/format'
 import type { PageMeta } from '@/features/admin/listing'
 import { describeAdminFailure } from '@/features/admin/refusals'
-import type { AdminSpace, SpaceMember } from '@/features/admin/spaceSchemas'
+import type { AdminSpace, SpaceMember, SpaceMemberRole } from '@/features/admin/spaceSchemas'
 import { adminSpaceService } from '@/features/admin/spaceService'
 import {
+  canGrantAccess,
+  grantConfirmationFor,
+  grantRefusalNeedsInvitation,
   isSpaceMemberRole,
   memberActionsAvailable,
   memberRoleLabels,
@@ -14,6 +17,7 @@ import {
   privacyExplanation,
   spaceBadges,
   spaceCounts,
+  type GrantConfirmation,
 } from '@/features/admin/spaceState'
 
 /**
@@ -23,6 +27,12 @@ import {
  * granted per space, and nothing else grants reading rights, not even the global
  * administrator role (which manages accounts and roles, and deliberately does not open
  * anybody's content). So this is the screen where somebody's reach actually changes.
+ *
+ * Granting access is the reason the screen exists at all. It takes an e-mail address rather
+ * than picking from a list of accounts, because that is what the route takes — and because
+ * the person being let in is by definition not on the membership list yet. An address with
+ * no account behind it is the refusal worth handling well: it has an obvious next step, so
+ * the refusal carries a link to the invitations screen instead of only a diagnosis.
  *
  * Members load on expansion rather than with the list. A page of twenty-five spaces would
  * otherwise be twenty-six requests, twenty-five of which nobody asked for — and the reader
@@ -51,6 +61,19 @@ const membersProblem = ref<Record<string, string>>({})
 const savingMember = ref<string | null>(null)
 const confirmingRemoval = ref<string | null>(null)
 const refusal = ref<{ key: string; message: string } | null>(null)
+
+/** The grant form, kept per space rather than once for the screen: two spaces can be open
+ *  at the same time, and a half-typed address belongs to the one it was typed into. */
+const grantEmail = ref<Record<string, string>>({})
+const grantRole = ref<Record<string, SpaceMemberRole>>({})
+const grantBusy = ref<string | null>(null)
+const grantConfirming = ref<string | null>(null)
+const grantRefusal = ref<{
+  slug: string
+  message: string
+  /** Whether the refusal is worth answering with a link rather than with a retry. */
+  needsInvitation: boolean
+} | null>(null)
 
 const summary = computed(() =>
   meta.value === null
@@ -127,6 +150,123 @@ function askRemoval(space: AdminSpace, member: SpaceMember): void {
   refusal.value = null
 }
 
+function grantEmailOf(space: AdminSpace): string {
+  return grantEmail.value[space.slug] ?? ''
+}
+
+/** Reader until somebody says otherwise: the narrowest of the three, so a grant sent in a
+ *  hurry gives away the least. */
+function grantRoleOf(space: AdminSpace): SpaceMemberRole {
+  return grantRole.value[space.slug] ?? 'reader'
+}
+
+function setGrantEmail(space: AdminSpace, value: string): void {
+  grantEmail.value = { ...grantEmail.value, [space.slug]: value }
+  // A confirmation and a refusal were both about the address that was there a moment ago.
+  grantConfirming.value = null
+  clearGrantRefusal(space)
+}
+
+/** Narrowed rather than cast, as with the role picker on a row: the component's payload is
+ *  loosely typed and goes straight into a request body. */
+function setGrantRole(space: AdminSpace, value: unknown): void {
+  if (!isSpaceMemberRole(value)) {
+    return
+  }
+
+  grantRole.value = { ...grantRole.value, [space.slug]: value }
+  grantConfirming.value = null
+}
+
+function clearGrantRefusal(space: AdminSpace): void {
+  if (grantRefusal.value?.slug === space.slug) {
+    grantRefusal.value = null
+  }
+}
+
+function grantConfirmation(space: AdminSpace): GrantConfirmation | null {
+  return grantConfirmationFor(space, grantEmailOf(space), grantRoleOf(space))
+}
+
+/**
+ * The form's own button — and, for the admin role, deliberately not the button that sends.
+ *
+ * Where a confirmation is due this only opens it, every time, even if it is already open.
+ * The alternative is that pressing Enter twice hands out the role that can hand out the
+ * space, without anybody having read what it gives.
+ */
+async function submitGrant(space: AdminSpace): Promise<void> {
+  if (!canGrantAccess(space, grantEmailOf(space))) {
+    return
+  }
+
+  if (grantConfirmation(space) !== null) {
+    grantConfirming.value = space.slug
+    clearGrantRefusal(space)
+
+    return
+  }
+
+  await sendGrant(space)
+}
+
+/**
+ * Grants the role, then re-reads the membership.
+ *
+ * Re-read rather than stitched together from the answer: the route upserts and answers with
+ * an address and a role, so it says neither whether somebody new appeared nor what their
+ * name is, when they were added or who added them — and those are what the row shows. The
+ * private-space rule is checked again here for the same reason as in the other two
+ * handlers: the check that decides what is drawn and the check that guards the request are
+ * one function, so there is no path where one holds and the other does not.
+ */
+async function sendGrant(space: AdminSpace): Promise<void> {
+  if (!canGrantAccess(space, grantEmailOf(space))) {
+    return
+  }
+
+  grantBusy.value = space.slug
+  clearGrantRefusal(space)
+
+  try {
+    await adminSpaceService.grantAccess(space.slug, grantEmailOf(space), grantRoleOf(space))
+
+    grantConfirming.value = null
+    grantEmail.value = { ...grantEmail.value, [space.slug]: '' }
+    await loadMembers(space)
+    syncMemberCount(space)
+  } catch (cause) {
+    // The confirmation panel stays open where there was one: the refusal answers the
+    // question it asked.
+    grantRefusal.value = {
+      slug: space.slug,
+      message: describeAdminFailure(cause, 'Nie udało się nadać dostępu.'),
+      needsInvitation: grantRefusalNeedsInvitation(cause),
+    }
+  } finally {
+    grantBusy.value = null
+  }
+}
+
+/**
+ * Sets the row's counter from the membership just read.
+ *
+ * Not incremented or decremented here: the number came from the server and is the thing a
+ * reader glances at. Arithmetic on it would be right until two administrators worked at
+ * once, and then wrong with no sign of it.
+ */
+function syncMemberCount(space: AdminSpace): void {
+  const count = members.value[space.slug]?.length
+
+  if (count === undefined) {
+    return
+  }
+
+  spaces.value = spaces.value.map((row) =>
+    row.slug === space.slug ? { ...row, memberCount: count } : row,
+  )
+}
+
 /**
  * Changes one role.
  *
@@ -164,10 +304,8 @@ async function changeRole(space: AdminSpace, member: SpaceMember, value: unknown
 /**
  * Takes somebody out of a space.
  *
- * Afterwards the membership list is re-read and the space's counter set from it, rather
- * than decremented here. The counter came from the server and is the thing a reader
- * glances at; subtracting one locally would be right until two administrators worked at
- * once, and then wrong with no sign of it.
+ * Afterwards the membership list is re-read and the counter set from it — see
+ * `syncMemberCount` for why it is not simply decremented.
  */
 async function removeMember(space: AdminSpace, member: SpaceMember): Promise<void> {
   if (!memberActionsAvailable(space)) {
@@ -182,14 +320,7 @@ async function removeMember(space: AdminSpace, member: SpaceMember): Promise<voi
     await adminSpaceService.removeMember(space.slug, member.userId)
     confirmingRemoval.value = null
     await loadMembers(space)
-
-    const count = members.value[space.slug]?.length
-
-    if (count !== undefined) {
-      spaces.value = spaces.value.map((row) =>
-        row.slug === space.slug ? { ...row, memberCount: count } : row,
-      )
-    }
+    syncMemberCount(space)
   } catch (cause) {
     refusal.value = {
       key,
@@ -387,6 +518,136 @@ onMounted(() => void load())
               />
             </li>
           </ul>
+
+          <!-- Formularz tylko tam, gdzie pozostałe akcje na członkach. Przy przestrzeni
+               prywatnej backend odmówi (403), a pole, które prowadzi do odmowy, uczy nie
+               ufać interfejsowi — tak samo jak przycisk. -->
+          <form
+            v-if="memberActionsAvailable(space)"
+            class="mt-4 border-t border-default pt-4"
+            @submit.prevent="submitGrant(space)"
+          >
+            <h3 class="text-sm font-medium">Nadaj dostęp kolejnej osobie</h3>
+            <p class="mt-1 text-xs text-muted">
+              Ten adres musi już mieć konto — dostęp nadaje się osobie, nie zaproszeniu.
+              Osobie, która jest tu członkiem, wybrana rola zastąpi obecną.
+            </p>
+
+            <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+              <UFormField label="Adres e-mail" :name="`grant-email-${space.slug}`" class="flex-1">
+                <UInput
+                  :model-value="grantEmailOf(space)"
+                  type="email"
+                  autocomplete="off"
+                  class="w-full"
+                  @update:model-value="setGrantEmail(space, String($event))"
+                />
+              </UFormField>
+
+              <UFormField label="Rola" :name="`grant-role-${space.slug}`">
+                <USelect
+                  :model-value="grantRoleOf(space)"
+                  :items="memberRoleOptions"
+                  value-key="value"
+                  class="w-full sm:min-w-44"
+                  @update:model-value="setGrantRole(space, $event)"
+                />
+              </UFormField>
+
+              <UButton
+                type="submit"
+                icon="i-lucide-user-plus"
+                :loading="grantBusy === space.slug"
+                :disabled="
+                  !canGrantAccess(space, grantEmailOf(space)) || grantConfirming === space.slug
+                "
+              >
+                Nadaj dostęp
+              </UButton>
+            </div>
+
+            <!-- Potwierdzenie mówi, co ta rola daje, a nie „jesteś pewien?". Administrator
+                 przestrzeni jest jedyną z trzech ról, która poszerza zasięg dalej niż o
+                 czytanie i pisanie — może wpuścić tu kolejne osoby. -->
+            <UAlert
+              v-if="grantConfirming === space.slug && grantConfirmation(space) !== null"
+              class="mt-3"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-shield-alert"
+              :title="grantConfirmation(space)?.title ?? ''"
+            >
+              <template #description>
+                <p>
+                  Administrator przestrzeni nadaje i odbiera w niej role: może wpuścić
+                  kolejne osoby — także bez pytania Ciebie — i usunąć stąd każdego.
+                </p>
+                <p class="mt-1">
+                  Czyta i zapisuje wszystko, co w tej przestrzeni jest. Jeśli chodziło o
+                  samo czytanie albo pisanie, wybierz węższą rolę: rolę można później
+                  zmienić, ale tego, co ktoś zdążył przeczytać, nie da się odczytać z
+                  powrotem.
+                </p>
+
+                <UAlert
+                  v-if="grantRefusal !== null && grantRefusal.slug === space.slug"
+                  class="mt-2"
+                  color="error"
+                  variant="subtle"
+                  icon="i-lucide-x-circle"
+                  :description="grantRefusal.message"
+                />
+
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <UButton
+                    color="warning"
+                    size="sm"
+                    :loading="grantBusy === space.slug"
+                    @click="sendGrant(space)"
+                  >
+                    {{ grantConfirmation(space)?.confirmLabel ?? '' }}
+                  </UButton>
+                  <UButton
+                    size="sm"
+                    variant="subtle"
+                    color="neutral"
+                    @click="grantConfirming = null"
+                  >
+                    Nie teraz
+                  </UButton>
+                </div>
+              </template>
+            </UAlert>
+
+            <!-- Odmowa cytowana z backendu: powód opisany w dwóch miejscach rozjeżdża się
+                 przy pierwszej zmianie reguły. Odmowa o brakującym koncie ma znany
+                 następny krok, więc dostaje odnośnik, nie samą diagnozę. -->
+            <UAlert
+              v-else-if="grantRefusal !== null && grantRefusal.slug === space.slug"
+              class="mt-3"
+              color="error"
+              variant="subtle"
+              icon="i-lucide-x-circle"
+            >
+              <template #description>
+                <!-- Sięgnięte przez `?.`, bo wewnątrz slotu zawężenie z `v-else-if` nie
+                     obowiązuje. -->
+                <p>{{ grantRefusal?.message ?? '' }}</p>
+
+                <UButton
+                  v-if="grantRefusal?.needsInvitation === true"
+                  class="mt-2"
+                  size="xs"
+                  variant="subtle"
+                  color="error"
+                  icon="i-lucide-mail-plus"
+                  :to="{ name: 'admin-invitations' }"
+                >
+                  Przejdź do zaproszeń
+                </UButton>
+              </template>
+            </UAlert>
+          </form>
         </template>
       </UCard>
 

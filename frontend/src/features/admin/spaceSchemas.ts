@@ -50,6 +50,20 @@ export const spaceMemberListSchema = z.object({
   members: z.array(spaceMemberSchema),
 })
 
+/**
+ * What granting access answers with: an address and a role, not a membership row.
+ *
+ * Deliberately its own shape rather than `spaceMemberSchema`. The grant route takes an
+ * e-mail address — the person it names may have no membership yet — and answers in the same
+ * terms, so it cannot say who that address belongs to, when they were added or by whom.
+ * Whoever calls it therefore re-reads the membership list to learn the rest.
+ */
+export const spaceGrantSchema = z.object({
+  space: z.string(),
+  member: z.string(),
+  role: spaceMemberRoleSchema,
+})
+
 /** As with accounts: "200 member" reads two ways, and both are accepted rather than
  *  waiting for the stitching-together to discover which one was meant. */
 export const spaceMemberAnswerSchema = z.union([
@@ -62,3 +76,4 @@ export type SpaceMemberRole = z.infer<typeof spaceMemberRoleSchema>
 export type AdminSpace = z.infer<typeof adminSpaceSchema>
 export type AdminSpaceList = z.infer<typeof adminSpaceListSchema>
 export type SpaceMember = z.infer<typeof spaceMemberSchema>
+export type SpaceGrant = z.infer<typeof spaceGrantSchema>
