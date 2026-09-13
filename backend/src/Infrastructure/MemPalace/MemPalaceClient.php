@@ -33,6 +33,9 @@ final readonly class MemPalaceClient
 {
     private const PROTOCOL_VERSION = '2.0';
 
+    /** The MCP revision we negotiate in the handshake — JSON-RPC's version is the one above. */
+    private const MCP_PROTOCOL_VERSION = '2025-06-18';
+
     /** Backoff between read attempts, in milliseconds. Short: a request is waiting. */
     private const RETRY_BACKOFF_MS = [100, 300];
 
@@ -93,6 +96,82 @@ final readonly class MemPalaceClient
 
         // Unreachable: the loop either returns or rethrows on its last attempt.
         throw MemPalaceUnavailable::malformed($tool, 'wyczerpano próby bez rozstrzygnięcia');
+    }
+
+    /**
+     * What the server says about itself in the MCP handshake.
+     *
+     * Lives here rather than in a second client because the wire format, the base
+     * URL, the token and the rule that none of them reach a log are all already
+     * settled in this class — and a second client is a second place to forget the
+     * last of those.
+     *
+     * `initialize` is used because MemPalace has no `/version` route, and because
+     * it answers with what is actually RUNNING rather than with what somebody
+     * meant to build. Not retried and not routed through CallOutcome: this is the
+     * protocol handshake, not a tool, so there is no payload envelope to peel and
+     * no in-band tool error to disentangle from a transport one.
+     *
+     * @return array<string, mixed> the `result.serverInfo` object, e.g. `{name, version}`
+     *
+     * @throws MemPalaceUnavailable
+     */
+    public function serverInfo(): array
+    {
+        try {
+            $response = $this->httpClient->request('POST', rtrim($this->baseUrl, '/') . '/mcp', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    // The streaming type is offered because the MCP HTTP
+                    // transport may answer either way; this server replies with
+                    // plain JSON, and a client that accepted only that would be
+                    // relying on it never changing its mind.
+                    'Accept' => 'application/json, text/event-stream',
+                    'Authorization' => 'Bearer ' . $this->token,
+                ],
+                'json' => [
+                    'jsonrpc' => self::PROTOCOL_VERSION,
+                    'id' => 1,
+                    'method' => 'initialize',
+                    'params' => [
+                        'protocolVersion' => self::MCP_PROTOCOL_VERSION,
+                        'capabilities' => new \stdClass(),
+                        'clientInfo' => ['name' => 'ws-memory', 'version' => '1'],
+                    ],
+                ],
+                'timeout' => $this->timeoutSeconds,
+            ]);
+
+            $status = $response->getStatusCode();
+            if (200 !== $status) {
+                throw MemPalaceUnavailable::httpStatus('initialize', $status);
+            }
+
+            $body = $response->getContent(throw: false);
+        } catch (MemPalaceUnavailable $e) {
+            throw $e;
+        } catch (HttpExceptionInterface $e) {
+            throw MemPalaceUnavailable::transport('initialize', $e);
+        }
+
+        try {
+            /** @var mixed $envelope */
+            $envelope = json_decode($body, true, flags: \JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw MemPalaceUnavailable::malformed('initialize', 'odpowiedź nie jest JSON-em: ' . $e->getMessage());
+        }
+
+        if (!\is_array($envelope) || !\is_array($envelope['result'] ?? null)) {
+            throw MemPalaceUnavailable::malformed('initialize', 'brak pola result');
+        }
+
+        $serverInfo = $envelope['result']['serverInfo'] ?? null;
+        if (!\is_array($serverInfo)) {
+            throw MemPalaceUnavailable::malformed('initialize', 'brak pola result.serverInfo');
+        }
+
+        /** @var array<string, mixed> $serverInfo */
+        return $serverInfo;
     }
 
     /**

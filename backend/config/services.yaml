@@ -24,6 +24,22 @@ parameters:
     # nginx; in production the real domain.
     app.public_base_url: '%env(default:app_default_base_url:WS_PUBLIC_URL)%'
     app_default_base_url: 'http://127.0.0.1:8080'
+    # The version the palace image was BUILT from — `MEMPALACE_VERSION` in the
+    # root .env, which drives `pip install mempalace==...`. Deliberately not the
+    # same fact as the version that answers: the two drift the moment somebody
+    # edits .env without rebuilding, and the panel shows both so that gap is
+    # visible (TODO-015). Read through the container so the application has one
+    # way to reach configuration rather than two.
+    mempalace.pinned_version: '%env(default::MEMPALACE_VERSION)%'
+    # Where release information comes from. A parameter, not a constant: the test
+    # suite points it at a port nothing listens on to prove that an unreachable
+    # catalogue reports "nie udało się sprawdzić" rather than "brak aktualizacji".
+    pypi.base_url: '%env(default:pypi_default_base_url:PYPI_URL)%'
+    pypi_default_base_url: 'https://pypi.org/pypi'
+    # Short, because an administrator is watching a spinner and the scheduler has
+    # nothing to gain from waiting longer. A check that hangs reads as a broken
+    # panel; one that fails says to try again.
+    pypi.timeout: 8.0
 
 services:
     _defaults:
@@ -69,6 +85,20 @@ services:
     App\Domain\Identity\AgentTokenDirectory: '@App\Infrastructure\Doctrine\DoctrineAgentTokenDirectory'
     App\Domain\Identity\AuthorDirectory: '@App\Infrastructure\Doctrine\DoctrineAuthorDirectory'
     App\Domain\Audit\AuditTrail: '@App\Infrastructure\Doctrine\DoctrineAuditTrail'
+    App\Domain\Dependency\ReleaseCatalog: '@App\Infrastructure\PyPi\PyPiReleaseCatalog'
+    App\Domain\Dependency\RunningVersion: '@App\Infrastructure\MemPalace\MemPalaceRunningVersion'
+    App\Domain\Dependency\DependencyStateStore: '@App\Infrastructure\Doctrine\DoctrineDependencyStateStore'
+    App\Domain\Dependency\UpdateRequestRepository: '@App\Infrastructure\Doctrine\DoctrineUpdateRequestRepository'
+    App\Domain\Dependency\UpdaterHeartbeat: '@App\Infrastructure\Doctrine\DoctrineUpdaterHeartbeat'
+
+    App\Infrastructure\PyPi\PyPiReleaseCatalog:
+        arguments:
+            $baseUrl: '%pypi.base_url%'
+            $timeoutSeconds: '%pypi.timeout%'
+
+    App\Application\Dependency\DependencyCheckService:
+        arguments:
+            $pinnedVersion: '%mempalace.pinned_version%'
 
     App\Infrastructure\MemPalace\MemPalaceClient:
         arguments:
@@ -130,3 +160,20 @@ when@test:
                 $registered: !tagged_iterator app.mcp_tool
         App\Domain\Memory\MemoryRegistry: '@App\Infrastructure\Doctrine\DoctrineMemoryRegistry'
         App\Domain\Space\SpaceCatalog: '@App\Infrastructure\Doctrine\DoctrineSpaceCatalog'
+        App\Domain\Dependency\DependencyStateStore: '@App\Infrastructure\Doctrine\DoctrineDependencyStateStore'
+        App\Infrastructure\Doctrine\DoctrineDependencyStateStore:
+            public: true
+        # The update half of TODO-015. Its interesting behaviour is concurrency —
+        # a claim two agent runs cannot both win, an order the database refuses to
+        # duplicate, a claimed order nobody came back from — and none of that is
+        # reachable through HTTP, where the answer is one request at a time.
+        App\Application\Dependency\UpdateRequestService:
+            public: true
+        App\Application\Dependency\UpdaterAgent:
+            public: true
+        App\Domain\Dependency\UpdateRequestRepository: '@App\Infrastructure\Doctrine\DoctrineUpdateRequestRepository'
+        App\Infrastructure\Doctrine\DoctrineUpdateRequestRepository:
+            public: true
+        App\Domain\Dependency\UpdaterHeartbeat: '@App\Infrastructure\Doctrine\DoctrineUpdaterHeartbeat'
+        App\Infrastructure\Doctrine\DoctrineUpdaterHeartbeat:
+            public: true

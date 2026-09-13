@@ -110,6 +110,22 @@ function signOut(): void {
             color="neutral"
             aria-label="Tokeny agentów"
           />
+          <!-- Administracja to osobne miejsce, nie kolejna pozycja obok przestrzeni.
+               Pasek boczny odpowiada na pytanie „gdzie jest wiedza"; utrzymanie
+               instalacji odpowiada na zupełnie inne i miesza dwie role w jednym
+               widoku. Stąd wejście z nagłówka i własny układ po drugiej stronie.
+
+               Widoczne wyłącznie dla administratora globalnego: pozycja menu
+               prowadząca do odmowy jest gorsza niż jej brak, bo przy każdym
+               spojrzeniu przypomina, że część aplikacji jest zamknięta. -->
+          <UButton
+            v-if="auth.user?.isGlobalAdmin === true"
+            :to="{ name: 'admin' }"
+            icon="i-lucide-sliders-horizontal"
+            variant="ghost"
+            color="neutral"
+            aria-label="Administracja"
+          />
           <UAvatar :alt="auth.user?.displayName ?? ''" :text="initials" size="sm" />
           <UButton
             variant="ghost"

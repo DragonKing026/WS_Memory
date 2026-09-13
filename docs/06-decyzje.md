@@ -1236,3 +1236,71 @@ przebieg ręcznie: `gh workflow run pelne.yml --ref <gałąź>`.
 scaleniu: łapie to, czego push nie złapie — zależność zewnętrzną, która psuje
 się bez naszego commita. Obraz znika, model przestaje być dostępny, PyPI się
 zmienia. O takiej awarii lepiej wiedzieć rano niż przy najbliższej zmianie.
+
+---
+
+## D-032 — Aktualizacja MemPalace przez agenta na hoście, nie przez gniazdo Dockera
+
+**Data:** 2026-09-13 14:05 · **Stan:** Przyjęta
+
+Panel administratora pozwala **zlecić** aktualizację MemPalace. Samo zlecenie
+trafia do tabeli w bazie; wykonuje je skrypt uruchamiany cyklicznie **na hoście**
+(timer systemd). Żaden kontener nie dostaje dostępu do Dockera.
+
+### Skąd w ogóle potrzeba
+
+MemPalace jest przypięty na sztywno (`MEMPALACE_VERSION`, `pip install
+mempalace==...`) i słusznie — aktualizacja pałaca dotyka wektorów, więc nie ma
+być przypadkiem. Skutek uboczny jest jednak taki, że **nikt nie wie, kiedy wyszło
+coś nowego**. Przy pisaniu tego zadania okazało się, że działa 3.7.0, a na PyPI
+jest 3.9.0 — dwie wersje mniejsze w tyle, i dowiedzieliśmy się o tym tylko
+dlatego, że ktoś ręcznie zapytał. To jest dług, który rośnie po cichu, aż
+aktualizacja przestaje być krokiem i staje się projektem.
+
+### Odrzucone: gniazdo Dockera w kontenerze backendu
+
+Najprostsze do zrobienia i najgorsze z możliwych. Kontener z `/var/run/docker.sock`
+może uruchomić dowolny obraz z dowolnym montowaniem, czyli ma władzę **równoważną
+rootowi na hoście**. Backend obsługuje ruch z sieci i ma konta użytkowników, więc
+dowolne zdalne wykonanie kodu w Symfony albo przejęcie konta administratora
+kończyłoby się przejęciem maszyny. Wygoda nie jest tego warta.
+
+### Odrzucone: osobna usługa-aktualizator z gniazdem Dockera
+
+Powierzchnia mniejsza — usługa bez portu na hoście, osiągalna tylko z sieci
+compose, o wąskim API. Ale backend nadal może ją wywołać, więc włamanie do
+backendu nadal daje Dockera. Przesuwa granicę o jeden krok, nie stawia jej.
+
+### Wybrane: agent na hoście, komunikacja przez bazę
+
+Backend zapisuje **zlecenie**, agent je podejmuje. Kompromitacja aplikacji
+webowej pozwala co najwyżej zlecić aktualizację do wersji, która istnieje na
+PyPI — nie uruchomić dowolnego kodu na hoście.
+
+Agent rozmawia z aplikacją przez `docker compose exec backend php bin/console`,
+a nie przez HTTP. Dzięki temu nie trzeba wymyślać uwierzytelniania dla agenta ani
+wystawiać endpointu, który musiałby być chroniony inaczej niż sesją użytkownika.
+
+**Wersja docelowa jest walidowana wzorcem po obu stronach** — przy zapisie
+zlecenia i w agencie. Nie z nieufności do backendu, tylko dlatego, że jedna
+warstwa walidacji to zero warstw, gdy akurat ta jedna ma błąd. Jest to jedyne
+miejsce, w którym dane z aplikacji wpływają na polecenie wykonywane na hoście.
+
+### Co agent robi obowiązkowo
+
+Kopia zapasowa schematu `palace` **przed** przebudową i `test/semantyka.sh`
+**po** niej, z wycofaniem przy porażce. Powód jest w D-003: zepsuta trafność
+wyszukiwania jest **cicha** — wyszukiwarka nadal odpowiada, tylko przestaje
+trafiać. Aktualizacja bez tego testu byłaby aktualizacją, po której nie wiadomo,
+czy coś się zepsuło.
+
+### Koszt, który świadomie bierzemy
+
+Instalacja przestaje być samym `docker compose up`: trzeba jeszcze wgrać jednostkę
+systemd. Dopóki tego nie zrobiono, panel **mówi wprost, że aktualizator jest
+niedostępny** i nie pokazuje przycisku, który nic nie robi. Przycisk bez skutku
+jest gorszy niż jego brak, bo uczy nie ufać interfejsowi.
+
+Drugi koszt: kliknięcie nie daje natychmiastowego wyniku, tylko zlecenie
+podejmowane w ciągu minuty. Panel pokazuje stan i dziennik, więc oczekiwanie jest
+widoczne, a nie zagadkowe.

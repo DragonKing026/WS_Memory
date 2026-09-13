@@ -1,0 +1,44 @@
+# WS_Memory — timer agenta aktualizacji MemPalace (TODO-015).
+#
+# Budzi ws-memory-aktualizator.service CO MINUTĘ. Tak często nie dlatego, że
+# aktualizacje są częste (są rzadkie), ale dlatego, że ten sam przebieg zgłasza
+# PULS. Panel administratora rozpoznaje po nim, czy agent jest zainstalowany —
+# minutowa siatka znaczy, że po kliknięciu „Aktualizuj” robota rusza najdalej
+# po minucie, a nieżyjący agent jest widoczny niemal od razu.
+#
+# Koszt jednego przebiegu bez zlecenia to dwa wywołania konsoli Symfony
+# (puls i próba podjęcia zlecenia) — ułamek sekundy procesora.
+#
+# Instalacja i wyłączanie: docker/systemd/README.md
+#
+# Podmień __KATALOG_PROJEKTU__ na ścieżkę repozytorium — tu tylko w jednym
+# miejscu (Documentation=), harmonogram żadnych ścieżek nie potrzebuje.
+
+[Unit]
+Description=WS_Memory — puls i podejmowanie zleceń aktualizacji MemPalace (co minutę)
+Documentation=file://__KATALOG_PROJEKTU__/docker/systemd/README.md
+
+[Timer]
+Unit=ws-memory-aktualizator.service
+
+# Pierwszy przebieg minutę po starcie — nie od razu, bo zaraz po włączeniu
+# maszyny kontenery jeszcze wstają i agent nie miałby z kim rozmawiać.
+OnBootSec=1min
+
+# Liczone od OSTATNIEGO URUCHOMIENIA jednostki, nie od zegara. Przy OnCalendar
+# co minutę wpisy kolejkowałyby się w trakcie kilkunastominutowej aktualizacji;
+# tak następny przebieg wypada minutę po poprzednim. Skrypt ma dodatkowo
+# blokadę (flock), więc nawet skolejkowany przebieg nie wejdzie w drugi.
+OnUnitActiveSec=1min
+
+# Dokładność do kwadransa jest domyślna i zupełnie tu nieprzydatna: przy
+# minutowej siatce zlewałaby przebiegi. Piętnaście sekund pozwala systemd
+# grupować wybudzenia, a jednocześnie trzyma obiecaną „najdalej minutę”.
+AccuracySec=15s
+
+# Bez nadrabiania zaległości. Puls sprzed wyłączenia maszyny nie ma żadnej
+# wartości — panel ma wiedzieć, czy agent żyje TERAZ.
+Persistent=false
+
+[Install]
+WantedBy=timers.target

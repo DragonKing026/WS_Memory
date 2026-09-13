@@ -83,6 +83,32 @@ const routes: RouteRecordRaw[] = [
     ],
   },
   {
+    // Administration sits under its own layout, not under the wiki one, and the split
+    // is on purpose. The two answer different questions — „where is the knowledge"
+    // and „is this installation healthy" — and hanging the second under the space list
+    // put the machinery of the installation in front of everyone reading a document.
+    //
+    // Deliberately **not** guarded here, although it is for global administrators
+    // only: a guard can only send somebody away, and being bounced to the home page is
+    // how a person concludes they mistyped the address. The layout refuses in words,
+    // and the API refuses with 403 — which is where the boundary actually is.
+    path: '/admin',
+    component: () => import('@/layouts/AdminLayout.vue'),
+    children: [
+      {
+        path: '',
+        name: 'admin',
+        redirect: { name: 'admin-dependencies' },
+      },
+      {
+        path: 'zaleznosci',
+        name: 'admin-dependencies',
+        component: () => import('@/pages/AdminDependenciesPage.vue'),
+        meta: { title: 'Zależności' },
+      },
+    ],
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/pages/NotFoundPage.vue'),

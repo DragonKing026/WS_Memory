@@ -152,13 +152,34 @@ nie backup.
 ## Aktualizacja MemPalace
 
 MemPalace jest czarną skrzynką za granicą HTTP MCP (D-001), więc aktualizacja
-nie dotyka naszego kodu:
+nie dotyka naszego kodu. Wersja jest przypięta w `.env` (`MEMPALACE_VERSION`)
+i instalowana z PyPI przy budowaniu obrazu.
+
+### Z panelu administratora
+
+Aplikacja sprawdza PyPI co sześć godzin i pokazuje w panelu
+(**Administracja → Zależności**) wersję działającą, przypiętą i najnowszą.
+Przycisk zakłada zlecenie; wykonuje je **agent działający na hoście**, bo żaden
+kontener nie dostaje dostępu do Dockera (D-032). Agent robi kopię zapasową
+schematu `palace`, przebudowuje obraz, wymienia kontener, uruchamia test
+semantyki i **wycofuje się**, gdy test padnie.
+
+Wymaga to jednorazowej instalacji jednostki systemd — opisanej w
+`docker/systemd/README.md`. Dopóki jej nie ma, panel mówi wprost, że aktualizator
+jest niedostępny, i **nie pokazuje przycisku**, który i tak by nic nie zrobił.
+Samo sprawdzanie wersji działa bez agenta.
+
+Warto znać jedno ograniczenie automatycznego wycofania: cofa ono **wersję
+obrazu, nie zawartość bazy**. Gdyby nowsza wersja pałaca zmigrowała schemat
+`palace`, stary obraz może go nie zrozumieć — wtedy potrzebna jest ręczna
+interwencja, a agent wypisuje w dzienniku gotowe polecenie `pg_restore`.
+
+### Ręcznie
 
 1. Backup bazy.
-2. Podniesienie wersji w `docker/mempalace/Dockerfile`, przebudowa obrazu.
+2. Podniesienie `MEMPALACE_VERSION` w `.env`, przebudowa obrazu.
 3. `docker compose up -d mempalace`, sprawdzenie `/healthz`.
-4. Test integracyjny polskiej semantyki (patrz `TODO/000`) — jeśli przechodzi,
-   wektory są nietknięte.
+4. `./test/semantyka.sh` — jeśli przechodzi, wektory są nietknięte.
 
 Czego przy aktualizacji **nie wolno**: zmienić modelu embeddingów „przy okazji".
 To osobna operacja z przeliczeniem całej bazy.

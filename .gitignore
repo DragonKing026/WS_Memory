@@ -28,9 +28,22 @@ config/jwt/
 *.dump
 *.sql
 
+# Kopie zapasowe schematu palace robione przez agenta aktualizacji
+# (scripts/aktualizator.sh) wraz z jego plikiem blokady i zachowanymi
+# dziennikami. Zrzut bazy nie jest kodem i potrafi mieć setki megabajtów.
+/kopie/
+
 # Narzędzia i edytory
 .idea/
-.vscode/
+# Zawartość katalogu, a NIE sam katalog: gdy wykluczyć `.vscode/`, git w ogóle
+# do niego nie zagląda i wyjątek niżej nigdy nie zadziała.
+.vscode/*
+# …ten jeden plik dzielimy. Uczy edytor znaczników własnych Symfony
+# (`!tagged_iterator`), których ogólny serwer języka YAML nie zna i zgłasza jako
+# błąd w pliku, który jest poprawny. Fałszywy alarm jest kosztowny nie dlatego,
+# że boli, tylko dlatego, że uczy ignorować listę problemów — a wtedy ginie
+# w niej ten prawdziwy.
+!.vscode/settings.json
 .DS_Store
 .notebook/
 

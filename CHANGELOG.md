@@ -15,6 +15,70 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 14:59 — Administracja wyprowadzona z paska bocznego bazy wiedzy
+
+Pozycja „Administracja → Zależności" wisiała w pasku bocznym obok przestrzeni
+i surowej pamięci. To pomieszanie dwóch ról: pasek boczny odpowiada na pytanie
+„gdzie jest wiedza", a utrzymanie instalacji na zupełnie inne. Czytający dokument
+miał maszynownię w kącie oka, a administrator musiał mijać listę przestrzeni,
+żeby dojść do swojego.
+
+Administracja ma teraz **własny układ** pod `/admin`, z własnym paskiem i jawnym
+powrotem do bazy wiedzy. Wejście jest ikoną w nagłówku, widoczną wyłącznie dla
+administratora globalnego. Odmowa dla osoby bez roli mieszka w układzie, nie na
+pojedynczej stronie — obowiązuje każdy ekran administracyjny, a powtarzana na
+każdym z osobna rozjedzie się przy pierwszym, który o niej zapomni.
+
+Rozstrzyga to przy okazji pytanie, które wracałoby przy każdym kolejnym ekranie
+z TODO-008 (użytkownicy, zaproszenia, przestrzenie, role, audyt): gdzie go
+powiesić.
+
+---
+## 2026-09-13 14:48 — Aktualizacja MemPalace z panelu administratora (TODO-015)
+
+Pałac jest przypięty na sztywno i to jest słuszne — aktualizacja dotyka wektorów,
+więc nie ma się dziać przypadkiem. Skutkiem ubocznym było jednak to, że **nikt nie
+wiedział, kiedy wyszło coś nowego**. Przy pisaniu zadania okazało się, że działa
+3.7.0, a na PyPI od 31 sierpnia jest 3.9.0. Dwie wersje mniejsze w tyle,
+i dowiedzieliśmy się o tym tylko dlatego, że ktoś ręcznie zapytał.
+
+Teraz aplikacja sprawdza PyPI co sześć godzin, a panel (**Administracja →
+Zależności**) pokazuje wersję działającą, przypiętą i najnowszą.
+
+**Wersja działająca bierze się z MCP `initialize`, nie z `.env`.** Pałac nie ma
+endpointu `/version`, ale handshake zwraca `serverInfo.version`. Zmienna mówi, co
+*miało* zostać zbudowane; handshake — co **naprawdę odpowiada**. Rozjazd między
+nimi znaczy, że ktoś zmienił `.env` i nie przebudował obrazu, i panel to pokazuje.
+
+**Aktualizację wykonuje agent na hoście, nie kontener** (D-032). Rozważono gniazdo
+Dockera w backendzie — odrzucone, bo kontener obsługujący ruch z sieci dostałby
+władzę równoważną rootowi na hoście. Backend zapisuje tylko zlecenie; skrypt na
+hoście robi kopię zapasową schematu `palace`, przebudowuje obraz, uruchamia test
+semantyki i **wycofuje się**, gdy test padnie — bo zepsuta trafność wyszukiwania
+jest cicha (D-003).
+
+Cztery stany na ekranie są rozróżnione celowo: „jest nowsza", „masz najnowszą",
+**„nie udało się sprawdzić"** i „agent niezainstalowany". Trzeci stoi wyżej niż
+dwa pierwsze, bo panel mówiący „wszystko aktualne", gdy w rzeczywistości nie
+dodzwonił się do PyPI, **kłamie**. Przy czwartym nie ma przycisku — przycisk bez
+skutku uczy nie ufać interfejsowi.
+
+Trzy rzeczy złapane dopiero przy składaniu części, nie przy pisaniu:
+`MEMPALACE_VERSION` nie docierała do kontenera backendu (więc rozjazd byłby
+niewidoczny właśnie wtedy, gdy zaistnieje); panel i backend przeczytały ten sam
+kontrakt inaczej; a `!tagged_iterator` w konfiguracji Symfony podświetlał się
+w edytorze jako błąd, choć `lint:yaml --parse-tags` mówi, że plik jest poprawny.
+
+Wyścig dwóch kliknięć rozbija się o **indeks częściowy w bazie**, nie o
+sprawdzenie w PHP — potwierdzone realnie: sześć równoległych zleceń, jedno
+przechodzi. Wersja docelowa walidowana wzorcem **po obu stronach**, bo trafia do
+`pip install` na hoście; `3.9.0; touch /tmp/wlamanie` jest odrzucane.
+
+Czego **nie** zrobiono: prawdziwego podniesienia 3.7.0 → 3.9.0. To operacja
+dotykająca wektorów i należy do decyzji człowieka. Ograniczenia i kruche miejsca
+spisane w `TODO/DONE/015-aktualizacja-mempalace.md`.
+
+---
 ## 2026-09-13 13:44 — Pełne sprawdzenie pomija zmiany wyłącznie tekstowe
 
 Rozliczenie TODO-016 zmieniło dwa pliki tekstowe i kazało pełnemu przebiegowi
