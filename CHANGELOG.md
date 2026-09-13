@@ -15,6 +15,26 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 13:44 — Pełne sprawdzenie pomija zmiany wyłącznie tekstowe
+
+Rozliczenie TODO-016 zmieniło dwa pliki tekstowe i kazało pełnemu przebiegowi
+postawić cały stos na 4 min 57 s. Zmiana w `docs/`, `TODO/` albo dowolnym `.md`
+nie ma czego zepsuć, więc od teraz nie stawia stosu.
+
+Filtr jest na poziomie workflowu i jest to bezpieczne **wyłącznie dlatego**, że
+pełne sprawdzenie nie jest wymaganym checkiem — gdyby było, pominięcie
+zgłosiłoby się jako wiecznie oczekujące i zablokowało każdy pull request
+dokumentacyjny. To ta sama pułapka, przez którą szybkie sprawdzenie ma bramkę,
+tylko obrócona: tam pomijamy **zadania** wymaganego workflowu i potrzebna jest
+bramka, tu pomijamy **cały workflow**, który wymagany nie jest. Zapisane
+w komentarzu przy filtrze i w `docs/09-ci.md`, bo pomylenie tych dwóch przypadków
+kończy się zablokowanym repozytorium.
+
+Bezpiecznik zostaje: skrypt wypychający czeka na wszystkie checki pull requesta,
+więc pełne sprawdzenie musi być zielone przed scaleniem, choć ruleset go nie
+wymaga.
+
+---
 ## 2026-09-13 13:36 — TODO-016 rozliczone
 
 Gałąź na zadanie, sprawdzenia zawężone ścieżkami, ruleset na jednym checku,
