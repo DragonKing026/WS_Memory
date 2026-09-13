@@ -15,6 +15,20 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:48 — Zadania mają pola wyboru, odhaczane na bieżąco
+
+Sekcje **Rozwiązanie** i **Kryteria ukończenia** są teraz listami `- [ ]`/`- [x]`
+we wszystkich czterech aktywnych zadaniach. Postęp widać przy konkretnym punkcie,
+a nie w tabeli obok — którą zresztą usunąłem z TODO-012, bo powtarzała listę
+rozwiązania i była drugim źródłem prawdy o tym samym.
+
+TODO-012 ma odhaczone punkty 1–4 oraz **sześć kryteriów**, które udowadniają
+testy scalone w `main`. Nie odhaczyłem kryterium o filtrze sekretów, choć serwer
+go ma: wymaga **dwóch osobnych testów**, po stronie klienta i serwera, a klienta
+nie ma. Kryterium odhacza się, gdy jest sprawdzone, nie gdy kod istnieje.
+
+
+---
 ## 2026-09-13 19:46 — Zadanie zrobione w połowie ma to po sobie widać
 
 TODO-012 miało serwerową połowę scaloną w `main` i **nadal stało na liście jako

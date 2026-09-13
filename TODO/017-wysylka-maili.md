@@ -61,37 +61,37 @@ dziennika audytu, który urósł do 40 tysięcy wpisów, zanim ktokolwiek spojrz
 
 ## Rozwiązanie
 
-1. `symfony/mailer` + `MAILER_DSN`, nadawca (`MAIL_FROM`, `MAIL_FROM_NAME`)
-   w konfiguracji i w `.env.example`. W środowisku testowym transport `null`.
-2. Tabela `ws.mail_templates`: klucz szablonu, temat, treść, kto i kiedy
-   zmienił. Zmiana szablonu **idzie do dziennika audytu**.
-3. Szablony domyślne wgrywane migracją, żeby świeża instancja miała działającą
-   treść, zanim ktokolwiek cokolwiek edytuje.
-4. Podstawianie miejsc z zamkniętej listy per szablon, walidowane **przy
-   zapisie** — nie przy wysyłce, kiedy jest za późno.
-5. Tabela `ws.mail_log`: adresat, szablon, temat, stan (`w kolejce`,
-   `wysłany`, `nieudany`), powód porażki, znaczniki czasu. **Bez treści.**
-6. Wysyłka przez Messenger, z ponowieniem i widocznym stanem w dzienniku.
-7. Ekran w panelu administracyjnym: lista szablonów, edycja, podgląd na
-   wartościach przykładowych, wysyłka próbna do siebie.
-8. Ekran dziennika maili: filtr po stanie i adresacie, powód porażki widoczny.
-9. Pierwszy szablon: **zaproszenie**. Kolejne dokładamy, gdy będą potrzebne —
-   nie na zapas.
-10. Retencja dziennika maili opisana w `docs/05-deployment.md`.
+- [ ] **1.** `symfony/mailer` + `MAILER_DSN`, nadawca (`MAIL_FROM`, `MAIL_FROM_NAME`)
+      w konfiguracji i w `.env.example`. W środowisku testowym transport `null`.
+- [ ] **2.** Tabela `ws.mail_templates`: klucz szablonu, temat, treść, kto i kiedy
+      zmienił. Zmiana szablonu **idzie do dziennika audytu**.
+- [ ] **3.** Szablony domyślne wgrywane migracją, żeby świeża instancja miała działającą
+      treść, zanim ktokolwiek cokolwiek edytuje.
+- [ ] **4.** Podstawianie miejsc z zamkniętej listy per szablon, walidowane **przy
+      zapisie** — nie przy wysyłce, kiedy jest za późno.
+- [ ] **5.** Tabela `ws.mail_log`: adresat, szablon, temat, stan (`w kolejce`,
+      `wysłany`, `nieudany`), powód porażki, znaczniki czasu. **Bez treści.**
+- [ ] **6.** Wysyłka przez Messenger, z ponowieniem i widocznym stanem w dzienniku.
+- [ ] **7.** Ekran w panelu administracyjnym: lista szablonów, edycja, podgląd na
+      wartościach przykładowych, wysyłka próbna do siebie.
+- [ ] **8.** Ekran dziennika maili: filtr po stanie i adresacie, powód porażki widoczny.
+- [ ] **9.** Pierwszy szablon: **zaproszenie**. Kolejne dokładamy, gdy będą potrzebne —
+      nie na zapas.
+- [ ] **10.** Retencja dziennika maili opisana w `docs/05-deployment.md`.
 
 ## Kryteria ukończenia
 
-- Wystawienie zaproszenia z panelu **wysyła maila** z działającym linkiem.
-- Niedostępny SMTP **nie wywraca** wystawienia zaproszenia; wpis w dzienniku
+- [ ] Wystawienie zaproszenia z panelu **wysyła maila** z działającym linkiem.
+- [ ] Niedostępny SMTP **nie wywraca** wystawienia zaproszenia; wpis w dzienniku
   maili ma stan `nieudany` i czytelny powód, a link nadal da się skopiować.
-- W `ws.mail_log` **nie ma treści maila ani tokena** — sprawdzone zapytaniem
+- [ ] W `ws.mail_log` **nie ma treści maila ani tokena** — sprawdzone zapytaniem
   po całej tabeli, nie przeglądem kodu.
-- Zmiana szablonu przez administratora zmienia treść następnego maila.
-- Szablon z nieznanym miejscem (`{{ nieistniejace }}`) **nie zapisuje się**,
+- [ ] Zmiana szablonu przez administratora zmienia treść następnego maila.
+- [ ] Szablon z nieznanym miejscem (`{{ nieistniejace }}`) **nie zapisuje się**,
   z komunikatem mówiącym, które miejsca są dozwolone.
-- Szablon nie jest wykonywany: wpisanie w treść konstrukcji silnika szablonów
+- [ ] Szablon nie jest wykonywany: wpisanie w treść konstrukcji silnika szablonów
   albo kodu trafia do maila **dosłownie**, jako tekst.
-- Podgląd i wysyłka próbna używają **wartości przykładowych**, nie prawdziwego
+- [ ] Podgląd i wysyłka próbna używają **wartości przykładowych**, nie prawdziwego
   tokena.
-- Nieudana wysyłka jest ponawiana, a dziennik pokazuje liczbę prób.
-- `docs/05-deployment.md` przestaje kłamać o `WS_DOMAIN`.
+- [ ] Nieudana wysyłka jest ponawiana, a dziennik pokazuje liczbę prób.
+- [ ] `docs/05-deployment.md` przestaje kłamać o `WS_DOMAIN`.

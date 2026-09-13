@@ -191,6 +191,9 @@ Struktura `frontend/src/` jak w 2.0: `pages/` (routing plikowy), `features/<dome
   starej (starą oznaczamy jako zastąpioną).
 - **`TODO/`** — ponumerowane zadania. Jeden plik = jedno zadanie, z sekcjami:
   **Powód**, **Analiza**, **Rozwiązanie**, **Kryteria ukończenia**.
+  **Rozwiązanie i Kryteria to listy z polami wyboru** (`- [ ]` / `- [x]`),
+  odhaczane **na bieżąco**, w commicie, który daną rzecz dowozi. Kryterium
+  odhacza się dopiero wtedy, gdy jest **sprawdzone**, a nie gdy kod istnieje.
 - **Zadanie zrobione w części dostaje stan `🔵 W TOKU — punkty A–B z N`
   i sekcję **Postęp**** z tabelą: co gotowe, co zostało i czego brakuje.
   Bez tego zadanie w połowie wygląda na liście dokładnie tak samo jak nietknięte,

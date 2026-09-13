@@ -65,97 +65,83 @@ audyt — odrzucone w D-010.
 
 ## Rozwiązanie
 
-1. Encje `Mirror`, `PublishBatch`, `PublishSettings` (`auto_publish` domyślnie
-   `true`) + rozszerzenie `memory_entries` (`source_replica`,
-   `source_drawer_id`, `publish_batch_id`, `content_hash`) z unikalnością na
-   parze źródłowej i indeksem `(space_id, content_hash)` pod odsiew powtórzeń.
-2. `POST /api/publish` — przyjmuje partię szuflad: treść, skrzydło i pokój
-   źródłowy, znaczniki czasu, identyfikator repliki i szuflady. Sprawdza rolę
-   `writer` w przestrzeni docelowej, przepuszcza przez filtr sekretów,
-   przelicza embeddingi po stronie serwera, zapisuje z autorem.
-   Tryb `preview=true` zwraca raport bez zapisu.
-3. `POST /api/publish/{batch}/revert` — wycofanie partii: usuwa szuflady z
-   pałaca i wiersze rejestru, zostawia partię ze statusem `reverted`.
-4. Filtr sekretów jako osobny, testowalny serwis (wzorce: `.env`, klucze
-   prywatne, `BEGIN * PRIVATE KEY`, hasła w URL-ach, tokeny o typowych
-   prefiksach). Raport pominięć jest częścią partii.
-5. **Wysyłka automatyczna** (domyślna): po sesji i po lokalnym mieleniu
-   zbiera szuflady nowsze niż znacznik, ustala przestrzeń docelową regułą
-   lądowania (mapowanie → zespołowa, brak → prywatna) i wysyła partią.
-6. **Kolejka wyjściowa** w `~/.ws-memory/outbox/`: nieudana wysyłka nie gubi
-   niczego i nie przerywa pracy; ponowienie z narastającym odstępem, znacznik
-   przesuwa się dopiero po potwierdzeniu przez serwer.
-7. Komenda `/ws-publish` — dla trybu ręcznego: filtr (skrzydło / temat /
-   zakres daty), podgląd, potwierdzenie, wysyłka z widocznym postępem.
-8. Propozycja mapowania, gdy nazwa lokalnego skrzydła odpowiada istniejącej
-   przestrzeni zespołowej użytkownika.
-9. Lustra: CRUD w `/api`, ekran w interfejsie (mapowanie skrzydło → przestrzeń,
-   wykluczenia pokoi, pauza, wyłącznik), pierwszy przebieg jako podgląd.
-10. Lokalny agent wysyłki w pluginie: uruchamiany hookiem `SessionEnd` albo
-   ręcznie, publikuje przyrostowo szuflady nowsze niż `last_drawer_filed_at`.
-11. Skill `ws-memory-recall` uzupełniony o kolejność dwóch źródeł: najpierw
-   `ws_search` (wspólna baza), potem lokalny `mempalace_search`.
-12. Dokumentacja dla dewelopera: jak postawić lokalny pałac i podłączyć oba
-   serwery MCP naraz.
+- [x] **1.** Encje `Mirror`, `PublishBatch`, `PublishSettings` (`auto_publish` domyślnie
+      `true`) + rozszerzenie `memory_entries` (`source_replica`,
+      `source_drawer_id`, `publish_batch_id`, `content_hash`) z unikalnością na
+      parze źródłowej i indeksem `(space_id, content_hash)` pod odsiew powtórzeń.
+- [x] **2.** `POST /api/publish` — przyjmuje partię szuflad: treść, skrzydło i pokój
+      źródłowy, znaczniki czasu, identyfikator repliki i szuflady. Sprawdza rolę
+      `writer` w przestrzeni docelowej, przepuszcza przez filtr sekretów,
+      przelicza embeddingi po stronie serwera, zapisuje z autorem.
+      Tryb `preview=true` zwraca raport bez zapisu.
+- [x] **3.** `POST /api/publish/{batch}/revert` — wycofanie partii: usuwa szuflady z
+      pałaca i wiersze rejestru, zostawia partię ze statusem `reverted`.
+- [x] **4.** Filtr sekretów jako osobny, testowalny serwis (wzorce: `.env`, klucze
+      prywatne, `BEGIN * PRIVATE KEY`, hasła w URL-ach, tokeny o typowych
+      prefiksach). Raport pominięć jest częścią partii.
+- [ ] **5.** **Wysyłka automatyczna** (domyślna): po sesji i po lokalnym mieleniu
+      zbiera szuflady nowsze niż znacznik, ustala przestrzeń docelową regułą
+      lądowania (mapowanie → zespołowa, brak → prywatna) i wysyła partią.
+- [ ] **6.** **Kolejka wyjściowa** w `~/.ws-memory/outbox/`: nieudana wysyłka nie gubi
+      niczego i nie przerywa pracy; ponowienie z narastającym odstępem, znacznik
+      przesuwa się dopiero po potwierdzeniu przez serwer.
+- [ ] **7.** Komenda `/ws-publish` — dla trybu ręcznego: filtr (skrzydło / temat /
+      zakres daty), podgląd, potwierdzenie, wysyłka z widocznym postępem.
+- [ ] **8.** Propozycja mapowania, gdy nazwa lokalnego skrzydła odpowiada istniejącej
+      przestrzeni zespołowej użytkownika.
+- [ ] **9.** Lustra: CRUD w `/api`, ekran w interfejsie (mapowanie skrzydło → przestrzeń,
+      wykluczenia pokoi, pauza, wyłącznik), pierwszy przebieg jako podgląd.
+- [ ] **10.** Lokalny agent wysyłki w pluginie: uruchamiany hookiem `SessionEnd` albo
+      ręcznie, publikuje przyrostowo szuflady nowsze niż `last_drawer_filed_at`.
+- [ ] **11.** Skill `ws-memory-recall` uzupełniony o kolejność dwóch źródeł: najpierw
+      `ws_search` (wspólna baza), potem lokalny `mempalace_search`.
+- [ ] **12.** Dokumentacja dla dewelopera: jak postawić lokalny pałac i podłączyć oba
+      serwery MCP naraz.
 
 ## Postęp
 
-**Zrobione — strona serwera** (2026-09-13, scalone w `main`, PR #17 i #18):
+Stan poszczególnych punktów jest w polach wyboru wyżej. Dwie rzeczy, których
+pola nie powiedzą:
 
-| Punkt | Stan |
-|---|---|
-| 1. Encje i migracja (`mirrors`, `publish_batches`, `publish_settings`) | ✅ `Version20260913000005` |
-| 2. `POST /api/publish` z trybem `preview` | ✅ |
-| 3. `POST /api/publish/{batch}/revert` | ✅ |
-| 4. Filtr sekretów jako osobny serwis w `Domain` | ✅ 24 testy |
-
-Po drodze zamknięta **dziura bezpieczeństwa** zgłoszona przez skanowanie kodu:
-para źródłowa nie była związana z właścicielem, więc podanie cudzej nazwy repliki
-pozwalało nadpisać cudzą szufladę i przenieść jej wiersz do własnej przestrzeni
+**Po drodze zamknięta dziura bezpieczeństwa**, zgłoszona przez skanowanie kodu
+na pull requeście. Para źródłowa nie była związana z właścicielem, więc podanie
+cudzej nazwy repliki zwracało cudzy wiersz — a ścieżka powtórnej publikacji
+nadpisywała wtedy jego szufladę i przenosiła ją do własnej przestrzeni
 (`Version20260913000006`). Rozstrzygnięcia projektowe: **D-036**.
 
-**Do zrobienia — strona klienta i interfejs:**
+**Punkt 11 był już zrobiony** przy TODO-009 — skill `ws-memory-recall` narzuca
+kolejność dwóch źródeł od początku.
 
-| Punkt | Czego brakuje |
-|---|---|
-| 5. Wysyłka automatyczna po sesji i po mieleniu | całość |
-| 6. Kolejka wyjściowa w `~/.ws-memory/outbox/` | całość |
-| 7. Komenda `/ws-publish` | całość |
-| 8. Propozycja mapowania po zbieżnej nazwie skrzydła | wymaga ekranu |
-| 9. Lustra: CRUD w `/api` i ekran w interfejsie | wymaga ekranu |
-| 10. Agent wysyłki we wtyczce (hook `SessionEnd`) | całość |
-| 11. `ws-memory-recall` o kolejności dwóch źródeł | **już jest** — dopisane w TODO-009 |
-| 12. Dokumentacja stawiania lokalnego pałaca | częściowo w `plugin/shared/konfiguracja.md` |
-
-Dopóki punkty 5–10 nie istnieją, **endpointu nie ma kto zawołać poza testami**,
-a wiedza z lokalnego pałaca nie jedzie nigdzie.
+Konsekwencja obecnego stanu, warta powiedzenia wprost: strona serwera działa
+i jest przetestowana, ale **endpointu nie ma kto zawołać poza testami**. Wiedza
+z lokalnego pałaca nie jedzie nigdzie, dopóki nie powstaną punkty 5–10.
 
 ## Kryteria ukończenia
 
-- Deweloper z lokalnym pałacem publikuje szufladę i widzi ją w interfejsie
+- [ ] Deweloper z lokalnym pałacem publikuje szufladę i widzi ją w interfejsie
   z własnym autorstwem oraz oznaczeniem, z której repliki przyszła.
-- Powtórna publikacja tej samej szuflady **nie** tworzy duplikatu (liczba
+- [x] Powtórna publikacja tej samej szuflady **nie** tworzy duplikatu (liczba
   szuflad w przestrzeni bez zmian, wiersz zaktualizowany).
-- Publikacja do przestrzeni bez roli `writer` jest odrzucona.
-- Szuflada z podstawionym plikiem `.env` **nie** przechodzi — ani z klienta,
+- [x] Publikacja do przestrzeni bez roli `writer` jest odrzucona.
+- [ ] Szuflada z podstawionym plikiem `.env` **nie** przechodzi — ani z klienta,
   ani gdy klient ją mimo wszystko wyśle (dwa osobne testy).
-- Przy domyślnych ustawieniach szuflada zapisana lokalnie pojawia się na
+- [ ] Przy domyślnych ustawieniach szuflada zapisana lokalnie pojawia się na
   serwerze **bez żadnej akcji użytkownika**.
-- Skrzydło bez mapowania ląduje w prywatnej przestrzeni właściciela i **nie
+- [x] Skrzydło bez mapowania ląduje w prywatnej przestrzeni właściciela i **nie
   jest widoczne** dla innych członków zespołu (test negatywny).
-- Mapowanie bez potwierdzenia nie kieruje niczego do przestrzeni zespołowej.
-- Wyłączenie `auto_publish` zatrzymuje wysyłkę całkowicie.
-- Ta sama treść wysłana dwukrotnie do jednej przestrzeni jest zapisana raz
+- [x] Mapowanie bez potwierdzenia nie kieruje niczego do przestrzeni zespołowej.
+- [ ] Wyłączenie `auto_publish` zatrzymuje wysyłkę całkowicie.
+- [x] Ta sama treść wysłana dwukrotnie do jednej przestrzeni jest zapisana raz
   (odsiew po `content_hash`).
-- **Przy wyłączonym serwerze** mielenie i zapis lokalny działają normalnie,
+- [ ] **Przy wyłączonym serwerze** mielenie i zapis lokalny działają normalnie,
   a szuflady czekają w kolejce; po włączeniu serwera dopinają się bez
   duplikatów i bez działania użytkownika (test: zatrzymanie kontenera,
   praca, uruchomienie).
-- Przerwanie wysyłki w połowie partii nie gubi szuflad ani nie przesuwa
+- [ ] Przerwanie wysyłki w połowie partii nie gubi szuflad ani nie przesuwa
   znacznika przed potwierdzeniem.
-- Wykluczony pokój nie trafia do przestrzeni, choć jest w skrzydle źródłowym.
-- Wycofanie partii usuwa szuflady i zostawia partię ze statusem `reverted`.
-- Agent z dwoma serwerami MCP znajduje treść i we wspólnej bazie, i w lokalnym
+- [ ] Wykluczony pokój nie trafia do przestrzeni, choć jest w skrzydle źródłowym.
+- [x] Wycofanie partii usuwa szuflady i zostawia partię ze statusem `reverted`.
+- [ ] Agent z dwoma serwerami MCP znajduje treść i we wspólnej bazie, i w lokalnym
   pałacu, w kolejności narzuconej skillem.
-- Kod projektu **nie** pojawia się w żadnym żądaniu do serwera — tylko tekst
+- [ ] Kod projektu **nie** pojawia się w żadnym żądaniu do serwera — tylko tekst
   szuflad (sprawdzone na zapisie ruchu).

@@ -37,30 +37,30 @@ kiedyś coś, czego nikt nie odtworzy.
 
 ## Rozwiązanie
 
-1. Dashboard jakości: przyrost bazy w czasie, udział treści zweryfikowanej,
-   dokumenty bez weryfikacji starsze niż miesiąc, przestrzenie bez aktywności.
-2. Rejestr luk: zgłoszenia z `ws-onboarding` i z ręcznego przycisku „brakuje
-   tu odpowiedzi" — lista do uzupełnienia, z liczbą zapytań.
-3. Wykrywanie duplikatów: zadanie cykliczne oparte na
-   `mempalace_check_duplicate`, wynik jako **propozycje** scalenia.
-4. Oznaczanie treści przedawnionej: dokument może wskazywać, że zastępuje inny;
-   zastąpiony spada w wynikach i pokazuje odnośnik do następcy.
-5. Kolejka propozycji w interfejsie (dla przestrzeni z `requires_proposal`):
-   lista, podgląd, przyjęcie jednym kliknięciem, odrzucenie z uzasadnieniem.
-6. Raport tygodniowy mailem do administratorów: przyrost, luki, duplikaty,
-   zadania w błędzie.
-7. Eksport przestrzeni do plików Markdown — na wypadek migracji i jako backup
-   czytelny bez systemu.
+- [ ] **1.** Dashboard jakości: przyrost bazy w czasie, udział treści zweryfikowanej,
+      dokumenty bez weryfikacji starsze niż miesiąc, przestrzenie bez aktywności.
+- [ ] **2.** Rejestr luk: zgłoszenia z `ws-onboarding` i z ręcznego przycisku „brakuje
+      tu odpowiedzi" — lista do uzupełnienia, z liczbą zapytań.
+- [ ] **3.** Wykrywanie duplikatów: zadanie cykliczne oparte na
+      `mempalace_check_duplicate`, wynik jako **propozycje** scalenia.
+- [ ] **4.** Oznaczanie treści przedawnionej: dokument może wskazywać, że zastępuje inny;
+      zastąpiony spada w wynikach i pokazuje odnośnik do następcy.
+- [ ] **5.** Kolejka propozycji w interfejsie (dla przestrzeni z `requires_proposal`):
+      lista, podgląd, przyjęcie jednym kliknięciem, odrzucenie z uzasadnieniem.
+- [ ] **6.** Raport tygodniowy mailem do administratorów: przyrost, luki, duplikaty,
+      zadania w błędzie.
+- [ ] **7.** Eksport przestrzeni do plików Markdown — na wypadek migracji i jako backup
+      czytelny bez systemu.
 
 ## Kryteria ukończenia
 
-- Dashboard pokazuje przyrost i udział treści zweryfikowanej.
-- Luka zgłoszona przez `ws-onboarding` pojawia się w rejestrze z licznikiem.
-- Zadanie duplikatów znajduje celowo wprowadzoną parę i **proponuje** scalenie,
+- [ ] Dashboard pokazuje przyrost i udział treści zweryfikowanej.
+- [ ] Luka zgłoszona przez `ws-onboarding` pojawia się w rejestrze z licznikiem.
+- [ ] Zadanie duplikatów znajduje celowo wprowadzoną parę i **proponuje** scalenie,
   nie wykonuje go.
-- Dokument oznaczony jako zastąpiony spada w wynikach i pokazuje następcę.
-- Przyjęcie propozycji tworzy dokument z zachowaną informacją o autorstwie AI.
-- Raport tygodniowy dociera i zawiera prawdziwe liczby.
-- Eksport przestrzeni daje pliki Markdown czytelne bez WS_Memory.
-- **Nic w tym zadaniu nie usuwa treści automatycznie** — potwierdzone
+- [ ] Dokument oznaczony jako zastąpiony spada w wynikach i pokazuje następcę.
+- [ ] Przyjęcie propozycji tworzy dokument z zachowaną informacją o autorstwie AI.
+- [ ] Raport tygodniowy dociera i zawiera prawdziwe liczby.
+- [ ] Eksport przestrzeni daje pliki Markdown czytelne bez WS_Memory.
+- [ ] **Nic w tym zadaniu nie usuwa treści automatycznie** — potwierdzone
   przeglądem kodu.

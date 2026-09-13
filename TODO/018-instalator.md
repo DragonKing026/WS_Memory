@@ -68,39 +68,39 @@ własną kopię.
 
 ## Rozwiązanie
 
-1. `scripts/instaluj.sh` — pyta o drogę (Docker / w systemie), zbiera dane,
-   generuje sekrety, zapisuje `.env`, stawia i sprawdza.
-2. Sprawdzenie **przed** czymkolwiek: wersje narzędzi, wolne porty, miejsce na
-   dysku, uprawnienia do Dockera. Braki wypisane naraz, nie po jednym.
-3. **Tryb nieinteraktywny** (`--plik-odpowiedzi`) — instalacja bez człowieka
-   i możliwość powtórzenia dokładnie tej samej instalacji.
-4. Konto administratora zakładane poleceniem konsoli, hasło pokazane raz
-   i zapisane w pliku o prawach `600` z jawną informacją, gdzie leży.
-5. **Sprawdzenie po instalacji**: logowanie działa, `/mcp` odpowiada, pałac
-   odpowiada, wyszukiwanie semantyczne zwraca sensowny wynik
-   (`test/semantyka.sh`). Instalator, który kończy się „gotowe" bez sprawdzenia,
-   przenosi porażkę na pierwszego użytkownika.
-6. `scripts/odinstaluj.sh` — potwierdzenie nazwą instancji, kopia zapasowa przed
-   usunięciem, wypisanie **co dokładnie** zostanie usunięte i co zostanie.
-7. Instalacja w systemie: wykrycie składników, jednostki systemd, konfiguracja
-   nginxa, użytkownik systemowy — na istniejącym Postgresie i PHP.
-8. `README.md` i `docs/05-deployment.md` opisują obie drogi, z jawnym
-   powiedzeniem, która jest wspierana.
+- [ ] **1.** `scripts/instaluj.sh` — pyta o drogę (Docker / w systemie), zbiera dane,
+      generuje sekrety, zapisuje `.env`, stawia i sprawdza.
+- [ ] **2.** Sprawdzenie **przed** czymkolwiek: wersje narzędzi, wolne porty, miejsce na
+      dysku, uprawnienia do Dockera. Braki wypisane naraz, nie po jednym.
+- [ ] **3.** **Tryb nieinteraktywny** (`--plik-odpowiedzi`) — instalacja bez człowieka
+      i możliwość powtórzenia dokładnie tej samej instalacji.
+- [ ] **4.** Konto administratora zakładane poleceniem konsoli, hasło pokazane raz
+      i zapisane w pliku o prawach `600` z jawną informacją, gdzie leży.
+- [ ] **5.** **Sprawdzenie po instalacji**: logowanie działa, `/mcp` odpowiada, pałac
+      odpowiada, wyszukiwanie semantyczne zwraca sensowny wynik
+      (`test/semantyka.sh`). Instalator, który kończy się „gotowe" bez sprawdzenia,
+      przenosi porażkę na pierwszego użytkownika.
+- [ ] **6.** `scripts/odinstaluj.sh` — potwierdzenie nazwą instancji, kopia zapasowa przed
+      usunięciem, wypisanie **co dokładnie** zostanie usunięte i co zostanie.
+- [ ] **7.** Instalacja w systemie: wykrycie składników, jednostki systemd, konfiguracja
+      nginxa, użytkownik systemowy — na istniejącym Postgresie i PHP.
+- [ ] **8.** `README.md` i `docs/05-deployment.md` opisują obie drogi, z jawnym
+      powiedzeniem, która jest wspierana.
 
 ## Kryteria ukończenia
 
-- Na czystej maszynie z Dockerem `./scripts/instaluj.sh` daje **działającą
+- [ ] Na czystej maszynie z Dockerem `./scripts/instaluj.sh` daje **działającą
   instancję**, do której da się zalogować danymi, które wypisał.
-- Instalator uruchomiony drugi raz na istniejącej instancji **nie niszczy
+- [ ] Instalator uruchomiony drugi raz na istniejącej instancji **nie niszczy
   danych** — mówi, co zastał, i pyta.
-- Przerwanie instalatora w połowie (Ctrl+C) nie zostawia stanu, którego
+- [ ] Przerwanie instalatora w połowie (Ctrl+C) nie zostawia stanu, którego
   deinstalator nie umie posprzątać.
-- Brakujący składnik jest zgłoszony **przed** pierwszą zmianą w systemie.
-- `./scripts/odinstaluj.sh` usuwa wszystko, co instalator utworzył, a `docker
+- [ ] Brakujący składnik jest zgłoszony **przed** pierwszą zmianą w systemie.
+- [ ] `./scripts/odinstaluj.sh` usuwa wszystko, co instalator utworzył, a `docker
   ps -a`, `docker volume ls` i katalog projektu nie zawierają po nim śladów
   poza tym, co jawnie zostawił.
-- Deinstalator **nie usuwa kopii zapasowych** bez jawnej opcji.
-- Hasło administratora jest zapisane w pliku o prawach `600`, poza
+- [ ] Deinstalator **nie usuwa kopii zapasowych** bez jawnej opcji.
+- [ ] Hasło administratora jest zapisane w pliku o prawach `600`, poza
   repozytorium, i instalator mówi gdzie.
-- Żaden sekret nie trafia do `.env.example` ani do historii powłoki.
-- Plik odpowiedzi pozwala powtórzyć instalację bez pytań.
+- [ ] Żaden sekret nie trafia do `.env.example` ani do historii powłoki.
+- [ ] Plik odpowiedzi pozwala powtórzyć instalację bez pytań.
