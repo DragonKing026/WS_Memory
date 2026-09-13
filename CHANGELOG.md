@@ -15,6 +15,39 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 15:25 — MemPalace podniesiony do 3.9.0; dwie usterki z prawdziwego przebiegu
+
+Agent aktualizacji zainstalowany jako jednostka systemd i **użyty naprawdę**:
+3.7.0 → 3.9.0, zlecone z panelu, wykonane na hoście. Test semantyki przeszedł na
+nowej wersji (podobieństwo 0,743 dla zapytania bez wspólnych słów z treścią),
+a kopia zapasowa sprzed operacji zapisała się sama.
+
+Uruchomienie na żywo obnażyło dwie usterki, których **nie złapał żaden test** —
+i to jest tu najciekawsze, bo obie są tego samego rodzaju: dotyczą stanu **poza**
+tym, który testy w ogóle widzą.
+
+**Panel po udanej aktualizacji nadal pokazywał starą wersję.** Zapisany stan
+przepisuje wyłącznie sprawdzenie, a nikt o nie nie prosił. Ekran meldował
+„zakończone powodzeniem" i obok tego wersje sprzed operacji, którą właśnie
+ogłosił za zakończoną. Testy tego nie widziały, bo wszystkie asercje dotyczyły
+wierszy, które ta klasa **zapisuje** — a rzecz szła o wiersz, którego nie
+zapisywała.
+
+**Backend nie widział nowego `.env`.** Agent wymieniał tylko kontener pałaca,
+a zmienna środowiskowa ustala się przy **tworzeniu** kontenera. Pole „przypięta"
+pokazywało starą wartość, czyli dokładnie ten rozjazd, który ta funkcja ma
+wykrywać — wywołany przez nią samą. Testy tego nie widziały, bo wszystkie chodzą
+wewnątrz jednego, raz utworzonego kontenera.
+
+Obie poprawki sprawdzone porządnie: test regresji **pokazany najpierw jako
+czerwony** po tymczasowym cofnięciu poprawki, a pełna pętla przejechana drugi raz
+z celowo zafałszowanym stanem, który sam się poprawił.
+
+Morał wart zapisania: **test sprawdza to, co kod robi ze stanem, który zna.**
+Wersja w środowisku kontenera i wiersz przepisywany inną ścieżką są poza tym
+zasięgiem — wychodzą dopiero wtedy, gdy operację wykona się naprawdę.
+
+---
 ## 2026-09-13 14:59 — Administracja wyprowadzona z paska bocznego bazy wiedzy
 
 Pozycja „Administracja → Zależności" wisiała w pasku bocznym obok przestrzeni

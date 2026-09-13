@@ -462,6 +462,26 @@ if ! wykonaj_zmiane docker compose up -d --wait --wait-timeout "${LIMIT_CZEKANIA
   przerwij_porazka "pałac w wersji ${WERSJA_DOCELOWA} nie stał się zdrowy w ${LIMIT_CZEKANIA} s"
 fi
 
+# ─── Krok 6b: backend i worker też muszą zobaczyć nowe .env ──────────────────
+#
+# MEMPALACE_VERSION wchodzi do środowiska kontenerów backendu i workera, a
+# środowisko ustala się przy TWORZENIU kontenera. Sama podmiana pliku nie
+# dociera do procesu, który już działa.
+#
+# Bez tego kroku panel po udanej aktualizacji pokazuje w polu „przypięta" starą
+# wersję — czyli dokładnie ten rozjazd „przypięta vs działająca", który ma
+# wykrywać, tyle że wywołany przez samego siebie. Wyszło przy pierwszym
+# prawdziwym podniesieniu 3.7.0 → 3.9.0; żaden test tego nie łapał, bo wszystkie
+# chodzą wewnątrz jednego, raz utworzonego kontenera.
+#
+# Idzie PRZED testem semantyki i przed zgłoszeniem wyniku, bo `ws:updater:finish`
+# wykonuje się właśnie w tym kontenerze — wymiana po zgłoszeniu ucięłaby raport
+# w połowie.
+
+if ! wykonaj_zmiane docker compose up -d --wait --wait-timeout "${LIMIT_CZEKANIA}" backend worker; then
+  przerwij_porazka "backend lub worker nie wstał po podmianie .env — pałac działa w ${WERSJA_DOCELOWA}, ale aplikacja go nie obsłuży"
+fi
+
 # ─── Krok 7: test semantyki ──────────────────────────────────────────────────
 #
 # Krok, bez którego cała ta operacja byłaby wiarą, a nie sprawdzeniem. Zepsuta
