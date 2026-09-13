@@ -15,6 +15,19 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 13:36 — TODO-016 rozliczone
+
+Gałąź na zadanie, sprawdzenia zawężone ścieżkami, ruleset na jednym checku,
+pełne sprawdzenie przed scaleniem. Szczegóły i to, czego nie zrobiono, w
+`TODO/DONE/016-galaz-na-zadanie.md`.
+
+Ten wpis jest przy okazji sprawdzianem zawężania: zmienia wyłącznie `TODO/`
+i `CHANGELOG.md`, więc `Testy backendu` i `Testy frontendu` powinny zostać
+**pominięte**, a bramka `Wynik sprawdzenia` mimo to zielona. Gdyby pominięcie
+zgłosiło się jako oczekujące zamiast jako w porządku, ten pull request nie dałby
+się scalić — i o to właśnie chodziło w całym rozdzielaniu na etapy.
+
+---
 ## 2026-09-13 13:29 — Sprawdzenia zawężone ścieżkami; pełne sprawdzenie przed scaleniem
 
 Domknięcie D-031. Zadanie `Zakres zmian` porównuje gałąź z `main` i wystawia dwie
