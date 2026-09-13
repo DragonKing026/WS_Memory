@@ -2,7 +2,7 @@
 tags: [ws-memory, decisions, adr, architecture, rationale]
 ---
 
-> Translated from [`docs/06-decyzje.md`](../06-decyzje.md) (synced 2026-09-12).
+> Translated from [`docs/06-decyzje.md`](../06-decyzje.md) (synced 2026-09-13).
 > **The Polish version is authoritative.** Decision numbers are shared between
 > both versions and are the common point of reference.
 
@@ -1173,3 +1173,68 @@ privileges or a manual administrator step on every existing database. Both are a
 price for matching inside a word, given that prefixes cover the real use ("I type
 `Palace`, I want `PalaceWing`"). To be added if somebody genuinely needs it — then
 deliberately, with an administrative step.
+
+---
+
+## D-031 — A branch per task; checks narrowed by path; the full run on main
+
+**Date:** 2026-09-13 12:55 · **Status:** Accepted
+
+Changes land through a **branch per task** (`todo-NNN-short-name`) and a pull
+request, not straight onto `main`. The quick check is **narrowed by path**, and the
+one required check is a **single gate job** ("Wynik sprawdzenia", the check result).
+The full check — the whole stack, the embedding model, the E2E tests — runs **after
+the merge into `main`**, not on every pull request.
+
+**What it was until now:** everything went straight onto `main`. The "Ochrona gałęzi
+głównej" ruleset required a pull request and green checks, but the push script
+bypassed it with the administrator role. Its output said so outright:
+`Bypassed rule violations for refs/heads/main: Changes must be made through
+a pull request.` The rule existed and was broken by every single commit. A rule
+bypassed at every use is not a safeguard — it is an entry in the settings that looks
+like one.
+
+**Rejected:** *permanent layer branches* (`frontend`, `backend`, `docs`) — tempting,
+because the checks could then be pinned to a branch once and for all. Three reasons
+against, all of them from this repository:
+
+1. **Changes do not split along layers, because the project's own rules force them
+   not to.** Every change must have an entry in `CHANGELOG.md`, and documentation
+   goes in the same commit in two languages. The model cache fix of 13 September
+   touched `docker-compose.yml`, `.env.example`, the workflow, `docs/09-ci.md`,
+   `docs/en/09-ci.md` and `CHANGELOG.md`. TODO-007 touched the backend, the frontend
+   and the documentation at once. A layer branch would require cutting such a change
+   into three, none of which is complete on its own.
+2. **`CHANGELOG.md` is appended to AT THE TOP of the file.** That is the worst
+   possible file for branches living in parallel: the conflict is there on every
+   merge, always, and in the same place.
+3. **Permanent branches delay integration.** The slash-encoding bug in a document
+   address (`procedury%2Fpierwsza`) was found by an E2E test at exactly the moment
+   the frontend met the backend. The longer a layer branch lives, the later that
+   moment arrives — and by then it costs more.
+
+**Why a branch per task:** the `TODO-NNN` structure already exists, so the mapping is
+natural and introduces no new convention to remember —
+`todo-015-aktualizacja-mempalace`. The branch lives for hours, not weeks, so a
+conflict in `CHANGELOG.md` is a minor rebase rather than a permanent condition.
+
+**Why one gate job rather than a list of required jobs** — this is a trap that would
+cost half a day of searching, so it is written down explicitly. A frontend-only change
+must not run PHPUnit or PHPStan, which means the backend jobs are to be skipped. But
+**a skipped job does not report as green** — to the protection rule it is forever
+pending, so requiring it outright would block every pull request it does not apply to.
+That is why the ruleset requires a single job ("Wynik sprawdzenia") that always runs,
+collects the results of the others, and treats **a skip as fine and a failure as an
+error**.
+
+**The cost, stated plainly:** an integration fault reaches `main` and we learn about
+it **a few minutes after the merge rather than before it**. This is a deliberate
+trade-off — the full stack answers the question "does all of this come up together",
+and that question is meaningful for the state that actually holds, not for each task
+branch separately. Anybody who wants the answer sooner triggers the run by hand:
+`gh workflow run pelne.yml --ref <branch>`.
+
+**Why the daily schedule stays** despite the full run after every merge: it catches
+what a push cannot — an external dependency breaking without a commit of ours. An
+image disappears, a model stops being available, PyPI changes. Such a failure is
+better known in the morning than at the next change.

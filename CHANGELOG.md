@@ -15,6 +15,51 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 13:01 — Gałąź na zadanie; koniec omijania ochrony main-a (D-031)
+
+Ruleset „Ochrona gałęzi głównej" istniał i wymagał pull requesta oraz zielonych
+checków. I był łamany **przy każdym commicie** — skrypt wypychający pchał prosto
+na `main` rolą administratora, co wypisywał zresztą sam:
+
+```
+remote: Bypassed rule violations for refs/heads/main:
+remote: - Changes must be made through a pull request.
+```
+
+Reguła omijana przy każdym użyciu nie chroni przed niczym. Od teraz: **jedno
+zadanie = jedna gałąź = jeden pull request = jeden merge**, nazwa gałęzi za
+zadaniem (`todo-015-aktualizacja-mempalace`).
+
+Rozważane były stałe gałęzie warstwowe (`frontend`, `backend`, `docs`) i zostały
+odrzucone, bo zmiany w tym repozytorium nie dzielą się po warstwach — wymuszają
+to jego własne reguły. Każda zmiana ma wpis w CHANGELOGU, a dokumentacja idzie
+w tym samym commicie po polsku i po angielsku. Dzisiejsza poprawka cache'u
+dotknęła sześciu plików w czterech „warstwach" naraz. Do tego CHANGELOG dopisuje
+się **na górze pliku**, czyli w miejscu, w którym równolegle żyjące gałęzie
+konfliktują zawsze.
+
+`scripts/wypchnij.sh` przepisany: prowadzi całą drogę od gałęzi do scalenia —
+sprawdzenia lokalne, push gałęzi, założenie pull requesta, oczekiwanie na
+**wszystkie** jego checki, scalenie przez merge commit. Bez `--admin`. Stojąc na
+`main` z lokalnymi commitami sam zdejmuje je na gałąź zadania.
+
+Sprawdzenia będą zawężone ścieżkami — zmiana w samym frontendzie nie ma budzić
+PHPUnita ani PHPStana. Wchodzi tu pułapka warta zapamiętania: **pominięte
+zadanie nie zgłasza się jako zielone, tylko jako wiecznie oczekujące**, więc
+wymaganie go wprost zablokowałoby każdy pull request, którego nie dotyczy.
+Dlatego doszło jedno zadanie-bramka „Wynik sprawdzenia": wykonuje się zawsze,
+zbiera wyniki pozostałych i traktuje pominięcie jako w porządku, a porażkę jako
+błąd. To ono — i tylko ono — jest wymagane przez ruleset.
+
+Przy okazji domknięta druga przyczyna pobierania 2,3 GB przy każdym przebiegu.
+`actions/cache` zapisuje **tylko gdy zadanie skończyło się sukcesem**, a nasze
+padało na E2E — więc poprawiona ścieżka i tak by nie pomogła. Pułapka nakręca
+się sama: jeden czerwony test blokuje cache na zawsze. Odczyt i zapis są teraz
+rozdzielone, zapis ma `if: always()`, ale pod warunkiem, że **test semantyki
+przeszedł** — bo dopiero on dowodzi, że model wczytał się w całości, a zapisanie
+przerwanego pobierania utrwaliłoby uszkodzone pliki pod tym samym kluczem.
+
+---
 ## 2026-09-13 12:46 — E2E na buildzie produkcyjnym; „Nocne” staje się „Pełnym”
 
 Poprzednia poprawka pustego ekranu edytora **nie wystarczyła** i widać to w danych.

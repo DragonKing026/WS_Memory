@@ -1169,3 +1169,70 @@ aplikacji, albo ręczny krok administratora przy każdej istniejącej bazie. Jed
 i drugie to zła cena za szukanie fragmentu w środku słowa, skoro przedrostek
 pokrywa realne użycie („wpisuję `Palace`, chcę `PalaceWing`"). Do dodania, gdy
 ktoś tego naprawdę potrzebuje — wtedy świadomie, z krokiem administracyjnym.
+
+---
+
+## D-031 — Gałąź na zadanie; sprawdzenia zawężone ścieżkami; pełny przebieg na main
+
+**Data:** 2026-09-13 12:55 · **Stan:** Przyjęta
+
+Zmiany wchodzą przez **gałąź na zadanie** (`todo-NNN-krótka-nazwa`) i pull
+request, a nie prosto na `main`. Szybkie sprawdzenie jest **zawężone
+ścieżkami**, a wymaganym sprawdzeniem jest **jedno zadanie-bramka**
+(„Wynik sprawdzenia"). Pełne sprawdzenie — cały stos, model embeddingów,
+testy E2E — rusza **po scaleniu na `main`**, a nie na każdym pull requeście.
+
+**Co było dotąd:** wszystko szło prosto na `main`. Ruleset „Ochrona gałęzi
+głównej" wymagał pull requesta i zielonych sprawdzeń, ale skrypt wypychający
+omijał go rolą administratora. W jego wyjściu widniało to wprost:
+`Bypassed rule violations for refs/heads/main: Changes must be made through
+a pull request.` Reguła istniała i była łamana przy każdym commicie. Reguła
+obchodzona przy każdym użyciu nie jest zabezpieczeniem — jest wpisem
+w ustawieniach, który wygląda jak zabezpieczenie.
+
+**Odrzucono:** *stałe gałęzie warstwowe* (`frontend`, `backend`, `docs`) —
+kuszące, bo sprawdzenia dałoby się przypiąć do gałęzi raz na zawsze. Trzy
+powody przeciw, wszystkie z tego repozytorium:
+
+1. **Zmiany nie dzielą się po warstwach, bo własne reguły projektu to
+   wymuszają.** Każda zmiana musi mieć wpis w `CHANGELOG.md`, a dokumentacja
+   idzie w tym samym commicie w dwóch językach. Poprawka cache'u modelu
+   z 13 września dotknęła `docker-compose.yml`, `.env.example`, workflowu,
+   `docs/09-ci.md`, `docs/en/09-ci.md` i `CHANGELOG.md`. TODO-007 dotknęło
+   backendu, frontendu i dokumentacji naraz. Gałąź warstwowa wymagałaby
+   rozcięcia takiej zmiany na trzy, z których żadna nie jest sama w sobie
+   kompletna.
+2. **`CHANGELOG.md` dopisuje się NA GÓRZE pliku.** To najgorszy możliwy plik
+   dla równolegle żyjących gałęzi: konflikt jest przy każdym scaleniu, zawsze
+   i w tym samym miejscu.
+3. **Stałe gałęzie opóźniają integrację.** Błąd z kodowaniem ukośnika
+   w adresie dokumentu (`procedury%2Fpierwsza`) znalazł test E2E dokładnie
+   w momencie, gdy frontend spotkał backend. Im dłużej gałąź warstwowa żyje,
+   tym później przychodzi ten moment — a wtedy jest już droższy.
+
+**Dlaczego gałąź na zadanie:** struktura `TODO-NNN` już istnieje, więc
+mapowanie jest naturalne i nie wprowadza nowej konwencji do zapamiętania —
+`todo-015-aktualizacja-mempalace`. Gałąź żyje godziny, nie tygodnie, więc
+konflikt na `CHANGELOG.md` jest drobnym rebasem, a nie stanem trwałym.
+
+**Dlaczego jedno zadanie-bramka, a nie lista wymaganych zadań** — to pułapka,
+która kosztowałaby pół dnia szukania, więc zapisujemy ją wprost. Zmiana
+wyłącznie we frontendzie nie ma uruchamiać PHPUnita ani PHPStana, czyli
+zadania backendu mają być pomijane. Ale **pominięte zadanie nie zgłasza się
+jako zielone** — dla reguły ochrony jest wiecznie oczekujące, więc wymaganie
+go wprost zablokowałoby każdy pull request, którego ono nie dotyczy. Dlatego
+ruleset wymaga jednego zadania („Wynik sprawdzenia"), które wykonuje się
+zawsze, zbiera wyniki pozostałych i traktuje **pominięcie jako w porządku,
+a porażkę jako błąd**.
+
+**Koszt, który trzeba nazwać wprost:** usterka integracyjna trafia na `main`
+i dowiadujemy się o niej **kilka minut po scaleniu, a nie przed nim**. To
+świadomy kompromis — pełny stos odpowiada na pytanie „czy to wszystko razem
+wstaje", a to pytanie ma sens dla stanu, który faktycznie obowiązuje, nie dla
+każdej gałęzi zadania z osobna. Kto chce odpowiedzi wcześniej, uruchamia
+przebieg ręcznie: `gh workflow run pelne.yml --ref <gałąź>`.
+
+**Dlaczego harmonogram dobowy zostaje** mimo pełnego przebiegu po każdym
+scaleniu: łapie to, czego push nie złapie — zależność zewnętrzną, która psuje
+się bez naszego commita. Obraz znika, model przestaje być dostępny, PyPI się
+zmienia. O takiej awarii lepiej wiedzieć rano niż przy najbliższej zmianie.

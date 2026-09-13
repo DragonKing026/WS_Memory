@@ -245,19 +245,51 @@ once stops being read. And this particular documentation is input for AI agents
 — an out-of-date description does not merely mislead a person, it is taken as
 fact by a model and propagated into further decisions.
 
+### A branch per task — nothing goes straight to `main`
+
+One task = one branch = one pull request = one merge. The branch is named after
+the task: `todo-015-aktualizacja-mempalace`. For a change with no task, a short
+descriptive slug.
+
+`main` is guarded by a ruleset and **that protection is not bypassed**. For a
+while it was: the push script pushed straight to `main` with an administrator
+role, and its output said so on every commit — `Bypassed rule violations for
+refs/heads/main`. A rule bypassed on every use protects nothing.
+
+**Why a branch per task rather than long-lived layer branches** (`frontend`,
+`backend`, `docs`) — because changes in this repository do not divide by layer,
+and its own rules are what force that. Every change carries an entry in
+`CHANGELOG.md`, and documentation ships in the same commit in two languages, so
+almost every change cuts across. On top of that, `CHANGELOG.md` is appended at
+the top of the file — exactly where branches living in parallel conflict, every
+time. Full reasoning: D-031.
+
+A branch should live for hours, not weeks. The longer it lives, the closer it
+gets to the option we just rejected.
+
 ### Pushing — `./scripts/wypchnij.sh`, not a bare `git push`
 
-The script runs **locally the same checks** that "Szybkie sprawdzenie" runs in CI
-(PHP syntax, PHPUnit, PHPStan, `lint:yaml`, frontend types and tests, the build,
-documentation consistency, task write-ups, workflow and compose syntax), pushes only
-once all of them are green, then **waits for CI** and, on failure, prints the tail of
-the step that broke.
+The script walks the **whole road from branch to merge**: it runs locally the same
+checks that "Szybkie sprawdzenie" runs in CI (PHP syntax, PHPUnit, PHPStan,
+`lint:yaml`, frontend types and tests, the build, documentation consistency, task
+write-ups, workflow and compose syntax), pushes the branch only once all of them are
+green, opens a pull request, waits for **all** of its checks and merges on green. On
+failure it does not merge, and prints the tail of the step that broke.
 
 ```bash
-./scripts/wypchnij.sh                   # check, push, wait
-./scripts/wypchnij.sh --tylko-lokalnie  # check only
-./scripts/wypchnij.sh --bez-czekania    # check and push, do not wait
+./scripts/wypchnij.sh                       # check, push, PR, wait, merge
+./scripts/wypchnij.sh todo-015-aktualizacja # the same, with an explicit branch name
+./scripts/wypchnij.sh --tylko-lokalnie      # check only
+./scripts/wypchnij.sh --bez-czekania        # check, push, open the PR and stop
 ```
+
+Standing on `main` with local commits, the script **moves them onto a task branch**
+and resets `main` to `origin/main`, saying loudly what it did. That is safe, because
+it only ever concerns commits that were never pushed.
+
+Merging uses a **merge commit**, not a squash — commits made after every closed step
+are meant to stay in the history, which is the whole point of making them. The script
+**never uses `--admin`**: bypassing the ruleset is exactly what D-031 put an end to.
 
 **Why this is a rule rather than a convenience:** pushing and moving on means somebody
 else finds out about the red run, several commits later — by which point it is no

@@ -86,15 +86,24 @@ jobs:
         # embeddingów chodzi jako root, więc o prawa nie ma sporu.
         run: mkdir -p /tmp/model-embeddingow
 
-      - name: Cache modelu embeddingów
-        # Bez tego każdy przebieg pobiera ~2,3 GB z Hugging Face.
+      - name: Wagi modelu z poprzedniego przebiegu
+        # Odczyt i zapis są tu ROZDZIELONE (`cache/restore` + `cache/save`
+        # zamiast `cache`), i to nie jest kosmetyka — bez tego cache nie działa
+        # wcale.
         #
-        # Krok istniał już wcześniej i **nie działał**: wskazywał katalog hosta,
-        # a model lądował w wolumenie nazwanym Dockera, którego `actions/cache`
-        # nie widzi. Zapisywał więc pusty katalog przez cały czas — w liście
-        # cache'ów repozytorium nie było ani jednego wpisu dla embeddingów.
-        # Teraz `EMBEDDING_CACHE_DIR` niżej montuje ten katalog do kontenera.
-        uses: actions/cache@v6
+        # `actions/cache` zapisuje dopiero w kroku końcowym i **tylko gdy
+        # zadanie skończyło się sukcesem**. Nasze zadanie padało na testach E2E,
+        # więc zapis nie następował nigdy. Powstała pułapka, która sama się
+        # nakręca: jeden czerwony test blokuje cache na zawsze, a każdy kolejny
+        # przebieg znowu pobiera 2,3 GB — i wygląda to dokładnie tak samo jak
+        # cache, który działa. W liście cache'ów repozytorium nie było ani
+        # jednego wpisu dla embeddingów przy 46 innych.
+        #
+        # (Wcześniej był jeszcze drugi błąd: krok wskazywał katalog hosta, a
+        # model lądował w wolumenie nazwanym Dockera. Rozwiązuje to
+        # `EMBEDDING_CACHE_DIR`.)
+        id: cache-modelu
+        uses: actions/cache/restore@v6
         with:
           path: /tmp/model-embeddingow
           key: embeddings-${{ steps.model.outputs.klucz }}-v2
@@ -107,6 +116,11 @@ jobs:
       - name: Test polskiej semantyki
         # Sedno tego przebiegu. Zapisuje zdanie po polsku i szuka go frazą bez
         # wspólnych słów; przechodzi tylko wtedy, gdy wektory rozumieją polski.
+        #
+        # Identyfikator jest tu po to, żeby zapis cache'u niżej mógł się na nim
+        # oprzeć: ten krok kończy się powodzeniem wyłącznie wtedy, gdy model
+        # naprawdę się wczytał i liczy sensowne wektory.
+        id: semantyka
         run: ./test/semantyka.sh
 
       - name: Backend i sprawdzenie zdrowia
@@ -201,6 +215,23 @@ jobs:
       - name: Dzienniki przy niepowodzeniu
         if: failure()
         run: docker compose logs --tail 100
+
+      - name: Zapisz wagi modelu na przyszłość
+        # `always()`, bo zapis ma być NIEZALEŻNY od wyniku całego zadania —
+        # w tym właśnie tkwił poprzedni błąd.
+        #
+        # Ale nie bezwarunkowo: zapisujemy tylko wtedy, gdy test semantyki
+        # przeszedł. Wtedy wiadomo, że model wczytał się w całości. Zapisanie
+        # cache'u po przerwanym pobieraniu utrwaliłoby uszkodzone pliki pod tym
+        # samym kluczem i psuło każdy następny przebieg.
+        #
+        # Pomijamy też przy trafieniu, bo zapis pod istniejący klucz i tak by
+        # się nie udał — a niepotrzebny błąd w dzienniku uczy ignorować dziennik.
+        if: always() && steps.semantyka.conclusion == 'success' && steps.cache-modelu.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: /tmp/model-embeddingow
+          key: embeddings-${{ steps.model.outputs.klucz }}-v2
 
       - name: Sprzątanie
         if: always()
