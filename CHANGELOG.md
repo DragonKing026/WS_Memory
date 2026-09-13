@@ -15,6 +15,40 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 17:23 — Instrukcje jako zasoby MCP; TODO-009 zamknięte
+
+Gateway wystawia treść z `plugin/shared/` jako **zasoby MCP**: `resources/list`,
+`resources/read` i `resources` w `capabilities`. Siedem adresów w schemacie
+`ws-memory://` — protokół recall, zasady dokumentowania, konfiguracja i po jednym
+na każdego z czterech podagentów. Powód jest ten sam, dla którego instrukcje nie
+mieszkają we wtyczce (D-013): treść ma jedno źródło, a jej zmiana jest **deployem
+serwera**, nie aktualizacją wtyczki u każdej osoby — i każdy klient MCP, nie tylko
+Claude Code, czyta dokładnie ten sam tekst.
+
+Mapowanie adresu na plik jest **jawną tablicą w kodzie**, a nie skanem katalogu:
+skan opublikowałby każdemu agentowi cokolwiek, co do tego katalogu wpadnie —
+brudnopis, kopię zostawioną przez edytor. Frontmatter jest metadanymi opakowania,
+więc wychodzi z treści zasobu. Brak pliku na dysku jest błędem, nigdy pustym
+zasobem: pusta instrukcja czyta się dla modelu jak „nie ma żadnego protokołu"
+i agent po prostu jedzie dalej.
+
+**Odczytu zasobu nie zapisujemy w dzienniku audytu i jest to decyzja, nie
+przeoczenie.** Zasób to statyczny tekst, identyczny dla każdego tokena, a klient
+MCP odpytuje listę przy każdym połączeniu — wpis mówiłby „ktoś się podłączył",
+a nie „ktoś coś zrobił". Ten sam mechanizm dał już w tym systemie 20 335
+fałszywych wpisów `user.login`. Sprawdzone na żywym gatewayu: dziesięć odczytów,
+zero nowych wierszy audytu. Limit tempa obejmuje te metody tak samo jak resztę.
+
+`plugin/` weszło do zakresu backendu w szybkim sprawdzeniu — od teraz zmiana samej
+instrukcji potrafi wywrócić PHPUnita, i ma to zrobić na gałęzi, a nie po scaleniu.
+
+Backend: **416 testów**, PHPStan poziom 8 czysty.
+
+**TODO-009 zamknięte.** Jedno kryterium zostało niespełnione i jest tak zapisane:
+zakazu odpowiadania z wiedzy ogólnej w `ws-onboarding` nie da się potwierdzić
+testem — nie ma mechanizmu, który by go wymusił.
+
+---
 ## 2026-09-13 17:21 — Dwie reguły gita dla pracy równoległej w jednym drzewie
 
 Indeks gita jest wspólny dla wszystkich sesji w katalogu, więc gołe `git commit`
