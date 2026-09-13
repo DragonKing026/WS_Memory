@@ -131,6 +131,24 @@ backend wysyła `{dependency, updater}`, panel spodziewał się samej zależnoś
 Wyszło przy zszywaniu, nie przy pisaniu — schematy przyjmują teraz oba kształty
 i mają na to testy.
 
+### Poprawka po przeglądzie: administracja to osobne miejsce
+
+Pierwsza wersja wieszała „Administracja → Zależności" w pasku bocznym bazy
+wiedzy, obok przestrzeni i surowej pamięci. Zwrócone w przeglądzie i słusznie:
+to dwie różne role i dwa różne pytania. Pasek boczny odpowiada „gdzie jest
+wiedza", a utrzymanie instalacji — „czy to w ogóle działa i kto może tu wejść".
+Zmieszane, każdy czytający dokument miał maszynownię w kącie oka, a
+administrator musiał ją mijać, żeby dojść do swojego.
+
+Administracja ma teraz własny układ (`AdminLayout.vue`) pod `/admin`, z własnym
+paskiem i powrotem do bazy wiedzy; wejście jest ikoną w nagłówku, widoczną tylko
+dla administratora globalnego. Rozstrzyga to od razu pytanie, które wracałoby
+przy każdym kolejnym ekranie administracyjnym z TODO-008: gdzie go powiesić.
+
+Odmowa dla osoby bez roli mieszka w układzie, nie na stronie — obowiązuje każdy
+ekran administracyjny, a powtórzona na każdym z osobna rozjechałaby się przy
+pierwszym, który o niej zapomni.
+
 ### Bezpieczeństwo
 
 Wersja docelowa jest walidowana wzorcem **po obu stronach** — przy zapisie

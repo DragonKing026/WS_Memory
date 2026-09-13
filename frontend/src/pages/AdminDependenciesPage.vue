@@ -293,30 +293,10 @@ function describeFailure(cause: unknown, fallback: string): string {
 </script>
 
 <template>
-  <!-- Refusal, not a redirect: somebody who followed a colleague's link learns why the
-       page is empty instead of wondering whether they mistyped the address. -->
-  <div v-if="!isAdmin" class="max-w-3xl">
-    <UCard>
-      <template #header>
-        <h1 class="font-medium">Zależności</h1>
-      </template>
-
-      <p class="font-medium">Nie masz dostępu do tego panelu.</p>
-      <p class="mt-1 text-sm text-muted">
-        Wersje zależności i ich aktualizacje widzi tylko administrator globalny, bo
-        aktualizacja pałaca pamięci dotyka danych całej instalacji. Jeśli uważasz, że
-        powinieneś tu wchodzić, poproś o tę rolę administratora.
-      </p>
-
-      <template #footer>
-        <UButton :to="{ name: 'home' }" variant="subtle" color="neutral">
-          Wróć do bazy wiedzy
-        </UButton>
-      </template>
-    </UCard>
-  </div>
-
-  <div v-else class="max-w-3xl space-y-4">
+  <!-- Odmowa dla osoby bez roli administratora należy do `AdminLayout`, nie tutaj:
+       obowiązuje każdy ekran administracyjny, a powtórzona na każdym z nich rozjedzie
+       się przy pierwszym, który o niej zapomni. -->
+  <div class="max-w-3xl space-y-4">
     <div>
       <h1 class="text-xl font-semibold">Zależności</h1>
       <p class="text-sm text-muted">

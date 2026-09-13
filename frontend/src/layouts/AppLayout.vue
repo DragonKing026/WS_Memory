@@ -110,6 +110,22 @@ function signOut(): void {
             color="neutral"
             aria-label="Tokeny agentów"
           />
+          <!-- Administracja to osobne miejsce, nie kolejna pozycja obok przestrzeni.
+               Pasek boczny odpowiada na pytanie „gdzie jest wiedza"; utrzymanie
+               instalacji odpowiada na zupełnie inne i miesza dwie role w jednym
+               widoku. Stąd wejście z nagłówka i własny układ po drugiej stronie.
+
+               Widoczne wyłącznie dla administratora globalnego: pozycja menu
+               prowadząca do odmowy jest gorsza niż jej brak, bo przy każdym
+               spojrzeniu przypomina, że część aplikacji jest zamknięta. -->
+          <UButton
+            v-if="auth.user?.isGlobalAdmin === true"
+            :to="{ name: 'admin' }"
+            icon="i-lucide-sliders-horizontal"
+            variant="ghost"
+            color="neutral"
+            aria-label="Administracja"
+          />
           <UAvatar :alt="auth.user?.displayName ?? ''" :text="initials" size="sm" />
           <UButton
             variant="ghost"
@@ -170,23 +186,6 @@ function signOut(): void {
         >
           Surowa pamięć
         </RouterLink>
-
-        <!-- Administration appears only for a global administrator. A menu item that
-             leads to a refusal is worse than no menu item: it teaches everybody else
-             that parts of the application are closed to them, every time they look at
-             the sidebar. -->
-        <template v-if="auth.user?.isGlobalAdmin === true">
-          <p class="text-xs uppercase tracking-wide text-muted px-2 mt-4 mb-1">
-            Administracja
-          </p>
-          <RouterLink
-            :to="{ name: 'admin-dependencies' }"
-            class="block px-2 py-1.5 rounded text-sm hover:bg-elevated"
-            active-class="bg-elevated font-medium"
-          >
-            Zależności
-          </RouterLink>
-        </template>
 
         <template v-if="privateSpace !== null">
           <p class="text-xs uppercase tracking-wide text-muted px-2 mt-4 mb-1">Prywatne</p>

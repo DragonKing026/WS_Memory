@@ -15,6 +15,25 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 14:59 — Administracja wyprowadzona z paska bocznego bazy wiedzy
+
+Pozycja „Administracja → Zależności" wisiała w pasku bocznym obok przestrzeni
+i surowej pamięci. To pomieszanie dwóch ról: pasek boczny odpowiada na pytanie
+„gdzie jest wiedza", a utrzymanie instalacji na zupełnie inne. Czytający dokument
+miał maszynownię w kącie oka, a administrator musiał mijać listę przestrzeni,
+żeby dojść do swojego.
+
+Administracja ma teraz **własny układ** pod `/admin`, z własnym paskiem i jawnym
+powrotem do bazy wiedzy. Wejście jest ikoną w nagłówku, widoczną wyłącznie dla
+administratora globalnego. Odmowa dla osoby bez roli mieszka w układzie, nie na
+pojedynczej stronie — obowiązuje każdy ekran administracyjny, a powtarzana na
+każdym z osobna rozjedzie się przy pierwszym, który o niej zapomni.
+
+Rozstrzyga to przy okazji pytanie, które wracałoby przy każdym kolejnym ekranie
+z TODO-008 (użytkownicy, zaproszenia, przestrzenie, role, audyt): gdzie go
+powiesić.
+
+---
 ## 2026-09-13 14:48 — Aktualizacja MemPalace z panelu administratora (TODO-015)
 
 Pałac jest przypięty na sztywno i to jest słuszne — aktualizacja dotyka wektorów,
