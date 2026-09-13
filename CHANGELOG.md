@@ -15,6 +15,28 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 17:18 — D-033 i D-034: gdzie mieszka wtyczka i czego nie sprawdziliśmy
+
+**D-033** — wtyczka zostaje w tym repozytorium, jako `plugin/`, a
+`.claude-plugin/marketplace.json` w korzeniu wskazuje ją wpisem `"./plugin"`.
+Bez submodułu i bez drugiego repozytorium. Sprawdzone w zainstalowanym katalogu
+wtyczek, nie w dokumentacji: większość wpisów oficjalnego katalogu Anthropica to
+podkatalogi jednego repo, a `claude plugin marketplace add --sparse` istnieje
+wprost pod ten przypadek, więc instalujący nie pobiera całej aplikacji. Wyjście
+na osobne repozytorium zostaje tanie (`git subtree split` plus zmiana wpisu),
+i właśnie dlatego można je odłożyć.
+
+**D-034** koryguje D-012. Ta wymieniła trzy mechanizmy Claude Code jako
+„sprawdzone w dokumentacji"; `TODO-009` dołożyło czwarte założenie. Dwa się
+potwierdziły, dwa nie: `source: {"type": "command"}` ma inny klucz **i inne
+przeznaczenie** (wypisuje ścieżkę do katalogu wtyczki, nie jest hakiem
+instalacyjnym), a zdarzenia `PreCompact` nie ma w udokumentowanej liście.
+
+Reguła, która z tego wynika: **mechanizm zewnętrznego narzędzia wpisujemy do
+decyzji dopiero po tym, jak go uruchomiliśmy.** „Sprawdzone w dokumentacji"
+znaczy „przeczytane".
+
+---
 ## 2026-09-13 16:58 — Treść instrukcji dla agentów: jedno źródło w `plugin/shared/`
 
 Siedem plików z treścią, którą wtyczka WS_Memory ma podawać agentom: protokół
