@@ -289,4 +289,76 @@ final class UpdaterAgentTest extends KernelTestCase
     {
         return (int) $this->connection->fetchOne('SELECT count(*) FROM ws.dependency_updates');
     }
+
+    /**
+     * A finished update must leave the panel showing the versions that are now true.
+     *
+     * Found by performing a real 3.7.0 → 3.9.0 upgrade, not by any test: the order
+     * closed as succeeded and the screen went on saying 3.7.0, because the stored state
+     * is only rewritten by a check and nothing had asked for one. The versions on
+     * screen were the versions from before the operation the screen had just reported
+     * as finished.
+     *
+     * Asserted through `check_problem` rather than a version number, because PyPI is
+     * deliberately unreachable for this suite — so a check that runs is a check that
+     * records a problem, and that row changing is the evidence that it ran at all.
+     */
+    public function testASucceededUpdateRefreshesWhatThePanelWillShow(): void
+    {
+        $this->agent->heartbeat();
+        $ordered = $this->orders->request($this->administrator, 'mempalace', Version::parse('3.9.0'));
+        $claimed = $this->agent->claimNext();
+        self::assertNotNull($claimed);
+
+        self::assertNull(
+            $this->problemRecordedFor('mempalace'),
+            'the fixture starts from a clean check, or this test would prove nothing',
+        );
+
+        $this->agent->finish($claimed->id, true, 'przebudowa i test semantyki przeszły');
+
+        self::assertNotNull(
+            $this->problemRecordedFor('mempalace'),
+            'a successful update must re-read the versions instead of leaving stale ones',
+        );
+        self::assertSame(UpdateStatus::Succeeded->value, $this->statusOf($ordered->id));
+    }
+
+    /**
+     * A failed update must not.
+     *
+     * Nothing changed on the host, so there is nothing new to read — and a check fired
+     * here would overwrite `check_problem` with whatever the network happened to say,
+     * burying the reason the update failed under an unrelated one.
+     */
+    public function testAFailedUpdateLeavesTheStoredVersionsAlone(): void
+    {
+        $this->agent->heartbeat();
+        $ordered = $this->orders->request($this->administrator, 'mempalace', Version::parse('3.9.0'));
+        $claimed = $this->agent->claimNext();
+        self::assertNotNull($claimed);
+
+        $this->agent->finish($claimed->id, false, 'test semantyki nie przeszedł, wycofano');
+
+        self::assertNull($this->problemRecordedFor('mempalace'));
+        self::assertSame(UpdateStatus::Failed->value, $this->statusOf($ordered->id));
+    }
+
+    private function problemRecordedFor(string $name): ?string
+    {
+        $value = $this->connection->fetchOne(
+            'SELECT check_problem FROM ws.dependency_state WHERE name = ?',
+            [$name],
+        );
+
+        return \is_string($value) ? $value : null;
+    }
+
+    private function statusOf(string $id): string
+    {
+        return (string) $this->connection->fetchOne(
+            'SELECT status FROM ws.dependency_updates WHERE id = ?',
+            [$id],
+        );
+    }
 }

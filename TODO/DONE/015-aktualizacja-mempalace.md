@@ -162,6 +162,35 @@ sprawdzenie w PHP. Sprawdzone realnie, nie tylko testem: sześć równoległych
 zleceń → jedno przechodzi, pięć odrzuconych. Sześć równoległych `claim` przy
 jednym zleceniu → dokładnie jedno niepuste wyjście.
 
+### Aktualizacja wykonana naprawdę — i dwie usterki, które to obnażyło
+
+**2026-09-13 15:24.** MemPalace podniesiony **3.7.0 → 3.9.0** przez panel, agentem na
+hoście. Test semantyki przeszedł na nowej wersji: polskie zapytanie bez wspólnych
+słów z treścią znalazło ją z podobieństwem 0,743. Wektory nietknięte. Kopia
+zapasowa sprzed operacji leży w `kopie/palace-20260913-151714-z-3.7.0.dump`
+(2,9 MB).
+
+Uruchomienie na żywo pokazało dwie rzeczy, których **nie złapał żaden test**:
+
+**Panel po udanej aktualizacji nadal pokazywał 3.7.0.** Zapisany stan
+przepisywało wyłącznie sprawdzenie, a nikt o nie nie prosił — więc ekran
+raportował „zakończone powodzeniem" i obok tego wersje sprzed operacji, którą
+właśnie ogłosił za zakończoną. Naprawione: udane zlecenie odświeża stan.
+Niepowodzenie sprawdzenia jest przy tym połykane celowo — aktualizacja się
+udała i to już jest zapisane, a zamiana tego w „nieudane zlecenie" raportowałaby
+odwrotność tego, co się stało.
+
+**Backend nie widział nowego `.env`.** Agent wymieniał tylko kontener pałaca,
+a `MEMPALACE_VERSION` wchodzi do środowiska kontenerów przy ich **tworzeniu**.
+Pole „przypięta" pokazywało więc starą wartość — czyli dokładnie ten rozjazd,
+który ta funkcja ma wykrywać, wywołany przez nią samą. Agent odtwarza teraz
+`backend` i `worker` po podmianie pliku, przed testem semantyki i przed
+zgłoszeniem wyniku (wymiana po zgłoszeniu ucięłaby raport w połowie).
+
+Obie poprawki sprawdzone tak, jak należy: test regresji **najpierw pokazano jako
+czerwony** po tymczasowym cofnięciu poprawki, a całą pętlę przejechano po raz
+drugi z celowo zafałszowanym stanem — który sam się poprawił.
+
 ### Czego nie zrobiono i co jest kruche
 
 - **Automatyczne wycofanie cofa wersję obrazu, nie zawartość bazy.** Gdyby nowsza

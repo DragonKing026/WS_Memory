@@ -46,6 +46,7 @@ final readonly class UpdaterAgent
     public function __construct(
         private UpdateRequestRepository $requests,
         private UpdaterHeartbeat $heartbeat,
+        private DependencyCheckService $check,
         private LoggerInterface $logger,
     ) {
     }
@@ -120,6 +121,37 @@ final readonly class UpdaterAgent
             'outcome' => $outcome->value,
         ]);
 
+        if ($succeeded) {
+            $this->refreshAfterUpdate($id);
+        }
+
         return true;
+    }
+
+    /**
+     * Re-reads the versions once an update has succeeded.
+     *
+     * Without this the panel keeps showing the versions from the last check, which
+     * after a successful update are the versions from **before** it: the update
+     * finishes, the screen still says 3.7.0, and the only way to see the truth is to
+     * press "Sprawdź teraz". Found by running a real 3.7.0 → 3.9.0 upgrade rather than
+     * by any test, because every test asserted on rows this class writes, and this is
+     * about a row it did not write.
+     *
+     * Failure here is logged and swallowed on purpose. The update itself succeeded and
+     * that fact is already recorded; turning "we could not reach PyPI a second later"
+     * into a failed order would report the opposite of what happened, and the next
+     * scheduled check will correct the display anyway.
+     */
+    private function refreshAfterUpdate(string $id): void
+    {
+        try {
+            $this->check->check();
+        } catch (\Throwable $problem) {
+            $this->logger->warning('Aktualizacja się powiodła, ale nie udało się odświeżyć wersji.', [
+                'requestId' => $id,
+                'problem' => $problem->getMessage(),
+            ]);
+        }
     }
 }
