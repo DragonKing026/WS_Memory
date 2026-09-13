@@ -19,6 +19,11 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  * is the only moment a private space is created. Both halves are tested
  * together because a half-completed acceptance — an account with nowhere to
  * write — would break inviolable rule 6 on the very first agent write.
+ *
+ * Accepting an invitation now also puts the account in the shared space everybody
+ * belongs to, in the same transaction and for a related reason: an account that
+ * exists but reaches no team knowledge is an account somebody has to finish
+ * creating by hand.
  */
 final class InvitationFlowTest extends KernelTestCase
 {
@@ -26,11 +31,19 @@ final class InvitationFlowTest extends KernelTestCase
     private IssueInvitation $issue;
     private AcceptInvitation $accept;
     private SpaceAccessResolver $access;
+    private string $sharedSlug;
 
     protected function setUp(): void
     {
         self::bootKernel();
         $container = static::getContainer();
+
+        // Configuration, not a constant: the test environment uses a different slug
+        // than production on purpose, and this test is about the rule, not the value.
+        $slug = $container->getParameter('app.default_space.slug');
+        self::assertIsString($slug);
+
+        $this->sharedSlug = $slug;
 
         $this->em = $container->get(EntityManagerInterface::class);
         $this->issue = $container->get(IssueInvitation::class);
@@ -42,7 +55,17 @@ final class InvitationFlowTest extends KernelTestCase
         );
     }
 
-    public function testAcceptingInvitationCreatesAccountWithItsOwnPrivateSpace(): void
+    /**
+     * A fresh account reaches exactly two spaces, and which is which is the point.
+     *
+     * It used to reach one, and "exactly its private space" was the whole rule. That
+     * stopped being true: the account is now also put in the shared space everybody
+     * belongs to. Both are named instead of counted, because they answer different
+     * questions — the private one is where a write that names no space lands
+     * (inviolable rule 6), the shared one is what makes the account useful on its
+     * first day without an administrator adding it to anything.
+     */
+    public function testAcceptingInvitationCreatesPrivateSpaceAndJoinsTheSharedOne(): void
     {
         $issued = ($this->issue)('nowy@web-systems.pl');
 
@@ -50,9 +73,16 @@ final class InvitationFlowTest extends KernelTestCase
 
         self::assertSame('nowy@web-systems.pl', $user->getEmail());
 
-        $spaces = $this->access->allowedSpaces(Actor::human($user->getId()->toRfc4122()));
-        self::assertCount(1, $spaces, 'a fresh account must own exactly its private space');
-        self::assertStringStartsWith('priv_', (string) $spaces[0]);
+        $slugs = array_map(
+            static fn (SpaceId $space): string => (string) $space,
+            $this->access->allowedSpaces(Actor::human($user->getId()->toRfc4122())),
+        );
+        sort($slugs);
+
+        $expected = ['priv_' . $user->getId()->toRfc4122(), $this->sharedSlug];
+        sort($expected);
+
+        self::assertSame($expected, $slugs, 'the private space to write into and the shared one to read');
     }
 
     public function testPrivateSpaceIsInvisibleToEveryoneElse(): void
