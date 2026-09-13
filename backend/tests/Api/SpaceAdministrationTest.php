@@ -227,6 +227,40 @@ final class SpaceAdministrationTest extends WebTestCase
     }
 
     /**
+     * Granting somebody the role they already hold changes nothing, so it records nothing.
+     *
+     * The request still succeeds — repeating it is not an error, and a client should be
+     * able to state the role it wants without first asking what it is. What must not
+     * happen is the entry: `space.member_role_changed` with `previousRole` equal to the
+     * new role is a log line describing a change that did not occur. This system has
+     * already paid for that habit once, with 20 335 `user.login` rows written per
+     * request instead of per sign-in.
+     */
+    public function testGrantingTheRoleSomebodyAlreadyHasRecordsNothing(): void
+    {
+        $token = $this->tokenFor('szef@web-systems.pl');
+
+        $this->postJson('/api/spaces/alfa/members', [
+            'email' => 'admin@web-systems.pl',
+            'role' => 'reader',
+        ], $token);
+        self::assertResponseIsSuccessful();
+
+        $this->postJson('/api/spaces/alfa/members', [
+            'email' => 'admin@web-systems.pl',
+            'role' => 'reader',
+        ], $token);
+        self::assertResponseIsSuccessful('repeating a grant is not an error');
+
+        $actions = $this->em->getConnection()->fetchFirstColumn(
+            "SELECT action FROM ws.audit_log WHERE space_slug = 'alfa' "
+            . "AND action LIKE 'space.member%' ORDER BY created_at"
+        );
+
+        self::assertSame(['space.member_added'], $actions);
+    }
+
+    /**
      * A switched-off account cannot be given access, because giving it changes nothing.
      *
      * The grant would succeed, the person still could not sign in, and the trail would

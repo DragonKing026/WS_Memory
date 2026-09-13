@@ -15,6 +15,27 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 17:44 — Trzy usterki wyłapane pierwszym logowaniem na świeże konto
+
+**Ekran zaproszeń nie otwierał się w ogóle.** Schemat frontendu wymagał, żeby
+każde zaproszenie miało zapraszającego, a **pierwsze konto każdej instancji
+zaprasza się z konsoli**, gdzie nikt nie jest zalogowany — więc `invitedBy` jest
+puste. Backend miał to poprawnie jako `?string` od encji po kontroler; złożenie
+psuł wyłącznie Zod. Efekt: ekran padał na każdej świeżo postawionej instancji, dla
+każdego, i wychodziło to dopiero po zalogowaniu się tym pierwszym kontem. Teraz
+zaproszenie bez zapraszającego wyświetla się jako „wystawione z konsoli".
+
+**Nadanie roli, którą ktoś już ma, dopisywało do audytu wpis o zmianie.**
+`space.member_role_changed` z `previousRole: "admin"` na `"admin"` — zdanie o
+zmianie, której nie było. Żądanie nadal kończy się powodzeniem, bo powtórzenie nie
+jest błędem, ale **nie zapisuje wiersza**. To ta sama rodzina co 20 335 fałszywych
+`user.login`: zdarzenie zapisywane przy żądaniu zamiast przy realnej czynności.
+Reguła ogólna trafiła do `docs/08-backend.md`.
+
+**Pusta przestrzeń odsyłała do TODO-008** — „edytor w przeglądarce dochodzi
+w TODO-008" — a edytor istnieje od wczoraj.
+
+---
 ## 2026-09-13 17:23 — Instrukcje jako zasoby MCP; TODO-009 zamknięte
 
 Gateway wystawia treść z `plugin/shared/` jako **zasoby MCP**: `resources/list`,

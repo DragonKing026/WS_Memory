@@ -198,6 +198,12 @@ the **persistence model**, and the rules live in `Domain/`.
 An unknown account and a wrong password answer identically — otherwise the login
 form would double as a way to check who works here.
 
+**The general rule, from the same lesson: an action that changed nothing writes no
+audit entry.** Granting somebody the role they already hold succeeds — repeating a
+request is not an error — but **records no row**. An entry reading "role changed
+from admin to admin" describes a change that did not happen, and it spoils the
+journal in exactly the way the fictitious sign-ins did, only more slowly.
+
 ### Reading a space
 
 1. The `api` firewall verifies the JWT and loads the user **from the database on

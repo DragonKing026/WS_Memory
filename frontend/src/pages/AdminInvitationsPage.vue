@@ -301,7 +301,9 @@ onMounted(() => void load())
               </p>
 
               <p class="mt-1 text-xs text-muted">
-                zaprosił {{ invitation.invitedBy }} ·
+                <!-- Zaproszenie z konsoli nie ma zapraszającego. Nazywamy to wprost,
+                     zamiast pokazywać puste miejsce po słowie „zaprosił". -->
+                {{ invitation.invitedBy === null ? 'wystawione z konsoli' : `zaprosił ${invitation.invitedBy}` }} ·
                 {{ formatDateTimeOr(invitation.createdAt, 'bez daty') }}
                 <template v-if="invitation.acceptedAt !== null">
                   · przyjęte {{ formatDateTimeOr(invitation.acceptedAt, 'bez daty') }}

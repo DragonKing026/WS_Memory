@@ -17,9 +17,16 @@ export const invitationStatusSchema = z.enum(['oczekuje', 'przyjete', 'wygasle']
 export const adminInvitationSchema = z.object({
   id: z.string().min(1),
   email: z.string(),
-  /** Display name of whoever issued it. An invitation is an act with an author, and it
-   *  is the only trace of who let a person in. */
-  invitedBy: z.string(),
+  /**
+   * Display name of whoever issued it, or null when nobody was signed in.
+   *
+   * Null is not an edge case: the first account on any instance is invited from the
+   * console (`ws:user:invite`), where there is no acting user to record — so the very
+   * first row every instance ever has carries a null here. Requiring a string broke
+   * this screen on day one for everybody, and the error surfaced only after somebody
+   * signed in with that first account.
+   */
+  invitedBy: z.string().nullable(),
   grantsGlobalAdmin: z.boolean(),
   status: invitationStatusSchema,
   createdAt: z.string(),
