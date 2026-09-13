@@ -15,6 +15,34 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:44 — Dwa nowe zadania: wysyłka maili i instalator
+
+**TODO-017** — system nie wysyła ani jednego maila i nigdy nie wysyłał; brakuje
+zależności, konfiguracji i nadawcy. Zaproszenie wypisuje link, a człowiek
+przekazuje go sam. Dokumentacja w tym miejscu **kłamie**: opisuje `WS_DOMAIN`
+jako „domena publiczna (certyfikat, linki w mailach)". Szablony będą edytowalne
+w panelu, ale **przez podstawianie miejsc, nie silnik szablonów** — szablon
+edytowany w przeglądarce i renderowany silnikiem to wykonywanie cudzego kodu na
+serwerze. Dziennik maili **nie zapisuje treści**: mail z zaproszeniem zawiera
+działający token, a dziennik z ciałem wiadomości byłby drugą kopią poświadczenia
+w miejscu, do którego zagląda się swobodnie.
+
+**TODO-018** — instalator i deinstalator. Powód wyszedł dziś na jaw w praktyce:
+nikt nie wiedział, jakie jest hasło administratora, bo instancja powstała bez
+zapisania go gdziekolwiek, a polecenia do jego ustawienia jeszcze nie było.
+Instalator **generuje sekrety zamiast o nie pytać** — sekret wpisany z palca jest
+albo słaby, albo zapisany w drugim miejscu. Instalacja w systemie **nie będzie
+udawać**, że postawi Postgresa z pgvector na dowolnej dystrybucji: wykryje braki
+i zainstaluje samą aplikację na tym, co jest. Deinstalator ma być trudniejszy od
+instalatora i domyślnie **zostawiać kopie zapasowe**.
+
+Przy okazji posprzątane dwa drzewa robocze po podagentach. Kontenery montujące je
+pisały jako root, więc 1159 plików nie dało się usunąć zwykłym `rm` — poszły
+kontenerem. W głównym drzewie ten sam mechanizm dotknął dwóch **śledzonych**
+plików (`frontend/auto-imports.d.ts`, `components.d.ts`); właściciel przywrócony.
+
+
+---
 ## 2026-09-13 19:33 — Dało się przejąć cudzą szufladę przez publikację
 
 Zgłoszone przez skanowanie kodu na pull requeście, zanim endpoint miał
