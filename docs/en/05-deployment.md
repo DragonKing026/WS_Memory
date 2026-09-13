@@ -153,13 +153,34 @@ Restoring from a backup must be tested — an untested backup is not a backup.
 ## Upgrading MemPalace
 
 MemPalace is a black box behind the HTTP MCP boundary (D-001), so upgrading it
-does not touch our code:
+does not touch our code. The version is pinned in `.env`
+(`MEMPALACE_VERSION`) and installed from PyPI when the image is built.
+
+### From the administration panel
+
+The application checks PyPI every six hours and shows, under
+**Administracja → Zależności**, the running, pinned and latest versions. The
+button files a request; a **host agent** carries it out, because no container is
+given access to Docker (D-032). The agent backs up the `palace` schema, rebuilds
+the image, replaces the container, runs the semantics test and **rolls back** if
+that test fails.
+
+This needs a one-off systemd unit installation, described in
+`docker/systemd/README.md`. Until it is there, the panel says plainly that the
+updater is unavailable and **shows no button** that would do nothing anyway.
+Checking versions works without the agent.
+
+One limitation of the automatic rollback is worth knowing: it reverts the
+**image version, not the database contents**. Should a newer palace migrate the
+`palace` schema, the older image may not understand it — that needs manual
+intervention, and the agent prints a ready `pg_restore` command in the log.
+
+### By hand
 
 1. Back up the database.
-2. Bump the version in `docker/mempalace/Dockerfile`, rebuild the image.
+2. Bump `MEMPALACE_VERSION` in `.env`, rebuild the image.
 3. `docker compose up -d mempalace`, check `/healthz`.
-4. Run the Polish semantics integration test (`make test-semantyka`) — if it
-   passes, the vectors are intact.
+4. `./test/semantyka.sh` — if it passes, the vectors are intact.
 
 What you must **not** do while upgrading: change the embedding model "while
 you're at it". That is a separate operation requiring the whole base to be

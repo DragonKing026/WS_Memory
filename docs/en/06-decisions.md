@@ -1238,3 +1238,76 @@ branch separately. Anybody who wants the answer sooner triggers the run by hand:
 what a push cannot — an external dependency breaking without a commit of ours. An
 image disappears, a model stops being available, PyPI changes. Such a failure is
 better known in the morning than at the next change.
+
+---
+
+## D-032 — Updating MemPalace through a host agent, not a Docker socket
+
+**Date:** 2026-09-13 14:05 · **Status:** Accepted
+
+The administration panel lets someone **request** a MemPalace update. The request
+lands in a database table; a script running periodically **on the host** (a
+systemd timer) carries it out. No container is given access to Docker.
+
+### Why this is needed at all
+
+MemPalace is pinned hard (`MEMPALACE_VERSION`, `pip install mempalace==...`), and
+rightly so — updating the palace touches the vectors, so it must not happen by
+accident. The side effect, though, is that **nobody knows when something new came
+out**. While writing this task it turned out 3.7.0 was running while PyPI had
+3.9.0 — two minor versions behind, and we only learned it because somebody asked
+by hand. That is the kind of debt that grows quietly until updating stops being a
+step and becomes a project.
+
+### Rejected: a Docker socket in the backend container
+
+The easiest to build and the worst available. A container holding
+`/var/run/docker.sock` can start any image with any mount, which is authority
+**equivalent to root on the host**. The backend serves traffic from the network
+and holds user accounts, so any remote code execution in Symfony, or one
+compromised administrator account, would end in a compromised machine. The
+convenience is not worth it.
+
+### Rejected: a separate updater service with the Docker socket
+
+A smaller surface — a service with no host port, reachable only from the compose
+network, with a narrow API. But the backend can still call it, so breaking into
+the backend still yields Docker. That moves the boundary by one step rather than
+drawing it.
+
+### Chosen: a host agent, talking through the database
+
+The backend writes a **request**; the agent picks it up. Compromising the web
+application allows, at most, requesting an update to a version that exists on
+PyPI — not running arbitrary code on the host.
+
+The agent talks to the application through `docker compose exec backend php
+bin/console`, not over HTTP. That way there is no need to invent authentication
+for the agent, nor to expose an endpoint that would have to be protected by
+something other than a user session.
+
+**The target version is validated by pattern on both sides** — when the request
+is stored and again in the agent. Not out of distrust of the backend, but because
+one layer of validation is zero layers on the day that layer has a bug. This is
+the only place where data from the application feeds a command executed on the
+host.
+
+### What the agent always does
+
+A backup of the `palace` schema **before** the rebuild and `test/semantyka.sh`
+**after** it, rolling back on failure. The reason is in D-003: broken search
+relevance is **silent** — search still answers, it just stops hitting. An update
+without that test would be an update after which nobody knows whether something
+broke.
+
+### The cost we accept knowingly
+
+Installation is no longer just `docker compose up`: a systemd unit has to be
+installed as well. Until it is, the panel **says plainly that the updater is
+unavailable** and shows no button that would do nothing. A button without an
+effect is worse than no button, because it teaches people to distrust the
+interface.
+
+The second cost: a click gives no immediate result, only a request picked up
+within a minute. The panel shows the state and the log, so the wait is visible
+rather than mysterious.
