@@ -15,6 +15,35 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 11:59 — Testy E2E i usterka, którą znalazły od razu
+
+Playwright w `frontend/e2e/`, uruchamiany przeciwko **działającemu stosowi**:
+logowanie → utworzenie → edycja → porównanie rewizji → cofnięcie, plus
+sprawdzenie, że świeżo zapisany dokument jest znajdowalny. W przebiegu nocnym,
+na maszynie przebiegu — Playwright potrzebuje przeglądarki z bibliotekami
+systemowymi, których obraz Alpine nie ma.
+
+**Pierwsze uruchomienie znalazło usterkę, której nie widziało nic innego.**
+Adres dokumentu ze ścieżką w nazwie (`procedury/pierwsza`) wychodził jako
+`procedury%2Fpierwsza`, bo vue-router koduje ukośnik wewnątrz parametru. Strona
+się otwierała, więc nic nie wyglądało na zepsute — ale adres różnił się od tego,
+do którego odsyłają drzewo i wyniki wyszukiwania, i to on trafiał do schowka.
+Adresy dokumentów budujemy teraz jako napisy (`features/documents/paths.ts`),
+z każdym odcinkiem kodowanym osobno.
+
+Do tego **potwierdzenie przy unieważnianiu tokena agenta**, którego brakowało:
+unieważnienie działa od następnego żądania agenta i nie da się go cofnąć —
+jedyna droga powrotna to wystawienie nowego tokena i przekonfigurowanie tego, co
+go używało. Na pojedyncze kliknięcie w liście podobnych wierszy to za mało
+ceremonii.
+
+Sam test też miał dwa błędy, oba mojego autorstwa i oba pouczające: liczyłem
+wiersze przez `hasText` z kotwicą `^`, która nigdy nie dopasuje elementu
+zawierającego więcej tekstu, a potem liczyłem je przez `count()`, które **na nic
+nie czeka** — więc test porównywał zero z zerem i przechodziłby, gdyby nie
+asercja na konkretną liczbę.
+
+---
 ## 2026-09-13 11:46 — Fałszywy alarm skryptu wypychającego
 
 Skrypt zgłosił porażkę CI, choć wszystkie trzy przebiegi były zielone. Winny był

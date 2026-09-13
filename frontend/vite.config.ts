@@ -44,6 +44,9 @@ export const baseConfig: ViteUserConfig = {
   },
   test: {
     environment: 'happy-dom',
+    // Wąsko i celowo: `e2e/` to testy Playwrighta, uruchamiane przez `test:e2e`
+    // przeciwko działającemu stosowi. Domyślny wzorzec Vitesta złapałby je jako
+    // testy jednostkowe i wywrócił się na braku przeglądarki.
     include: ['tests/**/*.test.ts'],
     globals: false,
   },

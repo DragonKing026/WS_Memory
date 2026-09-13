@@ -166,6 +166,33 @@ To check that the separation holds: `mount | grep /app` inside the container mus
 **two** lines — `/app` and, separately, `/app/node_modules`. One line means both sides
 are sharing a single directory.
 
+## End-to-end tests
+
+`frontend/e2e/` — Playwright, run against a **running stack**, not against mocks. It is
+the only place that checks whether signing in, saving a document, comparing revisions
+and rolling back work **together**, through nginx, Vite, the API and the database —
+which is the only arrangement a person ever performs.
+
+```bash
+docker compose up -d               # the stack must be up
+cd frontend && pnpm test:e2e
+```
+
+The config has no `webServer`: the stack is brought up by `docker compose`, and a
+Playwright-started server would test a different arrangement than the one that ships.
+In CI the tests run in the nightly workflow, on the runner rather than in the container
+— Playwright needs a browser with system libraries the Alpine image does not have.
+
+Vitest has a deliberately narrow `include` (`tests/**/*.test.ts`): the default pattern
+would pick up `e2e/*.spec.ts` as unit tests and fail on the missing browser.
+
+**The first run of these tests found a bug** nothing else saw: the address of a document
+whose slug contains a path (`procedury/pierwsza`) came out as `procedury%2Fpierwsza`,
+because vue-router encodes a slash inside a parameter. The page still opened, so nothing
+looked broken — but the address differed from what the tree and the search results link
+to, and it is what gets copied into a message. Hence `features/documents/paths.ts`:
+document addresses are built as strings, not through `params`.
+
 ## Dependency overrides
 
 `package.json` carries a single `pnpm.overrides` entry: **`esbuild: ^0.28.2`**.

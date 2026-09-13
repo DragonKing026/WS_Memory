@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { documentPath } from '@/features/documents/paths'
 import type { DocumentFolder } from '@/features/documents/tree'
 
 /**
@@ -62,7 +63,7 @@ function formatDate(value: string): string {
 
           <div class="min-w-0">
             <RouterLink
-              :to="{ name: 'document', params: { space, slug: leaf.item.slug } }"
+              :to="documentPath(space, leaf.item.slug)"
               class="text-sm hover:underline break-words"
             >
               {{ leaf.item.title }}

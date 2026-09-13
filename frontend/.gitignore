@@ -5,3 +5,7 @@ dist/
 
 # Magazyn pnpm, gdyby ktoś uruchomił install ze starym obrazem (patrz docker/frontend/Dockerfile).
 .pnpm-store/
+
+# Artefakty Playwrighta — ślady i zrzuty z nieudanych przebiegów.
+test-results/
+playwright-report/

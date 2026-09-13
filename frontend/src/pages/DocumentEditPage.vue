@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import MarkdownEditor from '@/components/documents/MarkdownEditor.vue'
 import MarkdownView from '@/components/documents/MarkdownView.vue'
 import { clearDraft, readDraft, saveDraft, type Draft } from '@/features/documents/draft'
+import { documentHistoryPath, documentPath } from '@/features/documents/paths'
 import { documentService } from '@/features/documents/service'
 import { useAuthStore } from '@/stores/auth'
 
@@ -155,7 +156,7 @@ async function save(force = false): Promise<void> {
     })
 
     clearDraft(space.value, slug.value)
-    await router.push({ name: 'document', params: { space: space.value, slug: slug.value } })
+    await router.push(documentPath(space.value, slug.value))
   } catch (error) {
     problem.value = error instanceof Error ? error.message : 'Nie udało się zapisać.'
   } finally {
@@ -217,7 +218,7 @@ onBeforeUnmount(() => {
           <UButton
             variant="ghost"
             color="neutral"
-            :to="{ name: 'document', params: { space, slug } }"
+            :to="documentPath(space, slug)"
           >
             Anuluj
           </UButton>
@@ -265,11 +266,7 @@ onBeforeUnmount(() => {
             <UButton
               size="xs"
               variant="subtle"
-              :to="{
-                name: 'history',
-                params: { space, slug },
-                query: { od: baseRevision ?? undefined, do: conflict },
-              }"
+              :to="`${documentHistoryPath(space, slug)}?od=${baseRevision ?? ''}&do=${conflict}`"
               target="_blank"
             >
               Zobacz, co się zmieniło

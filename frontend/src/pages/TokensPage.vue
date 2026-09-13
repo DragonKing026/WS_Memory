@@ -63,14 +63,29 @@ async function issue(): Promise<void> {
   }
 }
 
+/**
+ * Which token the reader is being asked about.
+ *
+ * Revoking takes effect at the agent's very next request and cannot be undone — the
+ * only way back is issuing a new token and reconfiguring whatever used the old one.
+ * A single click is too little ceremony for that, especially in a list where the rows
+ * look alike.
+ */
+const confirmingRevoke = ref<string | null>(null)
+const revoking = ref(false)
+
 async function revoke(token: AgentToken): Promise<void> {
   problem.value = null
+  revoking.value = true
 
   try {
     await tokenService.revoke(token.id)
+    confirmingRevoke.value = null
     await load()
   } catch (cause) {
     problem.value = cause instanceof Error ? cause.message : 'Nie udało się unieważnić tokena.'
+  } finally {
+    revoking.value = false
   }
 }
 
@@ -210,15 +225,30 @@ onMounted(load)
           </div>
 
           <UButton
-            v-if="token.usable"
+            v-if="token.usable && confirmingRevoke !== token.id"
             color="error"
             variant="ghost"
             size="sm"
             icon="i-lucide-ban"
-            @click="revoke(token)"
+            @click="confirmingRevoke = token.id"
           >
             Unieważnij
           </UButton>
+
+          <div v-else-if="token.usable" class="flex shrink-0 items-center gap-2">
+            <span class="text-xs text-muted">Odciąć natychmiast?</span>
+            <UButton color="error" size="xs" :loading="revoking" @click="revoke(token)">
+              Tak
+            </UButton>
+            <UButton
+              variant="subtle"
+              color="neutral"
+              size="xs"
+              @click="confirmingRevoke = null"
+            >
+              Nie
+            </UButton>
+          </div>
         </li>
       </ul>
     </UCard>

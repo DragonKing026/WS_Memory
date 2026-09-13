@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { documentPath } from '@/features/documents/paths'
 import { kindLabels, type SearchHit, type SearchMode } from '@/features/search/schemas'
 
 /**
@@ -22,12 +23,7 @@ const props = defineProps<{ hit: SearchHit; mode: SearchMode }>()
 /** A document has a page; raw memory does not, and a link that goes nowhere is worse
  *  than no link. */
 const target = computed(() =>
-  props.hit.documentSlug === null
-    ? null
-    : {
-        name: 'document',
-        params: { space: props.hit.space, slug: props.hit.documentSlug },
-      },
+  props.hit.documentSlug === null ? null : documentPath(props.hit.space, props.hit.documentSlug),
 )
 
 /**

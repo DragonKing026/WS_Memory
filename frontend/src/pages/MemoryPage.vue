@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
+import { documentPath } from '@/features/documents/paths'
 import { kindLabels } from '@/features/search/schemas'
 import type { MemoryEntry } from '@/features/memory/schemas'
 import { memoryService } from '@/features/memory/service'
@@ -149,10 +150,7 @@ watch([spaces, kind, since, before], () => void load(), { immediate: true })
             <div class="min-w-0">
               <RouterLink
                 v-if="entry.documentSlug"
-                :to="{
-                  name: 'document',
-                  params: { space: entry.space, slug: entry.documentSlug },
-                }"
+                :to="documentPath(entry.space, entry.documentSlug)"
                 class="font-medium hover:underline break-words"
               >
                 {{ entry.title }}

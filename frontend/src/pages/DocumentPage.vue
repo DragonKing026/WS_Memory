@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import MarkdownView from '@/components/documents/MarkdownView.vue'
+import { documentEditPath, documentHistoryPath } from '@/features/documents/paths'
 import { documentService } from '@/features/documents/service'
 import type { DocumentDetail } from '@/features/documents/schemas'
 import { useAuthStore } from '@/stores/auth'
@@ -130,7 +131,7 @@ watch([space, slug], () => void load(), { immediate: true })
             size="sm"
             variant="subtle"
             icon="i-lucide-history"
-            :to="{ name: 'history', params: { space, slug } }"
+            :to="documentHistoryPath(space, slug)"
           >
             Historia
           </UButton>
@@ -138,7 +139,7 @@ watch([space, slug], () => void load(), { immediate: true })
             v-if="canWrite"
             size="sm"
             icon="i-lucide-pencil"
-            :to="{ name: 'document-edit', params: { space, slug } }"
+            :to="documentEditPath(space, slug)"
           >
             Edytuj
           </UButton>

@@ -96,6 +96,49 @@ jobs:
       - name: Testy backendu na pełnym stosie
         run: make test
 
+      - name: Frontend na pełnym stosie
+        # Frontend nie startuje razem z backendem, bo szybki przebieg go nie
+        # potrzebuje. Tutaj jest niezbędny: testy E2E chodzą przez nginxa,
+        # dokładnie tą drogą, którą chodzi człowiek.
+        run: |
+          docker compose up -d --wait --wait-timeout 300 frontend
+          docker compose up -d --wait --wait-timeout 120 nginx
+
+      - name: Node 22 dla testów E2E
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+
+      - name: pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Zależności frontendu na maszynie przebiegu
+        # Na maszynie przebiegu, nie w kontenerze: Playwright potrzebuje
+        # przeglądarki z bibliotekami systemowymi, których obraz Alpine nie ma.
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Przeglądarka dla Playwrighta
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Testy E2E
+        working-directory: frontend
+        env:
+          WS_E2E_URL: http://127.0.0.1:8080
+        run: pnpm test:e2e
+
+      - name: Ślady z nieudanych testów E2E
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-slady
+          path: frontend/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Zużycie pamięci przez usługi
         # Nie jest to asercja, tylko zapis w dzienniku przebiegu. Serwer
         # embeddingów potrafił kiedyś zająć 21 GB i zdławić maszynę; regularny

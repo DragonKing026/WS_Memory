@@ -7,6 +7,7 @@ import type {
   HistoryRevision,
   RevisionDiff,
 } from '@/features/documents/schemas'
+import { documentPath } from '@/features/documents/paths'
 import { documentService } from '@/features/documents/service'
 import { useAuthStore } from '@/stores/auth'
 
@@ -114,7 +115,7 @@ async function rollback(revision: number): Promise<void> {
   try {
     await documentService.rollback(space.value, slug.value, revision)
     confirmingRollback.value = null
-    await router.push({ name: 'document', params: { space: space.value, slug: slug.value } })
+    await router.push(documentPath(space.value, slug.value))
   } catch (error) {
     problem.value = error instanceof Error ? error.message : 'Nie udało się cofnąć.'
   } finally {
@@ -148,7 +149,7 @@ watch([from, to], () => void compare())
   <div class="max-w-4xl space-y-4">
     <div>
       <RouterLink
-        :to="{ name: 'document', params: { space, slug } }"
+        :to="documentPath(space, slug)"
         class="text-xs text-muted hover:underline"
       >
         ← {{ space }} / {{ slug }}
@@ -243,7 +244,15 @@ watch([from, to], () => void compare())
       <div>
         <h2 class="mb-2 font-medium">Rewizje</h2>
         <ul class="divide-y divide-default border-y border-default">
-          <li v-for="revision in revisions" :key="revision.number" class="py-3">
+          <!-- Znacznik dla testu E2E: liczenie po treści jest kruche (wiersz zawiera
+               opis zmiany, autora i datę), a to, ile rewizji jest na liście, jest
+               właśnie tym, czego test cofania pilnuje. -->
+          <li
+            v-for="revision in revisions"
+            :key="revision.number"
+            data-test="rewizja"
+            class="py-3"
+          >
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="font-medium">

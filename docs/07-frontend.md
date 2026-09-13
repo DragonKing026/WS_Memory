@@ -181,6 +181,36 @@ Sprawdzenie, że rozdział działa: `mount | grep /app` w kontenerze musi pokaza
 **dwie** linie — `/app` i osobno `/app/node_modules`. Jedna linia znaczy, że
 obie strony dzielą jeden katalog.
 
+## Testy end-to-end
+
+`frontend/e2e/` — Playwright, uruchamiany przeciwko **działającemu stosowi**, nie
+przeciwko atrapom. To jedyne miejsce, które sprawdza, czy logowanie, zapis
+dokumentu, porównanie rewizji i cofnięcie działają **razem**, przez nginxa, Vite,
+API i bazę — czyli w jedynym układzie, jaki człowiek kiedykolwiek wykonuje.
+
+```bash
+docker compose up -d               # stos musi stać
+cd frontend && pnpm test:e2e
+```
+
+Konfiguracja nie ma `webServer`: stos podnosi `docker compose`, a Playwright
+startujący własny serwer sprawdzałby inny układ niż ten, który jedzie na
+produkcję. W CI testy chodzą w przebiegu nocnym, na maszynie przebiegu, a nie
+w kontenerze — Playwright potrzebuje przeglądarki z bibliotekami systemowymi,
+których obraz Alpine nie ma.
+
+Vitest ma celowo wąskie `include` (`tests/**/*.test.ts`): domyślny wzorzec
+złapałby pliki `e2e/*.spec.ts` jako testy jednostkowe i wywrócił się na braku
+przeglądarki.
+
+**Pierwszy przebieg tych testów znalazł usterkę**, której nie widziało nic
+innego: adres dokumentu ze ścieżką w nazwie (`procedury/pierwsza`) wychodził
+jako `procedury%2Fpierwsza`, bo vue-router koduje ukośnik wewnątrz parametru.
+Strona się otwierała, więc nic nie wyglądało na zepsute — ale adres był inny niż
+ten, do którego odsyłają drzewo i wyniki wyszukiwania, i to on trafiał do
+schowka. Stąd `features/documents/paths.ts`: adresy dokumentów budujemy jako
+napisy, nie przez `params`.
+
 ## Nadpisania zależności
 
 W `package.json` jest jedno `pnpm.overrides`: **`esbuild: ^0.28.2`**.
