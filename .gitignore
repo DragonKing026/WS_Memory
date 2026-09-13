@@ -33,6 +33,11 @@ config/jwt/
 # dziennikami. Zrzut bazy nie jest kodem i potrafi mieć setki megabajtów.
 /kopie/
 
+# Ślad instalacji: co i kiedy postawił scripts/instaluj.sh, żeby deinstalator
+# umiał posprzątać także po instalacji przerwanej w połowie. Stan tej maszyny,
+# nie kod — więc do repozytorium nie trafia.
+/var/
+
 # Narzędzia i edytory
 .idea/
 # Zawartość katalogu, a NIE sam katalog: gdy wykluczyć `.vscode/`, git w ogóle

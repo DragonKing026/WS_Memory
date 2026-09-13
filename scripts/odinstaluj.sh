@@ -145,6 +145,12 @@ else
 fi
 
 [ -f "${KORZEN}/.env" ] && usunie "Plik .env (hasła do bazy, sekrety aplikacji)"
+# Klucze JWT są sekretem tej instancji, tak jak `.env`, i muszą znikać RAZEM
+# z nim. Zostawione, spotykają się przy następnej instalacji z nowym
+# `JWT_PASSPHRASE` i nie dają się otworzyć — instancja wygląda na zdrową
+# i wywraca się dopiero przy pierwszym logowaniu (500, „bad decrypt”).
+# Zdarzyło się to naprawdę, przy pierwszej instalacji w trybie prod.
+[ -f "${KORZEN}/backend/config/jwt/private.pem" ] && usunie "Klucze JWT (są sekretem tej instancji, tak jak .env)"
 [ -f "${KORZEN}/backend/var/dostep-administratora.txt" ] && usunie "Plik z hasłem administratora"
 [ -f "${KORZEN}/var/instalacja.conf" ] && usunie "Ślad instalacji (var/instalacja.conf)"
 
@@ -257,7 +263,9 @@ if [ "${Z_OBRAZAMI}" -eq 1 ] && [ -n "${OBRAZY}" ]; then
     || ostrzez "Nie udało się usunąć części obrazów (mogą być używane)."
 fi
 
-for plik in "${KORZEN}/.env" "${KORZEN}/backend/var/dostep-administratora.txt" "${KORZEN}/var/instalacja.conf"; do
+for plik in "${KORZEN}/.env" "${KORZEN}/backend/var/dostep-administratora.txt" \
+            "${KORZEN}/var/instalacja.conf" \
+            "${KORZEN}/backend/config/jwt/private.pem" "${KORZEN}/backend/config/jwt/public.pem"; do
   if [ -f "${plik}" ]; then
     wykonaj rm -f "${plik}" && udalo "Usunięty ${plik#"${KORZEN}"/}"
   fi

@@ -37,7 +37,13 @@ when@test:
 when@prod:
     doctrine:
         orm:
-            proxy_dir: '%kernel.build_dir%/doctrine/orm/Proxies'
+            # `proxy_dir` tu NIE MA i to jest poprawka, nie przeoczenie.
+            # DoctrineBundle 3 usunął tę opcję (proxy idą do katalogu build
+            # same), a wpis został z przepisu Symfony dla wersji 2. Nikt tego
+            # nie zauważył, bo błąd wychodzi wyłącznie przy `cache:warmup
+            # --env=prod`, czyli przy budowaniu obrazu produkcyjnego — a przez
+            # cały czas pracy budowany był tylko obraz dev. Wyszło dopiero
+            # przy pierwszej prawdziwej instalacji w trybie prod (TODO-018).
             query_cache_driver:
                 type: pool
                 pool: doctrine.system_cache_pool
