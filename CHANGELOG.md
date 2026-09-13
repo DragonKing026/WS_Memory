@@ -15,6 +15,23 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 11:46 — Fałszywy alarm skryptu wypychającego
+
+Skrypt zgłosił porażkę CI, choć wszystkie trzy przebiegi były zielone. Winny był
+on sam: kod Pythona jedzie w pojedynczych cudzysłowach basha, a ja napisałem
+w f-stringu `\"` — ucieczki, które bash bierze dosłownie, więc Python wywracał
+się na składni i kończył kodem różnym od zera, co skrypt czytał jako czerwone CI.
+
+Ironia jest na miejscu: narzędzie do wykrywania fałszywych czerwonych świateł
+samo dało fałszywe czerwone światło. Poprawione bez ucieczek — klucze
+wyciągnięte do zmiennych i sklejanie zamiast f-stringu.
+
+Poprawka niesie własny morał: **sprawdzenie, że narzędzie wykrywa porażkę, nie
+wystarczy — trzeba też sprawdzić, że rozpoznaje sukces.** Ścieżkę porażki
+przetestowałem (odmówiło wypchnięcia przy brakującym pakiecie), ścieżki
+powodzenia nie.
+
+---
 ## 2026-09-13 11:43 — TODO-008: edytor, historia i weryfikacja
 
 Edytor Markdown (CodeMirror 6) z podglądem obok, ekran historii z porównaniem

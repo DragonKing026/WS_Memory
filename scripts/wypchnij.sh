@@ -126,12 +126,16 @@ for _ in $(seq 1 120); do
 done
 
 echo
+# Bez ucieczek w f-stringu: kod Pythona jedzie w pojedynczych cudzysłowach basha,
+# więc „\"" zostałoby wzięte dosłownie i wywróciło parser.
 echo "${STAN}" | python3 -c '
 import json, sys
 przebiegi = json.load(sys.stdin)
+dobre = ("success", "neutral", "skipped")
 for r in przebiegi:
-    print(f"  {r[\"conclusion\"] or r[\"status\"]:<12} {r[\"name\"]}")
-sys.exit(1 if any(r["conclusion"] not in ("success", "neutral", "skipped") for r in przebiegi) else 0)
+    stan = r["conclusion"] or r["status"]
+    print("  " + stan.ljust(12) + " " + r["name"])
+sys.exit(1 if any(r["conclusion"] not in dobre for r in przebiegi) else 0)
 '
 WYNIK=$?
 
