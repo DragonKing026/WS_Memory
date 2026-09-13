@@ -22,6 +22,11 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * an agent's first write may arrive minutes after the account exists. An
  * account without its space would fail that write with an error nobody could
  * act on.
+ *
+ * The shared space everybody belongs to is joined here too, in the same
+ * transaction and for the same reason: an account that exists but reaches no
+ * team knowledge is an account somebody has to finish creating by hand.
+ * See SharedSpaceForEveryone.
  */
 final readonly class AcceptInvitation
 {
@@ -29,6 +34,7 @@ final readonly class AcceptInvitation
         private EntityManagerInterface $entityManager,
         private UserPasswordHasherInterface $passwordHasher,
         private AuditTrail $audit,
+        private SharedSpaceForEveryone $sharedSpace,
     ) {
     }
 
@@ -66,6 +72,23 @@ final readonly class AcceptInvitation
             spaceSlug: $privateSpace->getSlug(),
             target: ['email' => $user->getEmail()],
         );
+
+        $shared = $this->sharedSpace->admit($user);
+        if (null !== $shared) {
+            // No actor: nobody granted this. Recording the new account as the actor
+            // would read as "they let themselves in", and recording whoever invited
+            // them is wrong too — a console invitation has no inviter at all. The
+            // entry says what happened: the rule admitted them.
+            $this->audit->record(
+                action: 'space.member_added',
+                spaceSlug: $this->sharedSpace->slug(),
+                target: [
+                    'member' => $user->getEmail(),
+                    'role' => $this->sharedSpace->role()->value,
+                    'reason' => 'default_space',
+                ],
+            );
+        }
 
         $this->entityManager->flush();
 

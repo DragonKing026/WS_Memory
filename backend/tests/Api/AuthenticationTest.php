@@ -23,12 +23,25 @@ final class AuthenticationTest extends WebTestCase
 
     private KernelBrowser $client;
     private EntityManagerInterface $em;
+    private string $sharedSlug;
+    private string $sharedRole;
 
     protected function setUp(): void
     {
         $this->client = static::createClient();
         $container = static::getContainer();
         $this->em = $container->get(EntityManagerInterface::class);
+
+        // From configuration, because that is what decides the answer: the slug and
+        // the role of the space every account joins are settings, and the test
+        // environment uses a different slug than production on purpose.
+        $slug = $container->getParameter('app.default_space.slug');
+        $role = $container->getParameter('app.default_space.role');
+        self::assertIsString($slug);
+        self::assertIsString($role);
+
+        $this->sharedSlug = $slug;
+        $this->sharedRole = $role;
 
         $this->em->getConnection()->executeStatement(
             'TRUNCATE ws.space_members, ws.invitations, ws.audit_log, ws.spaces, ws.users CASCADE'
@@ -92,10 +105,30 @@ final class AuthenticationTest extends WebTestCase
 
         self::assertSame('pracownik@web-systems.pl', $me['email']);
         self::assertFalse($me['isGlobalAdmin']);
-        self::assertCount(1, $me['spaces'], 'a fresh account sees exactly its private space');
-        self::assertStringStartsWith('priv_', $me['spaces'][0]['slug']);
-        self::assertSame('admin', $me['spaces'][0]['role']);
-        self::assertTrue($me['spaces'][0]['isPrivate']);
+
+        // Keyed by slug rather than read by position: one of the two entries comes
+        // from configuration, so the order they arrive in is not this test's business.
+        $bySlug = array_column($me['spaces'], null, 'slug');
+        self::assertCount(
+            2,
+            $bySlug,
+            'a fresh account sees its own private space and the shared one, and nothing else',
+        );
+
+        $private = 'priv_' . $this->em->getConnection()->fetchOne(
+            'SELECT id FROM ws.users WHERE email = :email',
+            ['email' => 'pracownik@web-systems.pl'],
+        );
+
+        self::assertArrayHasKey($private, $bySlug);
+        self::assertTrue($bySlug[$private]['isPrivate']);
+        self::assertSame('admin', $bySlug[$private]['role'], 'you administer your own space');
+
+        // The shared space is where the interface has something to show on day one;
+        // the role it arrives with decides whether the person can write there.
+        self::assertArrayHasKey($this->sharedSlug, $bySlug);
+        self::assertFalse($bySlug[$this->sharedSlug]['isPrivate']);
+        self::assertSame($this->sharedRole, $bySlug[$this->sharedSlug]['role']);
     }
 
     public function testSigningInIsRecordedInTheAuditLog(): void

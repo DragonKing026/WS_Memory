@@ -42,6 +42,7 @@ final class McpGatewayTest extends WebTestCase
     private User $owner;
     private string $fullToken;
     private string $narrowedToken;
+    private string $sharedSlug;
 
     protected function setUp(): void
     {
@@ -49,6 +50,13 @@ final class McpGatewayTest extends WebTestCase
         $container = static::getContainer();
         $this->em = $container->get(EntityManagerInterface::class);
         $this->connection = $this->em->getConnection();
+
+        // Configuration decides the slug of the space every account joins, and the
+        // test environment deliberately sets a different one than production.
+        $slug = $container->getParameter('app.default_space.slug');
+        self::assertIsString($slug);
+
+        $this->sharedSlug = $slug;
 
         $this->connection->executeStatement(
             'TRUNCATE ws.memory_entries, ws.agent_tokens, ws.space_members, ws.invitations, ws.audit_log, ws.spaces, ws.users CASCADE'
@@ -275,9 +283,16 @@ final class McpGatewayTest extends WebTestCase
         self::assertContains('beta', $slugs);
         self::assertNotContains('kadry', $slugs, 'przestrzeń bez członkostwa nie może się tu pojawić');
 
-        // The private space belongs here too: an agent has to know where a write
-        // with no space named will land, and that is the space.
-        self::assertCount(3, $slugs);
+        // The whole list, named. The private space belongs here because an agent has
+        // to know where a write with no space named will land; the shared space is
+        // there because every account is admitted to it when it is created. Naming
+        // them beats counting them — the count of four would also be reached by three
+        // memberships plus one leak, which is the failure this test exists to catch.
+        sort($slugs);
+        $expected = ['alfa', 'beta', $this->sharedSlug, 'priv_' . $this->owner->getId()->toRfc4122()];
+        sort($expected);
+
+        self::assertSame($expected, $slugs, 'dokładnie członkostwa tego konta, nic poza nimi');
         self::assertFalse($payload['scoped']);
 
         $roles = array_column($payload['spaces'], 'role', 'slug');

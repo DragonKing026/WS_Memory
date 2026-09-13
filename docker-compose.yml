@@ -145,6 +145,10 @@ services:
       # zastępczą z `backend/.env` i rozjazd byłby niewidoczny dokładnie wtedy,
       # gdy zaistnieje.
       MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.9.0}
+      # Wspólna przestrzeń, do której trafia każde nowe konto — patrz .env.example.
+      WS_DEFAULT_SPACE_SLUG: ${WS_DEFAULT_SPACE_SLUG:-wiedza}
+      WS_DEFAULT_SPACE_NAME: ${WS_DEFAULT_SPACE_NAME:-Baza wiedzy}
+      WS_DEFAULT_SPACE_ROLE: ${WS_DEFAULT_SPACE_ROLE:-writer}
       # Token do MemPalace zna WYŁĄCZNIE backend. Agenci dostają własne
       # tokeny wystawiane w aplikacji (reguła nienaruszalna nr 1).
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}

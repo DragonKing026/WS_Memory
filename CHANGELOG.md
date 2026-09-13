@@ -15,6 +15,124 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:11 — Testy integracyjne przestały zaśmiecać pałac (D-037)
+
+Trzy klasy z grupy `integracja` pisały do prawdziwego pałaca i nie kasowały po
+sobie **niczego**. Stan zmierzony tego dnia: **1554 szuflady i 100% z nich to
+śmieci po testach** — 531 skrzydeł `test-integracja-*`, 447 `test-wiki-*`, 324
+`test-mcp-*` i 162 osierocone `priv_<uuid>` po użytkownikach testowych.
+Prawdziwej treści: zero. Każdy przebieg dokładał 14 szuflad.
+
+Sprzątanie stoi raz, we wspólnej cesze, i bierze listę z rejestru
+`ws.memory_entries` — bo kasowanie własnego skrzydła przebiegu **nie wystarcza**:
+zapis bez wskazanej przestrzeni ląduje w prywatnej przestrzeni autora (reguła
+nienaruszalna 6) i stamtąd wzięło się te 162 skrzydła `priv_`. Kasuje przez API
+pałaca, nigdy SQL-em w schemacie `palace` — D-004 obowiązuje też testy.
+
+Porażka sprzątania nie wywraca testu, bo niedostępny pałac na końcu przebiegu nic
+nie mówi o sprawdzanym kodzie — ale idzie na stderr z nazwą skrzydła. **Cicha
+porażka sprzątania to dokładnie mechanizm, który wyprodukował te tysiąc skrzydeł**,
+więc ścieżkę porażki sprawdzono celowo psując nazwę narzędzia.
+
+Przy okazji ustalenie o samym narzędziu: `mempalace_status` wymienia **najwyżej
+1000 skrzydeł**, a resztę wrzuca do jednej pozycji `unknown`. Wyglądało to jak
+skrzydło z setkami szuflad, którego `list_drawers` nie potrafi pokazać — bo ono
+nie istnieje. Jedyną wiarygodną liczbą z tego narzędzia jest `total_drawers`.
+
+Zmierzone: 1727 szuflad przed przebiegiem grupy, 1727 po.
+
+---
+## 2026-09-13 19:04 — Konsola umie ustawić hasło i odwołać token agenta
+
+Do dziś z konsoli dało się konto **stworzyć**, ale nie **naprawić**. Konta
+administratora bez hasła nie odzyskiwało się w ogóle — jedynym wyjściem było
+zaproszenie na inny adres, po którym stare konto zostawało zablokowane, a obok
+niego powstawało drugie. `ws:user:password` kończy ten stan: **domyślnie
+generuje** hasło i wypisuje je raz, bo hasło podane w argumencie zostaje
+w historii powłoki i przeżywa każdy powód, dla którego je ustawiono. Reguła hasła
+przestała przy tym istnieć w dwóch kopiach — dwanaście znaków i odrzucanie haseł
+znanych z publicznych wycieków mieszkają w jednej klasie `PasswordPolicy`,
+z której korzysta i przyjmowanie zaproszenia, i to polecenie.
+
+Druga luka była gorsza, bo miała obejście: token agenta wystawiony do
+jednorazowej pracy odwoływało się **zapisem wprost w bazie**, czyli z pominięciem
+audytu i reguły „tylko własny token". Zrobiłem tak dziś sam, bo nie było innej
+drogi. `ws:agent:revoke` woła tę samą usługę co `DELETE /api/agent-tokens/{id}`,
+więc obie drogi mają jedną regułę i jeden ślad, a cudzy token odpowiada dokładnie
+jak nieistniejący. Towarzyszy mu `ws:agent:list` — **osobne polecenie, nie flaga**,
+bo takie, które z flagą czyta, a bez niej niszczy, jest o jedną literówkę od
+zdjęcia agenta z pracy w jej trakcie.
+
+Dwie rzeczy polecenie hasła **mówi wprost**, bo inaczej nikt by ich nie
+podejrzewał. Wydane tokeny JWT działają do wygaśnięcia — JWT jest bezstanowe
+(D-017), więc reset hasła brzmi jak odcięcie dostępu, a nim nie jest; odcina
+wyłączenie konta. I konto wyłączone hasło dostaje, ale się nim nie zaloguje:
+odmowa byłaby tu gorsza, bo hasło nie nadaje żadnego dostępu, więc wpis w audycie
+nie ma o czym skłamać — inaczej niż przy nadaniu roli, które dlatego odrzucamy.
+Sam wpis `user.password_reset` **nie ma aktora**: z konsoli nikt nie jest
+zalogowany, a wpisanie konta czytałoby się jak „sam sobie zmienił hasło".
+
+Dwanaście testów poleceń, każdy sprawdzony, że pada bez poprawki.
+
+---
+## 2026-09-13 18:30 — Slug testowej przestrzeni wpisany, a nie brany ze środowiska
+
+Testy dostawały nazwę wspólnej przestrzeni z `backend/.env.test`. Lokalnie
+działało; na pełnym stosie w CI **zmienna środowiskowa kontenera wygrywa z tym
+plikiem**, więc testy dostały produkcyjne `wiedza`, zderzyły się z własną fiksturą
+o tym samym slugu i padły — 58 błędów naraz, po raz drugi tego samego dnia.
+
+Teraz wartość jest **wpisana** w `when@test`, więc nie zależy od tego, w jakim
+środowisku akurat lecą. Sprawdzone przez uruchomienie całego zestawu z jawnie
+podstawioną zmienną `WS_DEFAULT_SPACE_SLUG=wiedza` — czyli dokładnie w warunkach,
+które wywróciły CI. 422 testy zielone.
+
+Przy okazji zniknął drugi opis tego samego z `.env.test`: dwa źródła prawdy dla
+jednej wartości to pytanie, które z nich obowiązuje.
+
+---
+## 2026-09-13 18:24 — Wartość ze spacją w `.env.example` wywróciła CI
+
+`WS_DEFAULT_SPACE_NAME=Baza wiedzy` bez cudzysłowów. Docker Compose czyta taki
+plik poprawnie, ale krok CI **sourceuje go jak skrypt powłoki** — i „wiedzy"
+stało się poleceniem: `./.env: line 79: wiedzy: command not found`, wyjście 127.
+
+Jedyna taka wartość w pliku. Sprawdzone `source`-em po poprawce.
+
+---
+## 2026-09-13 18:20 — Jedna wspólna przestrzeń dla każdego nowego konta (D-035)
+
+Konto trafia od razu do **Bazy wiedzy** z rolą `writer`. Przestrzeń powstaje sama
+przy pierwszym koncie, a pusty `WS_DEFAULT_SPACE_SLUG` wyłącza mechanizm.
+
+Powód wyszedł na jaw brutalnie: świeżo utworzone konto **administratora
+globalnego** zalogowało się i przeczytało „nie należysz jeszcze do żadnej
+przestrzeni zespołowej" — przy bazie wiedzy, która stała obok i była dla niego
+niewidoczna, mimo najwyższych uprawnień w systemie. Dopisywanie ludzi ręcznie,
+jeden po drugim, było jedyną drogą.
+
+To nie kłóci się z D-016. Tamta zabrania administratorowi **cichego** sięgania do
+przestrzeni — chodzi o wyjątek bez śladu. To jest jawna reguła stosowana do
+wszystkich i zapisywana w dzienniku. Wpis nie ma aktora, bo nikt tego nie nadał:
+nowe konto jako aktor czytałoby się jak „sam się wpuścił", a zaproszenie z konsoli
+nie ma zapraszającego wcale.
+
+**Dwie pułapki, obie warte zapamiętania.** Pierwsza: `flush()` w środku transakcji
+miał łapać kolizję klucza i doczytać cudzy wiersz — nie może, bo Doctrine
+**zamyka** EntityManagera po nieudanym `flush`, więc ścieżka ratunkowa działała na
+zamkniętym managerze, a konto zostawało utworzone w połowie. Zgłosiło to naraz
+58 testów. Druga: usługa wpięta wyłącznie w bloku `when@test` przechodziła **cały
+zestaw testów**, a dev i produkcja wywalały się na autowiringu przy pierwszym
+prawdziwym żądaniu. Złapane dopiero sprawdzeniem na żywej aplikacji — testy nie
+mogły tego złapać z definicji.
+
+Własność „świeże konto ma **dokładnie** swoją przestrzeń prywatną" przestała
+obowiązywać i była wprost zapisana w jedenastu testach. Zostały przepisane tak,
+żeby mówiły prawdę o nowym stanie — a nie tak, żeby przestały cokolwiek znaczyć:
+tam, gdzie wcześniej stała liczba przestrzeni, stoi teraz **wypisana lista
+slugów**, bo liczba przepuściłaby podmianę „wspólna → cudza".
+
+---
 ## 2026-09-13 17:50 — Sprawdzenie zadań przepuszczało anulowane leżące na liście
 
 Warunek w `sprawdz-zadania.py` brzmiał „zamknięte **i nie anulowane**", więc
