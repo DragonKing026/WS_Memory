@@ -15,6 +15,48 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 10:26 — TODO-007: ekrany wyszukiwania, przestrzeni i dokumentu
+
+Ekran `/` to teraz wyszukiwarka: przełącznik trybu z jednozdaniowym wyjaśnieniem
+różnicy, filtry (przestrzeń, klasa, zakres dat), wyniki z przestrzenią,
+trafnością, autorem i znacznikiem weryfikacji. Słabe wyniki w zwiniętej sekcji.
+Stan pusty nazywa szukaną frazę i podpowiada trzy realne przyczyny: zły tryb,
+za wąskie filtry, albo luka w dokumentacji.
+
+Do tego lista dokumentów przestrzeni (najnowsze na górze — ludzie przychodzą
+z pytaniem „co się zmieniło", nie „co istnieje") i ekran dokumentu z Markdownem,
+autorstwem i weryfikacją nad treścią, nie w stopce.
+
+**Trzy rzeczy naprawione po zobaczeniu ich na ekranie, nie w kodzie:**
+
+*Procent trafności w trybie dokładnym wprowadzał w błąd.* `ts_rank` ma inną
+skalę niż podobieństwo kosinusowe: trafienie idealne pokazywało się jako „14%".
+Sam to udokumentowałem w `SearchHit`, po czym i tak wyrenderowałem jako procent.
+W trybie leksykalnym nie ma już żadnej liczby — wynik jest dokładny albo go nie
+ma, a `ts_rank` służy tylko do porządkowania.
+
+*Layout na telefonie był zepsuty.* Panel boczny zabierał 256 z 390 pikseli,
+zostawiając 134 na treść. Teraz poniżej `md` menu chowa się za przyciskiem,
+wyszukiwarka dostaje własny wiersz, a treść całą szerokość. Sprawdzone przy
+390 px: brak przewijania poziomego.
+
+*Wyłączone przyciski nie wyglądały na wyłączone* — przezroczystość 0,75
+i podpowiedź widoczna dopiero po najechaniu. Dopisane zdanie mówiące wprost,
+że edycja i historia jeszcze nie działają.
+
+**Pułapka wolumenu `node_modules`, na którą wpadłem i którą opisałem.**
+Przysłonięcie `/app/node_modules` obowiązuje **od utworzenia kontenera**.
+Skasowanie katalogu po stronie hosta je rozbija — kontener zaczyna wtedy pisać
+prosto do repozytorium, zostawiając pliki roota i binaria musl w drzewie hosta.
+Objawy mylą, bo wszystko nadal działa. Procedura naprawy i sposób sprawdzenia
+(`mount | grep /app` musi dać **dwie** linie) są w `docs/07-frontend.md`.
+
+Podświetlenie renderuje się jako węzły tekstowe z części, które przysyła API —
+nigdzie nie ma `v-html` na treści z bazy. Markdown dokumentu idzie przez
+`markdown-it` z `html: false`, więc surowe znaczniki są ekranowane, a nie
+wykonywane.
+
+---
 ## 2026-09-13 10:08 — TODO-007: wyszukiwanie działa po stronie API
 
 Endpoint `GET /api/search`, oba tryby, z filtrami (przestrzeń, klasa wiedzy,

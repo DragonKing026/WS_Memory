@@ -154,6 +154,32 @@ z jednej strony wywracałby się po drugiej.
 Wersję Node bierz z `.nvmrc`. Prawdą o zależnościach pozostaje kontener:
 `typecheck`, `test` i `build` w CI biegną tam i to one rozstrzygają.
 
+### Pułapka: nie kasuj `frontend/node_modules` na hoście
+
+Wolumen przysłania `/app/node_modules` **od momentu utworzenia kontenera**.
+Skasowanie katalogu po stronie hosta usuwa punkt montowania i przysłonięcie
+przestaje działać — kontener zaczyna wtedy pisać prosto do katalogu hosta.
+Objawy są mylące, bo wszystko nadal działa: `pnpm add` w kontenerze zostawia
+pliki należące do roota w repozytorium, host dostaje binaria zbudowane pod musl,
+a `pnpm` zgłasza `ERR_PNPM_UNEXPECTED_STORE`.
+
+Jeśli już do tego doszło, kolejność naprawy ma znaczenie:
+
+```bash
+# 1. usuń katalog roota (z kontenera, bo host nie ma do niego prawa)
+docker run --rm -v "$PWD/frontend:/w" alpine rm -rf /w/node_modules
+# 2. zainstaluj na hoście, jako swój użytkownik
+cd frontend && CI=true npx pnpm@10.20.0 install --frozen-lockfile
+# 3. odtwórz kontener — dopiero to przywraca przysłonięcie
+docker compose up -d --force-recreate frontend
+# 4. uzupełnij zależności w kontenerze
+docker compose exec -e CI=true frontend pnpm install --frozen-lockfile
+```
+
+Sprawdzenie, że rozdział działa: `mount | grep /app` w kontenerze musi pokazać
+**dwie** linie — `/app` i osobno `/app/node_modules`. Jedna linia znaczy, że
+obie strony dzielą jeden katalog.
+
 ## Nadpisania zależności
 
 W `package.json` jest jedno `pnpm.overrides`: **`esbuild: ^0.28.2`**.

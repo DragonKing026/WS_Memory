@@ -140,6 +140,32 @@ musl). Sharing one directory would have `esbuild` from one side failing on the o
 Take the Node version from `.nvmrc`. The container remains the source of truth about
 dependencies: `typecheck`, `test` and `build` run there in CI, and those are what count.
 
+### The trap: never delete `frontend/node_modules` on the host
+
+The volume shadows `/app/node_modules` **from the moment the container is created**.
+Deleting the directory on the host side removes the mount point and the shadowing stops
+working — the container then writes straight into the host directory. The symptoms
+mislead, because everything still runs: `pnpm add` in the container leaves root-owned
+files in the repository, the host ends up with musl binaries, and `pnpm` reports
+`ERR_PNPM_UNEXPECTED_STORE`.
+
+If it has already happened, the order of the repair matters:
+
+```bash
+# 1. remove the root-owned directory (from a container — the host may not)
+docker run --rm -v "$PWD/frontend:/w" alpine rm -rf /w/node_modules
+# 2. install on the host, as your own user
+cd frontend && CI=true npx pnpm@10.20.0 install --frozen-lockfile
+# 3. recreate the container — only this restores the shadowing
+docker compose up -d --force-recreate frontend
+# 4. bring the container's dependencies up to date
+docker compose exec -e CI=true frontend pnpm install --frozen-lockfile
+```
+
+To check that the separation holds: `mount | grep /app` inside the container must print
+**two** lines — `/app` and, separately, `/app/node_modules`. One line means both sides
+are sharing a single directory.
+
 ## Dependency overrides
 
 `package.json` carries a single `pnpm.overrides` entry: **`esbuild: ^0.28.2`**.

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 
@@ -13,6 +13,34 @@ import { useAuthStore } from '@/stores/auth'
  */
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
+
+/** The header box only navigates; the search screen owns the query, the filters and
+ *  the results. Two places holding the same query would drift the moment one of them
+ *  gained a filter. */
+const headerQuery = ref('')
+
+/** Only meaningful below the `md` breakpoint; above it the menu is always visible. */
+const menuOpen = ref(false)
+
+// Closing on navigation is the difference between a menu and a menu that stays in the
+// way after you have used it.
+watch(
+  () => route.fullPath,
+  () => {
+    menuOpen.value = false
+  },
+)
+
+function search(): void {
+  const text = headerQuery.value.trim()
+  if (text === '') {
+    return
+  }
+
+  void router.push({ name: 'home', query: { q: text } })
+  headerQuery.value = ''
+}
 
 const initials = computed(() => {
   const name = auth.user?.displayName ?? ''
@@ -40,43 +68,76 @@ function signOut(): void {
 
 <template>
   <div class="min-h-screen flex flex-col bg-default text-default">
-    <header class="border-b border-default px-4 py-3 flex items-center gap-4">
-      <RouterLink :to="{ name: 'home' }" class="font-semibold shrink-0">
-        WS_Memory
-      </RouterLink>
-
-      <!-- Search lives in the header on every screen: looking for something is the
-           reason people open this application, and burying it behind a page would put
-           a click in front of the one action that matters. Wired up in TODO-007. -->
-      <div class="flex-1 max-w-2xl">
-        <UInput
-          disabled
-          icon="i-lucide-search"
-          placeholder="Szukaj w bazie wiedzy — dochodzi w TODO-007"
-          class="w-full"
-        />
-      </div>
-
-      <!-- ml-auto, a nie samo flex-1 na wyszukiwarce: pole ma ograniczoną szerokość
-           (max-w-2xl), więc na szerokim ekranie zostaje wolne miejsce, którego nikt
-           nie zagospodarowuje — i cały nagłówek zbija się do lewej. -->
-      <div class="ml-auto flex items-center gap-2 shrink-0">
+    <header class="border-b border-default px-4 py-3">
+      <div class="flex items-center gap-3">
+        <!-- The space menu becomes a toggle on a phone: a 256px sidebar on a 390px
+             screen leaves 134px for the content, which is not a narrow layout but a
+             broken one. -->
         <UButton
-          :to="{ name: 'tokens' }"
-          icon="i-lucide-key-round"
+          class="md:hidden"
+          icon="i-lucide-menu"
           variant="ghost"
           color="neutral"
-          aria-label="Tokeny agentów"
+          aria-label="Przestrzenie"
+          @click="menuOpen = !menuOpen"
         />
-        <UAvatar :alt="auth.user?.displayName ?? ''" :text="initials" size="sm" />
-        <UButton variant="ghost" color="neutral" icon="i-lucide-log-out" @click="signOut">
-          Wyloguj
-        </UButton>
+
+        <RouterLink :to="{ name: 'home' }" class="font-semibold shrink-0">
+          WS_Memory
+        </RouterLink>
+
+        <!-- Search lives in the header on every screen: looking for something is the
+             reason people open this application, and burying it behind a page would put
+             a click in front of the one action that matters. On a phone it moves to its
+             own row below, where it has room to be usable. -->
+        <form class="hidden md:block flex-1 max-w-2xl" @submit.prevent="search">
+          <UInput
+            v-model="headerQuery"
+            icon="i-lucide-search"
+            placeholder="Szukaj w bazie wiedzy"
+            class="w-full"
+          />
+        </form>
+
+        <!-- ml-auto, a nie samo flex-1 na wyszukiwarce: pole ma ograniczoną szerokość
+             (max-w-2xl), więc na szerokim ekranie zostaje wolne miejsce, którego nikt
+             nie zagospodarowuje — i cały nagłówek zbija się do lewej. -->
+        <div class="ml-auto flex items-center gap-2 shrink-0">
+          <UButton
+            :to="{ name: 'tokens' }"
+            icon="i-lucide-key-round"
+            variant="ghost"
+            color="neutral"
+            aria-label="Tokeny agentów"
+          />
+          <UAvatar :alt="auth.user?.displayName ?? ''" :text="initials" size="sm" />
+          <UButton
+            variant="ghost"
+            color="neutral"
+            icon="i-lucide-log-out"
+            aria-label="Wyloguj"
+            @click="signOut"
+          >
+            <span class="hidden sm:inline">Wyloguj</span>
+          </UButton>
+        </div>
       </div>
+
+      <form class="md:hidden mt-3" @submit.prevent="search">
+        <UInput
+          v-model="headerQuery"
+          icon="i-lucide-search"
+          placeholder="Szukaj w bazie wiedzy"
+          class="w-full"
+        />
+      </form>
     </header>
 
-    <div class="flex-1 flex min-h-0">
-      <nav class="w-64 border-r border-default p-3 shrink-0 overflow-y-auto">
+    <div class="flex-1 flex min-h-0 relative">
+      <nav
+        class="border-r border-default p-3 shrink-0 overflow-y-auto w-64"
+        :class="menuOpen ? 'block absolute inset-y-0 left-0 z-20 bg-default shadow-lg' : 'hidden md:block'"
+      >
         <p class="text-xs uppercase tracking-wide text-muted px-2 mb-1">Przestrzenie</p>
 
         <ul class="space-y-0.5">
@@ -110,7 +171,15 @@ function signOut(): void {
         </template>
       </nav>
 
-      <main class="flex-1 min-w-0 overflow-y-auto p-6">
+      <!-- Tapping outside the open menu closes it; without this the only way back is
+           the toggle, which the menu is covering. -->
+      <div
+        v-if="menuOpen"
+        class="md:hidden absolute inset-0 z-10 bg-black/30"
+        @click="menuOpen = false"
+      />
+
+      <main class="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6">
         <RouterView />
       </main>
     </div>

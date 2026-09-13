@@ -11,8 +11,10 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    MarkdownView: typeof import('./src/components/documents/MarkdownView.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SearchResult: typeof import('./src/components/search/SearchResult.vue')['default']
     UAlert: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Alert.vue')['default']
     UApp: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/App.vue')['default']
     UAvatar: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Avatar.vue')['default']
@@ -22,5 +24,9 @@ declare module 'vue' {
     UCheckbox: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Checkbox.vue')['default']
     UFormField: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/FormField.vue')['default']
     UInput: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Input.vue')['default']
+    USelect: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Select.vue')['default']
+    USelectMenu: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/SelectMenu.vue')['default']
+    USwitch: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Switch.vue')['default']
+    UTabs: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Tabs.vue')['default']
   }
 }

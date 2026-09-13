@@ -46,6 +46,14 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Przestrzeń' },
       },
       {
+        // A slug may contain slashes (`umowy/najem`), so the parameter is greedy.
+        // Declared after the space route, or `s/wiedza` itself would match here.
+        path: 's/:space/:slug(.*)',
+        name: 'document',
+        component: () => import('@/pages/DocumentPage.vue'),
+        meta: { title: 'Dokument' },
+      },
+      {
         path: 'settings/tokens',
         name: 'tokens',
         component: () => import('@/pages/TokensPage.vue'),
