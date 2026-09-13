@@ -15,6 +15,23 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 17:50 — Sprawdzenie zadań przepuszczało anulowane leżące na liście
+
+Warunek w `sprawdz-zadania.py` brzmiał „zamknięte **i nie anulowane**", więc
+zadanie anulowane mogło zostać w `TODO/` bez słowa protestu. Dokładnie to zrobiło
+TODO-010: leżało dobę na liście do zrobienia, mimo że D-012 anulowała je dzień
+wcześniej — i zauważył to człowiek, pytając, czemu nie robimy go przed 011. Czyli
+tym kosztem, któremu ten skrypt ma zapobiegać.
+
+Teraz anulowane liczy się tak samo jak ukończone: **ma zniknąć z listy**.
+Sprawdzone symulacją — zadanie oznaczone jako anulowane i zostawione w `TODO/`
+jest zgłaszane, czego przed poprawką nie było.
+
+Drugą stroną tej zmiany jest to, że anulowanego nie zmuszamy już do sekcji
+**Co zostało zrobione**. Nic w nim nie powstało; wystarczy **Dlaczego anulowane**.
+Wymaganie rozliczenia z pracy, której nie było, produkuje tylko pustą sekcję.
+
+---
 ## 2026-09-13 17:47 — Anulowane TODO-010 zeszło z listy zadań
 
 Zadanie jest anulowane od 2026-09-12 (decyzja D-012 zabrała mielenie po stronie

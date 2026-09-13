@@ -194,6 +194,10 @@ Struktura `frontend/src/` jak w 2.0: `pages/` (routing plikowy), `features/<dome
 - **`TODO/DONE/`** — po ukończeniu **przenosisz** tam plik zadania (`git mv`)
   i dopisujesz sekcję **Co zostało zrobione** z datą, godziną i faktami:
   co powstało, co przetestowano, co odłożono i dlaczego.
+  **Zadanie anulowane też stąd znika** — z sekcją **Dlaczego anulowane** zamiast
+  rozliczenia, bo nic w nim nie powstało. Zostawione w `TODO/` wygląda jak
+  zaległość: TODO-010 leżało tak dobę po anulowaniu i ktoś zapytał, czemu nie
+  robimy go przed 011.
 - **`TODO/zrzuty/`** — zrzuty ekranu z weryfikacji zadań, nazwane
   `NNN-krotki-opis.png`. **Nigdy w korzeniu repozytorium**: katalog główny jest
   spisem treści projektu, a plik, który się w nim znajdzie „na chwilę", zostaje

@@ -206,6 +206,10 @@ The structure of `frontend/src/` follows 2.0: `pages/` (file-based routing),
 - **`TODO/DONE/`** — once finished you **move** the task file there (`git mv`)
   and add a **Co zostało zrobione** (What was done) section with the date, time
   and facts: what was built, what was tested, what was deferred and why.
+  **A cancelled task leaves the list too** — with a **Dlaczego anulowane** (Why
+  cancelled) section instead of an accounting, because nothing was built. Left in
+  `TODO/` it reads as a backlog item: TODO-010 sat there for a day after being
+  cancelled and somebody asked why we were not doing it before 011.
 - **`TODO/zrzuty/`** — screenshots from verifying tasks, named
   `NNN-short-description.png`. **Never in the repository root**: the root is the
   project's table of contents, and a file that lands there "for a moment" stays
