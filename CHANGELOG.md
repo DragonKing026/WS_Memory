@@ -15,6 +15,24 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:50 — Metodologia zadań zapisana tam, gdzie się jej szuka
+
+Reguły o polach wyboru i o zadaniu zrobionym w części trafiły dotąd tylko do
+`AGENTS.md` i do samych plików zadań — czyli do kontraktu i do przykładów, ale
+nie do miejsca, w którym opisany jest **sposób prowadzenia zadań**.
+`TODO/README.md` i jego angielski odpowiednik mają teraz obie, z powodami:
+kryterium odhacza się po sprawdzeniu, a nie po napisaniu kodu, i nie prowadzi się
+obok drugiej listy postępu, bo rozjedzie się z pierwszą.
+
+Zapisane jest też to, czego **żaden skrypt nie wymusi**: `sprawdz-zadania.py` nie
+wie, ile z zadania jest zrobione, i wiedzieć nie będzie. Reguła utrzymywana
+ręcznie ma być nazwana ręcznie utrzymywaną, zamiast udawać, że pilnuje jej CI.
+
+Doszedł `TODO/SZABLON.md` — nowe zadanie startuje z gotowymi polami wyboru
+i z opisem stanów, więc konwencja nie zależy od tego, czy ktoś ją pamięta.
+
+
+---
 ## 2026-09-13 19:48 — Zadania mają pola wyboru, odhaczane na bieżąco
 
 Sekcje **Rozwiązanie** i **Kryteria ukończenia** są teraz listami `- [ ]`/`- [x]`
