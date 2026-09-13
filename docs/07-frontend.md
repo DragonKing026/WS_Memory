@@ -67,7 +67,7 @@ Domeny WS_Memory: `auth`, `spaces`, `documents`, `search`, `memory`, `admin`.
 | `/s/:space/proposals` | kolejka propozycji (tylko gdy przestrzeń ją wymaga) |
 | `/memory` | ✅ surowa pamięć z filtrami (graf wiedzy dochodzi później) |
 | `/settings/tokens` | ✅ tokeny agentów: wystawianie, zakres, unieważnianie |
-| `/admin/*` | użytkownicy, zaproszenia, przestrzenie, role, audyt |
+| `/admin/*` | użytkownicy, zaproszenia, przestrzenie, role, audyt, szablony maili, dziennik maili |
 
 ## Zasady
 

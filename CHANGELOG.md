@@ -15,6 +15,77 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 20:56 — Ekrany maili w panelu, TODO-017 zamknięte
+
+Dwa ekrany: **szablony** i **dziennik maili**. Obejrzane w przeglądarce, nie
+tylko przetestowane — zrzuty leżą w `TODO/zrzuty/017-*.png`.
+
+Ekran szablonów mówi wprost to, co najłatwiej zrozumieć opacznie: szablonów
+**nie dodaje się i nie usuwa**, a wszystko, co nie jest miejscem z listy, trafia
+do skrzynki adresata **dosłownie**. Obok pól stoi lista dozwolonych miejsc wraz
+z tym, w co każde się zamieni — bo pytanie „co mogę tu wpisać" nie powinno
+wymagać wywołania błędu.
+
+`{{ link }}` wpisany w temat daje ostrzeżenie **w trakcie pisania**, a zapis
+i tak odmawia — słowami backendu. Sprawdziłem oba: podpowiedź to podpowiedź,
+regułą jest serwer. Podgląd składa serwer, jednym żądaniem na przycisk, i jest
+zarazem sprawdzeniem poprawności: co odrzuci podgląd, odrzuci też zapis, tym
+samym zdaniem.
+
+Dziennik pokazuje adresata, rodzaj, stan i **powód porażki słowami serwera
+poczty** — to jest ta kolumna, po której poznaje się złe hasło w DSN od
+zamkniętego portu. Liczba prób pojawia się tylko wtedy, gdy coś znaczy: „1 próba"
+w każdym wierszu zasłaniałaby ten jeden, gdzie prób było cztery. Na zrzucie
+widać przypadek, dla którego powód porażki zostaje przy stanie „wysłany": dwie
+odmowy serwera, sukces przy trzeciej próbie.
+
+Schemat wiersza dziennika jest **ścisły** i odrzuca pole z treścią. Nie jest to
+ostrożność na wyrost: schemat, który nadmiarowe pole po cichu pomija, pozwoliłby
+backendowi zacząć je przysyłać — a wtedy działający token wyświetla się w panelu
+i nic tego nie zgłasza.
+
+**TODO-017 zamknięte**: dziesięć punktów i wszystkie kryteria.
+
+
+---
+## 2026-09-13 20:42 — API szablonów maili i dziennika wysyłki
+
+Kontrakt pod ekrany w panelu. Lista szablonów oddaje w jednej odpowiedzi treść,
+**zamkniętą listę miejsc**, wartości przykładowe i gotowy podgląd — bo ekran
+pokazuje to wszystko naraz, a druga runda po każdy szablon kupiłaby tylko
+kręciołek.
+
+`POST …/preview` renderuje treść **niezapisaną**, więc podgląd jest przed
+zapisem, nie po. Renderuje go serwer, nie przeglądarka: podgląd składany po
+stronie klienta byłby drugą implementacją tej jednej rzeczy, która ma mieć
+jedną — i pokazywałby radośnie szablon, który serwer właśnie odrzuci.
+
+`POST …/test` wysyła do **własnego adresu administratora**, a nie do adresu
+z żądania. Formularz z polem „odbiorca" to sposób na wysłanie maila z tego
+serwera do obcej osoby z treścią do wyboru nadawcy; test sprawdza wprost, że
+adres podany w żądaniu jest ignorowany. Odpowiedź to 202, nie 200 — wiadomość
+jest w kolejce, a czy doszła, mówi dziennik.
+
+**Nie ma trasy tworzącej szablon ani kasującej szablon**, i test tego pilnuje.
+Zbiór szablonów to zbiór miejsc w kodzie, które wysyłają maila; wiersz dodany
+ręcznie byłby treścią, której nic nie renderuje. Dziennika maili też nie da się
+z panelu wyczyścić — z tego samego powodu, z którego nie da się wyczyścić audytu.
+
+Nieznany stan w filtrze to **422, nie ciche zignorowanie**: filtr, który po cichu
+się rozszerza, każe ekranowi mówić „to są nieudane" przy widoku wszystkich.
+
+Test sprawdza też, że `{% if %}`, `{{ 7 * 7 }}` i `<?php … ?>` **przechodzą przez
+całą drogę** — wpisane, zapisane, odczytane, wyrenderowane — jako znaki. To jest
+zdanie, które przy następnym „użyjmy Twiga, ma piaskownicę" musi zapalić się na
+czerwono.
+
+Jeden test padł po drodze i wskazywał na zły adres z dobrego powodu:
+`queued_at` ma dokładność do sekundy, a pytanie „najnowszy wiersz" nie jest wtedy
+jednoznaczne. Pyta teraz o to, co faktycznie twierdzi — wiersz dla tego adresu —
+i dodatkowo o brak wiersza dla adresu z żądania.
+
+
+---
 ## 2026-09-13 20:30 — Maile naprawdę wychodzą: szablony, podstawianie miejsc, dziennik
 
 Serwerowa strona TODO-017. Zaproszenie wystawione z panelu albo z konsoli

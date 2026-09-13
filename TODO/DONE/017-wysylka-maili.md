@@ -4,7 +4,7 @@ tags: [ws-memory, todo, maile, zaproszenia, panel-admina, audyt]
 
 # TODO-017 — Wysyłka maili: szablony w panelu i dziennik
 
-**Utworzono:** 2026-09-13 19:40 · **Stan:** 🔵 **W TOKU — punkty 1–6, 9 i 10 z 10** (2026-09-13 20:40) · **Zależności:** 008
+**Utworzono:** 2026-09-13 19:40 · **Stan:** ✅ **UKOŃCZONE 2026-09-13** · **Zależności:** 008
 
 ## Powód
 
@@ -72,9 +72,9 @@ dziennika audytu, który urósł do 40 tysięcy wpisów, zanim ktokolwiek spojrz
 - [x] **5.** Tabela `ws.mail_log`: adresat, szablon, temat, stan (`w kolejce`,
       `wysłany`, `nieudany`), powód porażki, znaczniki czasu. **Bez treści.**
 - [x] **6.** Wysyłka przez Messenger, z ponowieniem i widocznym stanem w dzienniku.
-- [ ] **7.** Ekran w panelu administracyjnym: lista szablonów, edycja, podgląd na
+- [x] **7.** Ekran w panelu administracyjnym: lista szablonów, edycja, podgląd na
       wartościach przykładowych, wysyłka próbna do siebie.
-- [ ] **8.** Ekran dziennika maili: filtr po stanie i adresacie, powód porażki widoczny.
+- [x] **8.** Ekran dziennika maili: filtr po stanie i adresacie, powód porażki widoczny.
 - [x] **9.** Pierwszy szablon: **zaproszenie**. Kolejne dokładamy, gdy będą potrzebne —
       nie na zapas.
 - [x] **10.** Retencja dziennika maili opisana w `docs/05-deployment.md`.
@@ -91,19 +91,40 @@ dziennika audytu, który urósł do 40 tysięcy wpisów, zanim ktokolwiek spojrz
   z komunikatem mówiącym, które miejsca są dozwolone.
 - [x] Szablon nie jest wykonywany: wpisanie w treść konstrukcji silnika szablonów
   albo kodu trafia do maila **dosłownie**, jako tekst.
-- [ ] Podgląd i wysyłka próbna używają **wartości przykładowych**, nie prawdziwego
+- [x] Podgląd i wysyłka próbna używają **wartości przykładowych**, nie prawdziwego
   tokena.
 
-## Postęp
+## Co zostało zrobione
 
-Strona serwerowa działa i jest sprawdzona empirycznie, nie tylko testami:
-mail wyszedł przez prawdziwy SMTP (mailpit), a **skrót tokena z treści maila
-zgadza się z wierszem w `ws.invitations`** — czyli link w skrzynce jest tym
-linkiem, który zakłada konto. Na martwym porcie SMTP: cztery próby, stan
-`nieudany` z czytelnym powodem, zaproszenie nietknięte.
+**2026-09-13 21:00.** Wszystkie dziesięć punktów i wszystkie kryteria.
 
-Zostają **punkty 7 i 8** — dwa ekrany w panelu administracyjnym. Wysyłki
-próbnej i podglądu nie da się odhaczyć, dopóki nie ma skąd ich uruchomić:
-usługi (`SendTestMail`, `renderSample`) są, ekranu nie ma.
+Sprawdzone empirycznie, nie tylko testami: mail wyszedł przez prawdziwy SMTP
+(mailpit za profilem `dev`), a **skrót tokena z treści maila zgadza się
+z wierszem w `ws.invitations`** — czyli link w skrzynce jest tym linkiem, który
+zakłada konto. Na martwym porcie SMTP: cztery próby (1 + 3 ponowienia), stan
+`nieudany` z powodem od serwera, zaproszenie nietknięte.
+
+Dwie rzeczy wyszły dopiero z prób i żadnej nie dało się przewidzieć z kodu:
+
+- **`TRUNCATE ws.users CASCADE`** z `setUp` każdego testu integracyjnego
+  kaskaduje na tabele z kluczem obcym do `users`. Z kluczem przy szablonach
+  pierwszy test wyczyściłby treści wgrane migracją i każdy kolejny mail byłby
+  „brak szablonu". Autor zmiany jest więc **adresem**, nie referencją do konta.
+- **Maile wysyła `worker`, nie `backend`.** Rozjazd konfiguracji między nimi
+  jest niewidoczny: backend z prawdziwym DSN i worker z `null://null` dają
+  w dzienniku stan **wysłany**, choć nic nie poszło. Opisane w deploymencie.
+
+Ekrany obejrzane w przeglądarce: [017-szablony-maili.png](zrzuty/017-szablony-maili.png)
+i [017-dziennik-maili.png](zrzuty/017-dziennik-maili.png). Na drugim widać
+przypadek, dla którego powód porażki zostaje obok stanu „wysłany": dwie odmowy
+serwera, sukces przy trzeciej próbie.
+
+Cena asynchroniczności zapisana jako **D-038**: token jedzie w wierszu kolejki,
+a wiadomość po wyczerpaniu ponowień zostaje w kolejce `failed` z treścią
+w środku. Sprawdzone zapytaniem — i stąd retencja każąca tę kolejkę czyścić.
+
+Poza zakresem, odkryte przez zmianę systemu: `drainQueue()` w teście pałaca
+liczył wszystkie wiadomości zamiast zleceń publikacji, a `make analiza` padało
+na OOM (PHPStan brał 16 procesów w kontenerze z 1 GiB).
 - [x] Nieudana wysyłka jest ponawiana, a dziennik pokazuje liczbę prób.
 - [x] `docs/05-deployment.md` przestaje kłamać o `WS_DOMAIN`.

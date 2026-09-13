@@ -53,7 +53,7 @@ WS_Memory domains: `auth`, `spaces`, `documents`, `search`, `memory`, `admin`.
 | `/s/:space/proposals` | the proposal queue (only where a space requires it) |
 | `/memory` | ✅ raw memory with filters (the knowledge graph comes later) |
 | `/settings/tokens` | ✅ agent tokens: issuing, scope, revocation |
-| `/admin/*` | users, invitations, spaces, roles, audit |
+| `/admin/*` | users, invitations, spaces, roles, audit, mail templates, mail journal |
 
 ## Rules
 

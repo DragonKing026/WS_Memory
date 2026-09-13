@@ -31,5 +31,6 @@ declare module 'vue' {
     USelectMenu: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/SelectMenu.vue')['default']
     USwitch: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Switch.vue')['default']
     UTabs: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Tabs.vue')['default']
+    UTextarea: typeof import('./node_modules/.pnpm/@nuxt+ui@4.11.1_ae72d9e48077e4a81f5adf8cc2d692aa/node_modules/@nuxt/ui/dist/runtime/components/Textarea.vue')['default']
   }
 }
