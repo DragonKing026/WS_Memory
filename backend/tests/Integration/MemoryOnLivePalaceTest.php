@@ -96,6 +96,17 @@ final class MemoryOnLivePalaceTest extends KernelTestCase
         $this->stranger = Actor::human($outsider->getId()->toRfc4122());
     }
 
+    protected function tearDown(): void
+    {
+        // Guarded on the wing because it is set last in setUp: when the palace was
+        // absent, setUp aborted on the skip and there is nothing to delete.
+        if (isset($this->wing)) {
+            $this->deleteDrawersFiledByThisTest($this->em->getConnection(), $this->client, $this->wing);
+        }
+
+        parent::tearDown();
+    }
+
     public function testPolishContentIsFoundByWordsItDoesNotContain(): void
     {
         // The assumption the entire project rests on (D-003), asserted through
@@ -143,12 +154,17 @@ final class MemoryOnLivePalaceTest extends KernelTestCase
             'added_by' => 'test-integracja',
         ]);
 
-        self::assertIsString($payload['drawer_id'] ?? null, 'add_drawer must answer with an identifier we can book');
+        $unregistered = $payload['drawer_id'] ?? null;
+        self::assertIsString($unregistered, 'add_drawer must answer with an identifier we can book');
+
+        // Nothing in ws.memory_entries names this drawer, so tearDown cannot find it
+        // on its own. Booked by hand, or one drawer per run stays in the palace for ever.
+        $this->alsoDeleteDrawer($unregistered);
 
         $found = $this->memory->search($this->member, new MemoryQuery(self::UNRELATED_WORDS, limit: 20));
 
         self::assertNotContains(
-            (string) $payload['drawer_id'],
+            $unregistered,
             array_map(static fn (MemoryFragment $f): string => $f->id->value, $found),
         );
     }

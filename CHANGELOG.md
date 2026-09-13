@@ -15,6 +15,33 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:11 — Testy integracyjne przestały zaśmiecać pałac (D-037)
+
+Trzy klasy z grupy `integracja` pisały do prawdziwego pałaca i nie kasowały po
+sobie **niczego**. Stan zmierzony tego dnia: **1554 szuflady i 100% z nich to
+śmieci po testach** — 531 skrzydeł `test-integracja-*`, 447 `test-wiki-*`, 324
+`test-mcp-*` i 162 osierocone `priv_<uuid>` po użytkownikach testowych.
+Prawdziwej treści: zero. Każdy przebieg dokładał 14 szuflad.
+
+Sprzątanie stoi raz, we wspólnej cesze, i bierze listę z rejestru
+`ws.memory_entries` — bo kasowanie własnego skrzydła przebiegu **nie wystarcza**:
+zapis bez wskazanej przestrzeni ląduje w prywatnej przestrzeni autora (reguła
+nienaruszalna 6) i stamtąd wzięło się te 162 skrzydła `priv_`. Kasuje przez API
+pałaca, nigdy SQL-em w schemacie `palace` — D-004 obowiązuje też testy.
+
+Porażka sprzątania nie wywraca testu, bo niedostępny pałac na końcu przebiegu nic
+nie mówi o sprawdzanym kodzie — ale idzie na stderr z nazwą skrzydła. **Cicha
+porażka sprzątania to dokładnie mechanizm, który wyprodukował te tysiąc skrzydeł**,
+więc ścieżkę porażki sprawdzono celowo psując nazwę narzędzia.
+
+Przy okazji ustalenie o samym narzędziu: `mempalace_status` wymienia **najwyżej
+1000 skrzydeł**, a resztę wrzuca do jednej pozycji `unknown`. Wyglądało to jak
+skrzydło z setkami szuflad, którego `list_drawers` nie potrafi pokazać — bo ono
+nie istnieje. Jedyną wiarygodną liczbą z tego narzędzia jest `total_drawers`.
+
+Zmierzone: 1727 szuflad przed przebiegiem grupy, 1727 po.
+
+---
 ## 2026-09-13 19:04 — Konsola umie ustawić hasło i odwołać token agenta
 
 Do dziś z konsoli dało się konto **stworzyć**, ale nie **naprawić**. Konta

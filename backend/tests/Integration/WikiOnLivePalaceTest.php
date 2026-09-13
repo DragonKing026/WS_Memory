@@ -12,6 +12,7 @@ use App\Domain\Space\SpaceRole;
 use App\Entity\Space;
 use App\Entity\SpaceMember;
 use App\Entity\User;
+use App\Infrastructure\MemPalace\MemPalaceClient;
 use App\Infrastructure\MemPalace\MemPalaceHealthProbe;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -49,6 +50,8 @@ final class WikiOnLivePalaceTest extends WebTestCase
     private const PASSWORD = 'DlugieHaslo123!x';
 
     private KernelBrowser $client;
+    /** Held only so tearDown can take back what this test put into the palace. */
+    private MemPalaceClient $palace;
     private EntityManagerInterface $em;
     private Connection $connection;
     private string $wing;
@@ -58,6 +61,10 @@ final class WikiOnLivePalaceTest extends WebTestCase
     {
         $this->client = static::createClient();
         $container = static::getContainer();
+
+        $palace = $container->get(MemPalaceClient::class);
+        self::assertInstanceOf(MemPalaceClient::class, $palace);
+        $this->palace = $palace;
 
         $probe = $container->get(MemPalaceHealthProbe::class);
         self::assertInstanceOf(MemPalaceHealthProbe::class, $probe);
@@ -85,6 +92,17 @@ final class WikiOnLivePalaceTest extends WebTestCase
         $this->em->flush();
 
         $this->agentToken = ($container->get(IssueAgentToken::class))($writer, 'agent testowy')->plainToken;
+    }
+
+    protected function tearDown(): void
+    {
+        // Guarded on the wing because it is set after the skip: with no palace there
+        // is nothing to clean and no client to clean it with.
+        if (isset($this->wing)) {
+            $this->deleteDrawersFiledByThisTest($this->connection, $this->palace, $this->wing);
+        }
+
+        parent::tearDown();
     }
 
     public function testDocumentBecomesFindableByMeaningOnceTheQueueIsDrained(): void

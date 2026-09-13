@@ -1497,3 +1497,65 @@ space.
 private space" stopped holding, and it was written down explicitly in the tests.
 They were rewritten so that they tell the truth about the new state, rather than
 so that they stopped meaning anything.
+
+---
+
+## D-037 — Integration tests delete from the palace what they wrote, by the register
+
+**Date:** 2026-09-13 18:56 · **Status:** Accepted
+
+The three classes in the `integracja` group write to a **real** palace and deleted
+nothing afterwards. Measured on 2026-09-13, the server's palace held **over 1500
+drawers**, of which **872 wings named `test-integracja-*`** and **128 orphaned
+`priv_<uuid>` wings** left behind by test users. Real content: zero. It grew in a
+few days, with every run adding a dozen or so drawers.
+
+**The decision.** The cleanup exists once, in the shared `RequiresLivePalace`
+trait, as a method called from each of the three classes' `tearDown()`. It takes
+the list of drawers from the **`ws.memory_entries` register**, skipping `kg_fact`
+rows, and deletes them **through the palace's own API**
+(`mempalace_delete_drawer`). A cleanup failure does not fail the test, but it is
+printed on stderr with the wing's name.
+
+**Why by the register rather than by the run's wing.** Every run creates its own
+`test-…-<hex>` wing, so "delete everything in my wing" looks like the simpler
+answer. It is not a complete one: **a write that names no space lands in the
+author's private space** (inviolable rule 6), and the tests make such writes on
+purpose — proving exactly that. Hence those 128 `priv_<uuid>` wings.
+`ws.memory_entries` lists the drawers regardless of where they landed, and in
+`tearDown` it is still intact, because what clears it is the **next** test's
+`setUp`.
+
+`kg_fact` rows are skipped because their `drawer_id` is derived from the fact
+(`DrawerId::forFact`) and names no drawer in the palace — facts live in the graph.
+A drawer filed **straight through the palace client**, with no register row, is
+booked by the test explicitly (`alsoDeleteDrawer`); without that, one drawer per
+run would stay for ever.
+
+**Rejected alternatives:**
+
+1. **`TRUNCATE` in the `palace` schema** — the fastest, and expressly forbidden by
+   D-004. The palace schema belongs to MemPalace; its shape is an implementation
+   detail of a dependency, not our contract. The rule has no exception for tests:
+   a test that bypasses the only permitted write path stops testing that path.
+2. **A separate palace for tests** (a second service, its own volume) — it solves
+   the problem, but doubles the stack's memory and start-up time, and above all
+   **stops testing what is being tested**: the value of these tests lies in
+   talking to the same instance and the same MemPalace version production has.
+   Worth revisiting if they ever start running in parallel.
+3. **Deleting by wing name** (`test-…-<hex>`) — see above: it misses everything
+   that landed in a private space. The palace has no "delete a wing" tool either,
+   so a list of drawers is needed regardless.
+4. **A separate cleanup in each of the three classes** — that was the prototype.
+   The palace still grew over a whole group run, because two of the classes
+   cleaned nothing. Three copies are three places to forget it in.
+5. **Letting a cleanup failure fail the test** — it would conflate two different
+   pieces of information. A palace that stopped answering at the end of a run says
+   nothing about the code under test, and a red light that does not mean "the code
+   is broken" teaches people to ignore red lights. Hence **loud on stderr, but no
+   test failure** — and with the wing's name, because without it there is no way
+   to tell what is left to delete by hand.
+
+**How it is verified.** `mempalace_status` before the group's run and after it must
+report the same `total_drawers`. Measured: 1689 → 1689 (before the change the same
+run added 14 drawers).

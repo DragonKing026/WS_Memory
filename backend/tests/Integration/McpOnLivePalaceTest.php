@@ -39,6 +39,7 @@ final class McpOnLivePalaceTest extends WebTestCase
     private const OTHER_WORDS = 'do jakiego okresu trafia rachunek od podwykonawcy';
 
     private KernelBrowser $client;
+    private MemPalaceClient $palace;
     private EntityManagerInterface $em;
     private string $token;
     private string $strangerToken;
@@ -51,6 +52,7 @@ final class McpOnLivePalaceTest extends WebTestCase
 
         $palace = $container->get(MemPalaceClient::class);
         self::assertInstanceOf(MemPalaceClient::class, $palace);
+        $this->palace = $palace;
 
         $zdrowie = $container->get(MemPalaceHealthProbe::class);
         self::assertInstanceOf(MemPalaceHealthProbe::class, $zdrowie);
@@ -80,6 +82,17 @@ final class McpOnLivePalaceTest extends WebTestCase
         $issueToken = $container->get(IssueAgentToken::class);
         $this->token = ($issueToken)($member, 'test integracyjny')->plainToken;
         $this->strangerToken = ($issueToken)($stranger, 'obcy agent')->plainToken;
+    }
+
+    protected function tearDown(): void
+    {
+        // Guarded on the wing because it is set after the skip: with no palace there
+        // is nothing to clean and no client to clean it with.
+        if (isset($this->wing)) {
+            $this->deleteDrawersFiledByThisTest($this->em->getConnection(), $this->palace, $this->wing);
+        }
+
+        parent::tearDown();
     }
 
     public function testWhatAnAgentWritesItCanFindAgainByDifferentWords(): void
