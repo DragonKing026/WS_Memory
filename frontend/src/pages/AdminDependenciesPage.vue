@@ -354,7 +354,7 @@ function describeFailure(cause: unknown, fallback: string): string {
           {{
             updater.installed
               ? 'Agent był instalowany, ale nie zgłosił pulsu od dawna — prawdopodobnie jego timer się wywraca. Do czasu naprawy nie da się zlecić aktualizacji.'
-              : 'Aktualizacje wykonuje skrypt na hoście, bo żaden kontener tej instalacji nie widzi Dockera. Bez niego nie ma czym założyć nowej wersji, więc przycisk aktualizacji jest tu świadomie nieobecny.'
+              : 'Aktualizacje wykonuje skrypt na hoście, bo żaden kontener tej instalacji nie widzi Dockera. Bez niego nie ma czym zainstalować nowej wersji, więc przycisk aktualizacji jest tu świadomie nieobecny.'
           }}
         </p>
         <p class="mt-1">
@@ -495,7 +495,7 @@ function describeFailure(cause: unknown, fallback: string): string {
         class="mt-3 text-sm text-muted"
       >
         <template v-if="verdict.newerVersion !== null">
-          Jest nowsza wersja ({{ verdict.newerVersion }}), ale nie ma jej czym założyć —
+          Jest nowsza wersja ({{ verdict.newerVersion }}), ale nie ma jej czym zainstalować —
           patrz komunikat o agencie powyżej.
         </template>
         <template v-else>
