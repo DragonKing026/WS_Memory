@@ -60,3 +60,7 @@ __pycache__/
 # wtyczki z tego repozytorium (`plugin/`). Sam token tu nie trafia — Claude Code
 # trzyma go w `~/.claude/.credentials.json`, bo `userConfig` ma `sensitive: true`.
 .claude/settings.local.json
+
+# Robocze drzewa gita zakładane przez podagentów pracujących równolegle.
+# Stan narzędzia, nie projektu — i znika razem z sesją.
+.claude/worktrees/

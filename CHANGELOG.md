@@ -15,6 +15,39 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 18:20 — Jedna wspólna przestrzeń dla każdego nowego konta (D-035)
+
+Konto trafia od razu do **Bazy wiedzy** z rolą `writer`. Przestrzeń powstaje sama
+przy pierwszym koncie, a pusty `WS_DEFAULT_SPACE_SLUG` wyłącza mechanizm.
+
+Powód wyszedł na jaw brutalnie: świeżo utworzone konto **administratora
+globalnego** zalogowało się i przeczytało „nie należysz jeszcze do żadnej
+przestrzeni zespołowej" — przy bazie wiedzy, która stała obok i była dla niego
+niewidoczna, mimo najwyższych uprawnień w systemie. Dopisywanie ludzi ręcznie,
+jeden po drugim, było jedyną drogą.
+
+To nie kłóci się z D-016. Tamta zabrania administratorowi **cichego** sięgania do
+przestrzeni — chodzi o wyjątek bez śladu. To jest jawna reguła stosowana do
+wszystkich i zapisywana w dzienniku. Wpis nie ma aktora, bo nikt tego nie nadał:
+nowe konto jako aktor czytałoby się jak „sam się wpuścił", a zaproszenie z konsoli
+nie ma zapraszającego wcale.
+
+**Dwie pułapki, obie warte zapamiętania.** Pierwsza: `flush()` w środku transakcji
+miał łapać kolizję klucza i doczytać cudzy wiersz — nie może, bo Doctrine
+**zamyka** EntityManagera po nieudanym `flush`, więc ścieżka ratunkowa działała na
+zamkniętym managerze, a konto zostawało utworzone w połowie. Zgłosiło to naraz
+58 testów. Druga: usługa wpięta wyłącznie w bloku `when@test` przechodziła **cały
+zestaw testów**, a dev i produkcja wywalały się na autowiringu przy pierwszym
+prawdziwym żądaniu. Złapane dopiero sprawdzeniem na żywej aplikacji — testy nie
+mogły tego złapać z definicji.
+
+Własność „świeże konto ma **dokładnie** swoją przestrzeń prywatną" przestała
+obowiązywać i była wprost zapisana w jedenastu testach. Zostały przepisane tak,
+żeby mówiły prawdę o nowym stanie — a nie tak, żeby przestały cokolwiek znaczyć:
+tam, gdzie wcześniej stała liczba przestrzeni, stoi teraz **wypisana lista
+slugów**, bo liczba przepuściłaby podmianę „wspólna → cudza".
+
+---
 ## 2026-09-13 17:50 — Sprawdzenie zadań przepuszczało anulowane leżące na liście
 
 Warunek w `sprawdz-zadania.py` brzmiał „zamknięte **i nie anulowane**", więc
