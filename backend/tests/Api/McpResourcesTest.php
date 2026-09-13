@@ -184,7 +184,9 @@ final class McpResourcesTest extends WebTestCase
         // Through the configured directory, which is the one the application
         // reads: it differs between a host run and a container, and hard-coding
         // either would make this test lie in the other.
-        $directory = (string) static::getContainer()->getParameter('app.instructions_dir');
+        $directory = static::getContainer()->getParameter('app.instructions_dir');
+        self::assertIsString($directory);
+
         $path = rtrim($directory, '/') . '/' . $relative;
 
         self::assertFileExists($path);

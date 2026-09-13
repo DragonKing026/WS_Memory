@@ -52,6 +52,10 @@ final class FileInstructionLibraryTest extends KernelTestCase
             $text = $library->read($instruction->uri)->text;
             $raw = $this->rawFileBehind($instruction->uri, $directory);
 
+            if ('' === trim($text)) {
+                self::fail($instruction->uri . ' jest pusty');
+            }
+
             self::assertStringStartsWith(
                 "---\n",
                 $raw,
@@ -61,7 +65,6 @@ final class FileInstructionLibraryTest extends KernelTestCase
             // The body is the tail of the file, byte for byte. Anything dropped
             // from the middle or the end of the instruction fails here.
             self::assertStringEndsWith($text, $raw, $instruction->uri . ' nie zgadza się z plikiem w plugin/shared');
-            self::assertNotSame('', trim($text), $instruction->uri . ' jest pusty');
 
             // The wrapper's metadata is not instruction for a model and must not
             // reach its context.
@@ -75,14 +78,16 @@ final class FileInstructionLibraryTest extends KernelTestCase
         $library = $this->fromContainer();
         $raw = $this->rawFileBehind('ws-memory://protokol-recall', $this->configuredDirectory());
 
-        self::assertSame(1, preg_match('/^description:\s*"?(.+?)"?\s*$/m', $raw, $matched), 'plik nie ma opisu');
+        preg_match('/^description:\s*"?(.+?)"?\s*$/m', $raw, $matched);
+        $fromFile = $matched[1] ?? null;
+        self::assertIsString($fromFile, 'plik źródłowy nie ma opisu we frontmatterze');
 
         $described = [];
         foreach ($library->all() as $instruction) {
             $described[$instruction->uri] = $instruction->description;
         }
 
-        self::assertSame($matched[1], $described['ws-memory://protokol-recall']);
+        self::assertSame($fromFile, $described['ws-memory://protokol-recall']);
     }
 
     public function testNamesOnTheListMatchTheHandlesThePluginUses(): void
@@ -183,7 +188,10 @@ final class FileInstructionLibraryTest extends KernelTestCase
 
     private function configuredDirectory(): string
     {
-        return (string) $this->container()->getParameter('app.instructions_dir');
+        $directory = $this->container()->getParameter('app.instructions_dir');
+        self::assertIsString($directory);
+
+        return $directory;
     }
 
     private function container(): ContainerInterface
