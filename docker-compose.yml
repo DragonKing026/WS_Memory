@@ -138,6 +138,13 @@ services:
       DATABASE_URL: postgresql://ws_app:${WS_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-ws_memory}?serverVersion=18&charset=utf8
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
       MEMPALACE_URL: http://mempalace:8765
+      # Wersja PRZYPIĘTA, czyli ta, którą compose zbuduje. Aplikacja porównuje ją
+      # z wersją, którą pałac naprawdę zgłasza przez MCP `initialize`. Rozjazd
+      # znaczy, że ktoś zmienił `.env` i nie przebudował obrazu — panel ma to
+      # pokazać. Bez przekazania zmiennej tutaj backend czytałby wartość
+      # zastępczą z `backend/.env` i rozjazd byłby niewidoczny dokładnie wtedy,
+      # gdy zaistnieje.
+      MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.7.0}
       # Token do MemPalace zna WYŁĄCZNIE backend. Agenci dostają własne
       # tokeny wystawiane w aplikacji (reguła nienaruszalna nr 1).
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
@@ -193,13 +200,25 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    command: ["php", "bin/console", "messenger:consume", "async", "--time-limit=3600", "--memory-limit=256M", "-v"]
+    # Dwa transporty, jeden proces: `async` to zadania w tle (publikacja do
+    # pałaca), `scheduler_dependencies` to sprawdzanie wersji co 6 godzin
+    # (TODO-015). Harmonogram jest „stateful" — pamięta w cache, kiedy ostatnio
+    # się wykonał — bo --time-limit restartuje ten proces co godzinę, a licznik
+    # liczony od startu nigdy by nie doszedł do szóstej godziny.
+    command: ["php", "bin/console", "messenger:consume", "async", "scheduler_dependencies", "--time-limit=3600", "--memory-limit=256M", "-v"]
     environment:
       APP_ENV: ${APP_ENV:-dev}
       APP_SECRET: ${APP_SECRET}
       DATABASE_URL: postgresql://ws_app:${WS_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-ws_memory}?serverVersion=18&charset=utf8
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
       MEMPALACE_URL: http://mempalace:8765
+      # Wersja PRZYPIĘTA, czyli ta, którą compose zbuduje. Aplikacja porównuje ją
+      # z wersją, którą pałac naprawdę zgłasza przez MCP `initialize`. Rozjazd
+      # znaczy, że ktoś zmienił `.env` i nie przebudował obrazu — panel ma to
+      # pokazać. Bez przekazania zmiennej tutaj backend czytałby wartość
+      # zastępczą z `backend/.env` i rozjazd byłby niewidoczny dokładnie wtedy,
+      # gdy zaistnieje.
+      MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.7.0}
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?ustaw JWT_PASSPHRASE w .env}
     volumes:

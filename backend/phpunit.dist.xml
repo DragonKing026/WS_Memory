@@ -18,6 +18,12 @@
              number, and 120 requests to prove it would only be slower. -->
         <server name="MCP_CALLS_PER_MINUTE" value="5" force="true" />
         <server name="SHELL_VERBOSITY" value="-1" />
+        <!-- Nothing listens on port 1 of the loopback, so the connection is
+             refused immediately. Deliberate: the test suite must never reach the
+             real PyPI (it would pass or fail with somebody else's uptime), and
+             an unreachable catalogue is the case worth proving — it has to give
+             "nie udało się sprawdzić", not "brak aktualizacji". -->
+        <server name="PYPI_URL" value="http://127.0.0.1:1/pypi" force="true" />
     </php>
 
     <testsuites>
