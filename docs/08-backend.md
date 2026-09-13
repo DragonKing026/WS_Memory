@@ -179,6 +179,16 @@ mieszkają w `Domain/`.
 2. Provider `app_users` znajduje konto po adresie, hasło weryfikowane hasherem.
 3. Sukces → `LoginSuccessEvent` → `LoginAuditSubscriber` zapisuje `user.login`
    i znacznik ostatniego logowania; Lexik zwraca token JWT.
+
+   **Subskrybent sprawdza, z którego firewalla przyszło zdarzenie**, i to nie jest
+   ostrożność na zapas. Wszystkie firewalle są bezstanowe, więc `api` uwierzytelnia
+   token przy **każdym żądaniu** i za każdym razem wysyła to samo zdarzenie; `mcp`
+   robi to samo dla tokenów agentów. Bez tego strażnika jedna osoba klikająca po
+   aplikacji dopisywała wiersz „logowanie" na każde żądanie HTTP — przy pierwszym
+   otwarciu ekranu audytu było tam 40 889 wpisów, z czego 20 335 opisywało
+   logowania, których nie było. Dziennik audytu, w którym większość wpisów to
+   fikcja, jest gorszy od krótkiego: prawdziwe wpisy w nim są, tylko nikt ich nie
+   znajdzie.
 4. Porażka → `LoginFailureEvent` → wpis `user.login_failed` **bez aktora**:
    mamy wtedy deklarowaną tożsamość, nie potwierdzoną, więc zapisanie jej
    pozwalałoby podrabiać wpisy audytu cudzym adresem.

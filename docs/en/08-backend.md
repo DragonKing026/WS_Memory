@@ -182,6 +182,15 @@ the **persistence model**, and the rules live in `Domain/`.
    password.
 3. Success → `LoginSuccessEvent` → `LoginAuditSubscriber` records `user.login`
    and the last-login stamp; Lexik returns a JWT.
+
+   **The subscriber checks which firewall the event came from**, and that is not
+   precautionary tidiness. Every firewall is stateless, so `api` authenticates the
+   token on **every request** and dispatches the same event each time; `mcp` does the
+   same for agent tokens. Without that guard, one person clicking around the
+   application wrote a "sign-in" row per HTTP request — the first time the audit
+   screen was opened it held 40 889 entries, 20 335 of which described sign-ins that
+   never happened. An audit trail whose majority is fiction is worse than a short
+   one: the real entries are in there, and nobody will find them.
 4. Failure → `LoginFailureEvent` → a `user.login_failed` entry **with no actor**:
    at that point we have a claimed identity, not a confirmed one, so recording
    it would let anyone forge audit entries using somebody else's address.
