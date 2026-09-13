@@ -15,6 +15,43 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 11:10 — Surowa pamięć na własnym ekranie i pomiar wydajności
+
+Ekran `/memory` z `GET /api/memory`: przeglądanie wszystkiego, co trafiło do
+pamięci, z filtrami przestrzeni, klasy wiedzy i zakresu dat. **Osobno od wiki
+i to jest cały sens tego ekranu** — wiki jest tym, co zespół postanowił zapisać,
+a to jest tym, co zostało zauważone. Zmieszane w jednej liście, drugie
+przykryłoby pierwsze i czytelnik straciłby różnicę między „ustaliliśmy tak"
+a „agent zauważył coś takiego".
+
+`MemoryEntryView` jest osobnym typem od `SearchHit`, choć kuszące było użycie
+jednego: wynik wyszukiwania istnieje w odpowiedzi na pytanie i niesie trafność,
+a listowanie na żadne pytanie nie odpowiada. Wymyślona liczba na ekranie jest
+gorsza niż jej brak. Stronicowane od początku, bo rejestr rośnie najszybciej
+w całym systemie — dokumenty właśnie pokazały, co się dzieje bez tego.
+
+**Pomiar wydajności, kryterium ukończenia TODO-007.** Baza testowa: 10 037
+szuflad w pałacu i 10 005 dokumentów w bazie.
+
+| Co | Czas |
+|---|---|
+| Wyszukiwanie semantyczne (20 wyników) | **0,10 s** |
+| Wyszukiwanie leksykalne, zapytanie wybiórcze | **0,02 s** |
+| Wyszukiwanie leksykalne, słowo w każdym dokumencie | **0,40 s** |
+| Przeglądanie pamięci (20 wpisów) | **0,23 s** |
+| Lista dokumentów (strona po 100) | **0,25 s** |
+
+Wszystko z narzutem trybu deweloperskiego Symfony (samo `/api/me` to 0,02–0,04 s).
+Najgorszy przypadek leksykalny to 151 ms samego SQL-a — słowo występujące
+w dziesięciu tysiącach dokumentów, czyli sytuacja, w której indeks nie ma czego
+zawęzić.
+
+Znacznik autora dopisany też w drzewie dokumentów. Wcześniej pokazywałem tam sam
+znacznik AI, choć w wynikach wyszukiwania argumentowałem, że znacznik
+pojawiający się tylko czasem czyta się jako „nie wiadomo". Teraz w obu miejscach
+widać autora — w gęstym drzewie ikoną zamiast słowem.
+
+---
 ## 2026-09-13 10:57 — Drzewo dokumentów zamiast płaskiej listy
 
 Ekran przestrzeni pokazywał dokumenty jednym ciągiem. TODO-007 wymaga **drzewa**

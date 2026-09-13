@@ -159,6 +159,18 @@ function signOut(): void {
           Nie należysz jeszcze do żadnej przestrzeni zespołowej.
         </p>
 
+        <!-- Raw memory sits apart from the spaces, because it is not one: it cuts
+             across all of them and answers a different question (what has been filed)
+             than a space does (what is written down here). -->
+        <p class="text-xs uppercase tracking-wide text-muted px-2 mt-4 mb-1">Pamięć</p>
+        <RouterLink
+          :to="{ name: 'memory' }"
+          class="block px-2 py-1.5 rounded text-sm hover:bg-elevated"
+          active-class="bg-elevated font-medium"
+        >
+          Surowa pamięć
+        </RouterLink>
+
         <template v-if="privateSpace !== null">
           <p class="text-xs uppercase tracking-wide text-muted px-2 mt-4 mb-1">Prywatne</p>
           <RouterLink

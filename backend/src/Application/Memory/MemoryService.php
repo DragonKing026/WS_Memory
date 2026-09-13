@@ -10,6 +10,8 @@ use App\Domain\Memory\DrawerId;
 use App\Domain\Memory\KnowledgeFact;
 use App\Domain\Memory\LexicalIndex;
 use App\Domain\Memory\MemoryAccessDenied;
+use App\Domain\Memory\MemoryBrowser;
+use App\Domain\Memory\MemoryEntryView;
 use App\Domain\Memory\MemoryFragment;
 use App\Domain\Memory\MemoryKind;
 use App\Domain\Memory\MemoryQuery;
@@ -49,6 +51,7 @@ final readonly class MemoryService
     public function __construct(
         private MemoryStore $store,
         private LexicalIndex $lexical,
+        private MemoryBrowser $browser,
         private MemoryRegistry $registry,
         private SpaceAccessResolver $access,
         private SpaceCatalog $spaces,
@@ -150,6 +153,41 @@ final readonly class MemoryService
         ]);
 
         return $hits;
+    }
+
+    /**
+     * What has been going into memory lately, newest first.
+     *
+     * Browsing rather than searching, and routed through this class for the same
+     * reason as everything else: the set of readable spaces is computed once, here.
+     *
+     * @param list<SpaceId>|null $inSpaces narrows the set; never widens it
+     *
+     * @return list<MemoryEntryView>
+     */
+    public function browse(
+        Actor $actor,
+        ?array $inSpaces = null,
+        ?MemoryKind $kind = null,
+        ?\DateTimeImmutable $since = null,
+        ?\DateTimeImmutable $before = null,
+        int $limit = 50,
+        int $offset = 0,
+    ): array {
+        $allowed = $this->readableSpaces($actor, $inSpaces);
+
+        if ([] === $allowed) {
+            return [];
+        }
+
+        $entries = $this->browser->recent($allowed, $kind, $since, $before, $limit, $offset);
+
+        $this->audit->record('memory.browse', $actor, null, [
+            'spaces' => array_map(static fn (SpaceId $s): string => $s->value, $allowed),
+            'results' => \count($entries),
+        ]);
+
+        return $entries;
     }
 
     /**

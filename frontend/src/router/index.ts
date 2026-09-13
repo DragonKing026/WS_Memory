@@ -54,6 +54,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Dokument' },
       },
       {
+        path: 'memory',
+        name: 'memory',
+        component: () => import('@/pages/MemoryPage.vue'),
+        meta: { title: 'Surowa pamięć' },
+      },
+      {
         path: 'settings/tokens',
         name: 'tokens',
         component: () => import('@/pages/TokensPage.vue'),

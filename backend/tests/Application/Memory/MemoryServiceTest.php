@@ -34,6 +34,7 @@ final class MemoryServiceTest extends TestCase
 
     private InMemoryMemoryStore $palace;
     private RecordingLexicalIndex $lexical;
+    private RecordingMemoryBrowser $browser;
     private InMemoryMemoryRegistry $registry;
     private RecordingAuditTrail $audit;
 
@@ -41,6 +42,7 @@ final class MemoryServiceTest extends TestCase
     {
         $this->palace = new InMemoryMemoryStore();
         $this->lexical = new RecordingLexicalIndex();
+        $this->browser = new RecordingMemoryBrowser();
         $this->registry = new InMemoryMemoryRegistry();
         $this->audit = new RecordingAuditTrail();
     }
@@ -502,6 +504,7 @@ final class MemoryServiceTest extends TestCase
         return new MemoryService(
             $this->palace,
             $this->lexical,
+            $this->browser,
             $this->registry,
             new SpaceAccessResolver(new FixedMemberships($memberships)),
             new FakeSpaceCatalog($slugs, $privateSpaceOwner, $privateSpaceSlug),

@@ -6,9 +6,10 @@ tags: [ws-memory, dokumentacja, frontend, vue, vite, ui]
 
 # Frontend
 
-Stan: **fundament działa** (2026-09-12, `TODO-006`). Logowanie, akceptacja
-zaproszenia, layout z przestrzeniami, tokeny agentów. Brakuje wyszukiwania
-(`TODO-007`) oraz przeglądania i edytora dokumentów (`TODO-008`).
+Stan: **wyszukiwanie i przeglądanie działają** (2026-09-13, `TODO-007`).
+Logowanie, zaproszenia, wyszukiwanie w dwóch trybach, drzewo dokumentów, ekran
+dokumentu, surowa pamięć, tokeny agentów. Brakuje edytora i historii rewizji
+(`TODO-008`).
 
 Osobna aplikacja Vue 3, niezależna od backendu (D-008). Stack i struktura
 przeniesione z nowszego projektu z frontendem Vue, żeby zespół nie uczył się drugiego
@@ -58,13 +59,13 @@ Domeny WS_Memory: `auth`, `spaces`, `documents`, `search`, `memory`, `admin`.
 |---|---|
 | `/login` | ✅ logowanie; rejestracja wyłącznie z linku zaproszenia |
 | `/zaproszenie/:token` | ✅ ustawienie hasła z linku zaproszenia |
-| `/` | ⏳ wyszukiwanie i ostatnie zmiany (`TODO-007`); na razie ekran powitalny |
-| `/s/:space` | ⏳ drzewo dokumentów (`TODO-007`); na razie rola i ostrzeżenie |
-| `/s/:space/:slug` | dokument: treść, autor, znacznik weryfikacji, historia |
+| `/` | ✅ wyszukiwanie: dwa tryby, filtry, słabe wyniki osobno |
+| `/s/:space` | ✅ drzewo dokumentów przestrzeni, stronicowane |
+| `/s/:space/:slug` | ✅ dokument: treść, autor, weryfikacja (historia w `TODO-008`) |
 | `/s/:space/:slug/edit` | edytor: CodeMirror + podgląd obok |
 | `/s/:space/:slug/history` | lista rewizji, porównanie dwóch dowolnych, cofnięcie |
 | `/s/:space/proposals` | kolejka propozycji (tylko gdy przestrzeń ją wymaga) |
-| `/memory` | surowa pamięć: szuflady, dziennik, graf wiedzy — z filtrami |
+| `/memory` | ✅ surowa pamięć z filtrami (graf wiedzy dochodzi później) |
 | `/settings/tokens` | ✅ tokeny agentów: wystawianie, zakres, unieważnianie |
 | `/admin/*` | użytkownicy, zaproszenia, przestrzenie, role, audyt |
 

@@ -69,6 +69,11 @@ function formatDate(value: string): string {
             </RouterLink>
 
             <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
+              <!-- Both cases, not just the AI one. A badge that appears only sometimes
+                   reads as "unknown" the rest of the time, and in a base half-written
+                   by agents "a person wrote this" is information too. In a dense tree
+                   the human case is an icon rather than a word — visible without
+                   turning seventy rows into a wall of labels. -->
               <UBadge
                 v-if="leaf.item.authoredByAi"
                 color="warning"
@@ -78,6 +83,12 @@ function formatDate(value: string): string {
               >
                 AI
               </UBadge>
+              <UIcon
+                v-else
+                name="i-lucide-user"
+                class="size-3.5 text-muted"
+                aria-label="Napisane przez człowieka"
+              />
               <UBadge
                 v-if="leaf.item.verified"
                 color="success"

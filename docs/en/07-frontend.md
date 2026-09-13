@@ -7,9 +7,9 @@ tags: [ws-memory, documentation, frontend, vue, vite, ui]
 
 # Frontend
 
-Status: **the foundation works** (2026-09-12, `TODO-006`). Signing in, accepting an
-invitation, the layout with spaces, agent tokens. Missing: search (`TODO-007`) and
-document browsing and the editor (`TODO-008`).
+Status: **search and browsing work** (2026-09-13, `TODO-007`). Signing in, invitations,
+search in two modes, the document tree, the document screen, raw memory, agent tokens.
+Missing: the editor and revision history (`TODO-008`).
 
 A separate Vue 3 application, independent of the backend (D-008). Stack and
 structure carried over from the newer Vue-frontend project so the team does not have to
@@ -45,13 +45,13 @@ WS_Memory domains: `auth`, `spaces`, `documents`, `search`, `memory`, `admin`.
 |---|---|
 | `/login` | ✅ sign-in; registration only from an invitation link |
 | `/zaproszenie/:token` | ✅ setting a password from an invitation link |
-| `/` | search across all reachable knowledge + recent changes |
-| `/s/:space` | a space: document tree, recent agent writes |
-| `/s/:space/:slug` | a document: content, author, verification mark, history |
+| `/` | ✅ search: two modes, filters, weak results kept apart |
+| `/s/:space` | ✅ the space's document tree, paged |
+| `/s/:space/:slug` | ✅ a document: content, author, verification (history in `TODO-008`) |
 | `/s/:space/:slug/edit` | the editor: CodeMirror with a preview beside it |
 | `/s/:space/:slug/history` | revision list, comparison of any two, rollback |
 | `/s/:space/proposals` | the proposal queue (only where a space requires it) |
-| `/memory` | raw memory: drawers, diary, knowledge graph — with filters |
+| `/memory` | ✅ raw memory with filters (the knowledge graph comes later) |
 | `/settings/tokens` | ✅ agent tokens: issuing, scope, revocation |
 | `/admin/*` | users, invitations, spaces, roles, audit |
 
