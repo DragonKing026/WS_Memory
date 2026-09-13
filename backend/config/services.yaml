@@ -24,6 +24,22 @@ parameters:
     # nginx; in production the real domain.
     app.public_base_url: '%env(default:app_default_base_url:WS_PUBLIC_URL)%'
     app_default_base_url: 'http://127.0.0.1:8080'
+    # Nadawca wpisywany w nagłówek From. Nie jest to ten sam adres co odbiorca
+    # odpowiedzi ani nazwa instancji — jedno pole, jedno znaczenie.
+    app.mail.from: '%env(MAIL_FROM)%'
+    app.mail.from_name: '%env(MAIL_FROM_NAME)%'
+    # Ten sam WS_PUBLIC_URL co wyżej, ale **bez wartości zastępczej**, i w tym
+    # jest cała rzecz. Link wypisany w konsoli czyta człowiek siedzący przy tej
+    # maszynie, więc `http://127.0.0.1:8080` jest dla niego poprawny. Link w
+    # mailu czyta ktoś z innego komputera, gdzie ten adres prowadzi do jego
+    # własnej przeglądarki. Puste znaczy „nie wiem, jak mnie widać z zewnątrz",
+    # a wtedy mail się nie wysyła i dziennik maili mówi dlaczego — martwy link
+    # w cudzej skrzynce jest gorszy niż brak wiadomości.
+    app.mail.link_base_url: '%env(default:app_no_public_url:WS_PUBLIC_URL)%'
+    # Pusty ciąg, a nie brak wartości. `default::` dałoby `null`, czyli drugi
+    # sposób zapisania „nie ustawiono" — a wtedy każde miejsce czytające ten
+    # parametr musiałoby znać oba i któreś by jednego nie sprawdziło.
+    app_no_public_url: ''
     # Where the instruction texts published as MCP resources are read from. They
     # have one source — `plugin/shared/` (D-013) — but that source sits in a
     # different place in every environment: next to `backend/` when the test suite
@@ -118,6 +134,9 @@ services:
     # samples, becomes another adapter rather than another branch inside this one.
     App\Domain\Publishing\SecretScanner: '@App\Domain\Publishing\PatternSecretScanner'
     App\Domain\Audit\AuditTrail: '@App\Infrastructure\Doctrine\DoctrineAuditTrail'
+    App\Domain\Mail\MailTemplateLibrary: '@App\Infrastructure\Doctrine\DoctrineMailTemplateLibrary'
+    App\Domain\Mail\MailLog: '@App\Infrastructure\Doctrine\DoctrineMailLog'
+    App\Domain\Mail\MailSender: '@App\Infrastructure\Mail\SymfonyMailSender'
     App\Domain\Audit\AuditJournal: '@App\Infrastructure\Doctrine\DoctrineAuditJournal'
     App\Domain\Dependency\ReleaseCatalog: '@App\Infrastructure\PyPi\PyPiReleaseCatalog'
     App\Domain\Dependency\RunningVersion: '@App\Infrastructure\MemPalace\MemPalaceRunningVersion'
@@ -154,6 +173,20 @@ services:
     App\Presentation\Mcp\McpController:
         arguments:
             $callsPerMinute: '%mcp.calls_per_minute%'
+
+    App\Infrastructure\Mail\SymfonyMailSender:
+        arguments:
+            $fromAddress: '%app.mail.from%'
+            $fromName: '%app.mail.from_name%'
+
+    # Nazwa instancji w mailu to ta sama nazwa, którą instancja podpisuje nadawcę.
+    # Osobna zmienna byłaby drugim miejscem na tę samą rzecz i rozjechałaby się
+    # z pierwszym — mail od „Bazy wiedzy" zapraszający do „WS_Memory" czyta się
+    # jak pomyłka albo jak phishing.
+    App\Application\Mail\SendInvitationMail:
+        arguments:
+            $linkBaseUrl: '%app.mail.link_base_url%'
+            $instanceName: '%app.mail.from_name%'
 
     App\Presentation\Console\InviteUserCommand:
         arguments:
@@ -196,6 +229,12 @@ when@test:
         # tutaj nie zależy od środowiska, w którym akurat lecą.
         app.default_space.slug: 'wspolna'
         app.default_space.name: 'Wspólna baza'
+        # Publiczny adres WPISANY, z tego samego powodu co slug wyżej: zmienna
+        # środowiskowa kontenera wygrywa z `.env.test`, a `docker-compose.yml`
+        # podaje `WS_PUBLIC_URL` puste. Bez tej linijki każdy mail w testach
+        # byłby odmową „nie ustawiono publicznego adresu", więc sprawdzalibyśmy
+        # wyłącznie ścieżkę odmowy i ani razu tej, na której mail wychodzi.
+        app.mail.link_base_url: 'https://wiedza.test'
 
     services:
         _defaults:
@@ -210,6 +249,24 @@ when@test:
         # value object and DTO into a service and the container then fails on
         # constructors it cannot autowire — SpaceId(string $value) and the like.
         App\Application\Invitation\IssueInvitation:
+            public: true
+        # Wysyłka maili. Argumenty POWTÓRZONE, bo druga definicja zastępuje
+        # pierwszą w całości — bez nich usługa traci skalary i cały zestaw pada
+        # na autowiringu (ta sama pułapka, co przy SharedSpaceForEveryone).
+        App\Application\Mail\QueueMail:
+            public: true
+        App\Application\Mail\UpdateMailTemplate:
+            public: true
+        App\Application\Mail\SendInvitationMail:
+            public: true
+            arguments:
+                $linkBaseUrl: '%app.mail.link_base_url%'
+                $instanceName: '%app.mail.from_name%'
+        App\Domain\Mail\MailTemplateLibrary: '@App\Infrastructure\Doctrine\DoctrineMailTemplateLibrary'
+        App\Infrastructure\Doctrine\DoctrineMailTemplateLibrary:
+            public: true
+        App\Domain\Mail\MailLog: '@App\Infrastructure\Doctrine\DoctrineMailLog'
+        App\Infrastructure\Doctrine\DoctrineMailLog:
             public: true
         App\Application\Invitation\AcceptInvitation:
             public: true

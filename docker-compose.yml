@@ -153,6 +153,14 @@ services:
       # tokeny wystawiane w aplikacji (reguła nienaruszalna nr 1).
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?ustaw JWT_PASSPHRASE w .env}
+      # Wysyłka maili (TODO-017). Bez MAILER_DSN system nic nie wysyła i nie
+      # udaje, że wysyła — w dzienniku maili widać wpis nieudany z powodem.
+      # WS_PUBLIC_URL jest tu obowiązkowe dla maili z linkami: link względny
+      # w skrzynce nie prowadzi nigdzie.
+      MAILER_DSN: ${MAILER_DSN:-null://null}
+      MAIL_FROM: ${MAIL_FROM:-ws-memory@localhost}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Baza wiedzy}
+      WS_PUBLIC_URL: ${WS_PUBLIC_URL:-}
       # Instrukcje dla agentów AI: protokół recall, zasady dokumentowania, opisy
       # podagentów. Treść ma JEDNO źródło w plugin/shared (D-013) i wychodzi na
       # świat jako zasoby MCP, więc zmiana instrukcji jest deployem serwera, a nie
@@ -242,6 +250,14 @@ services:
       MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.9.0}
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?ustaw JWT_PASSPHRASE w .env}
+      # Wysyłka maili (TODO-017). Bez MAILER_DSN system nic nie wysyła i nie
+      # udaje, że wysyła — w dzienniku maili widać wpis nieudany z powodem.
+      # WS_PUBLIC_URL jest tu obowiązkowe dla maili z linkami: link względny
+      # w skrzynce nie prowadzi nigdzie.
+      MAILER_DSN: ${MAILER_DSN:-null://null}
+      MAIL_FROM: ${MAIL_FROM:-ws-memory@localhost}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Baza wiedzy}
+      WS_PUBLIC_URL: ${WS_PUBLIC_URL:-}
       # Instrukcje dla agentów AI: protokół recall, zasady dokumentowania, opisy
       # podagentów. Treść ma JEDNO źródło w plugin/shared (D-013) i wychodzi na
       # świat jako zasoby MCP, więc zmiana instrukcji jest deployem serwera, a nie
@@ -286,6 +302,32 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Skrzynka na próby, TYLKO do pracy na własnej maszynie (profil `dev`).
+  #
+  # Bez niej jedynym sposobem sprawdzenia, czy zaproszenie naprawdę wychodzi
+  # i czy link w treści działa, jest wysłanie go na prawdziwą skrzynkę — czyli
+  # próba na cudzym serwerze i prawdziwy token w cudzej infrastrukturze.
+  # Mailpit przyjmuje wszystko, nie wysyła nic dalej i pokazuje treść pod
+  # http://127.0.0.1:8025.
+  #
+  # Za profilem, więc `docker compose up` jej NIE podnosi. Uruchamia się
+  # świadomie: `docker compose --profile dev up -d mailpit`, a potem
+  # MAILER_DSN=smtp://mailpit:1025 w .env. Na produkcji ten profil nie istnieje.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    profiles: ["dev"]
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+      # Bez tego skrzynka rośnie bez końca między przebiegami.
+      MP_MAX_MESSAGES: 200
+    ports:
+      # Podgląd na pętli zwrotnej, tak jak nginx. Port SMTP zostaje wewnątrz
+      # sieci Compose — nic z hosta nie ma powodu tam pisać.
+      - "127.0.0.1:8025:8025"
+    mem_limit: 128m
 
 volumes:
   frontend_node_modules:

@@ -21,6 +21,7 @@
         "symfony/flex": "^2",
         "symfony/framework-bundle": "8.0.*",
         "symfony/http-client": "8.0.*",
+        "symfony/mailer": "8.0.*",
         "symfony/messenger": "8.0.*",
         "symfony/monolog-bundle": "^3",
         "symfony/runtime": "8.0.*",

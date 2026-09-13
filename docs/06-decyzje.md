@@ -1697,3 +1697,49 @@ zostawałaby na zawsze.
 **Jak to się sprawdza.** `mempalace_status` przed przebiegiem grupy i po nim ma
 podać tę samą liczbę `total_drawers`. Zmierzone: 1689 → 1689 (przed zmianą ten
 sam przebieg dokładał 14 szuflad).
+
+---
+## D-038 — Token zaproszenia jedzie w kolejce, a dziennik maili nie trzyma treści
+
+**Data:** 2026-09-13 20:35 · **Stan:** Przyjęta
+
+Mail z zaproszeniem zawiera **działający token**. Wysyłka jest asynchroniczna,
+bo niedostępny serwer poczty nie może wywracać wystawienia zaproszenia — a to
+znaczy, że token musi jakoś dojechać z żądania do procesu roboczego. Odtworzyć
+go po drodze nie da się: w bazie jest wyłącznie jego `sha256`.
+
+**Rozstrzygnięcie.** Wiadomość `SendMail` niesie **złożoną treść** (temat i
+ciało), więc token jest czasowo w wierszu `ws.messenger_messages`. Dziennik
+maili `ws.mail_log` **nie ma kolumny na treść** i mieć nie będzie: to on jest
+czytany swobodnie, bo „to tylko logi".
+
+Do tego temat, który dziennik zapisuje, nie może zawierać miejsca oznaczonego
+jako wrażliwe — zapis takiego szablonu jest odrzucany. Bez tej reguły zdanie
+„dziennik nie trzyma tokena" byłoby prawdziwe tylko dopóty, dopóki nikt nie
+wpisze `{{ link }}` w temat.
+
+**Co z tego wynika i jest zmierzone, nie założone.** Wiadomość, która nie
+przeszła wszystkich ponowień, ląduje w kolejce `failed` **z tokenem w środku**
+i zostaje tam, aż ktoś ją usunie. Sprawdzone na martwym porcie SMTP: cztery
+próby (1 + 3 ponowienia), wiersz w `ws.mail_log` ze stanem `nieudany` i czytelnym
+powodem, a w `ws.messenger_messages` jeden wiersz w kolejce `failed`, którego
+ciało pasuje do wzorca `[0-9a-f]{64}`. Dlatego **retencja w
+`docs/05-deployment.md` każe tę kolejkę czyścić** — i to jest jedyny powód, dla
+którego tam o niej mowa. Ekspozycja jest ograniczona: zaproszenie wygasa po
+siedmiu dniach, więc token z martwej wiadomości przestaje cokolwiek otwierać.
+
+**Odrzucone alternatywy:**
+
+1. **Wysyłka w żądaniu** — nie ma wtedy tokena w kolejce, ale niedostępny SMTP
+   zawiesza albo wywraca wystawienie zaproszenia. To dokładnie ta awaria, przed
+   którą TODO-017 ma chronić, i akurat ona zdarza się w dniu wdrożenia.
+2. **Zapis tokena w postaci jawnej, żeby worker złożył treść u siebie** —
+   poświadczenie odtwarzalne z własnej kopii bazy. Po to właśnie jest
+   trzymany skrót, więc byłoby to cofnięcie tej decyzji.
+3. **Szyfrowanie treści wiadomości kluczem aplikacji** — worker ma `APP_SECRET`
+   i dostęp do bazy, więc chroniłoby to przed czytelnikiem, który już ma jedno
+   i drugie. Zabezpieczenie do utrzymywania, nie właściwość.
+4. **Brak ponowień dla maili niosących token** — ograniczyłoby okno, ale
+   kosztem jedynej rzeczy, po której poznaje się chwilową awarię poczty od
+   trwałej. Zaproszenie, które nie doszło i nie doszło po raz drugi, to
+   zaproszenie do wystawienia od nowa przez człowieka.

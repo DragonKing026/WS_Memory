@@ -1709,3 +1709,48 @@ run would stay for ever.
 **How it is verified.** `mempalace_status` before the group's run and after it must
 report the same `total_drawers`. Measured: 1689 → 1689 (before the change the same
 run added 14 drawers).
+
+---
+## D-038 — The invitation token travels in the queue, and the mail journal keeps no body
+
+**Date:** 2026-09-13 20:35 · **Status:** Accepted
+
+An invitation mail contains a **working token**. Sending is asynchronous, because
+an unreachable mail server must not break issuing an invitation — which means the
+token has to get from the request to the worker somehow. It cannot be recomposed
+on the way: the database holds only its `sha256`.
+
+**Decision.** The `SendMail` message carries the **composed message** (subject and
+body), so the token sits temporarily in a `ws.messenger_messages` row. The mail
+journal `ws.mail_log` **has no column for a body** and will not get one: that is
+the table people read casually, because "it's only logs".
+
+The subject the journal does store may not contain a place marked sensitive —
+saving such a template is refused. Without that rule, "the journal holds no token"
+would be true only for as long as nobody typed `{{ link }}` into a subject.
+
+**What follows, measured rather than assumed.** A message that fails every retry
+lands in the `failed` queue **with the token inside** and stays there until somebody
+removes it. Verified against a dead SMTP port: four attempts (1 + 3 retries), a
+`ws.mail_log` row with status `failed` and a readable reason, and one
+`ws.messenger_messages` row in the `failed` queue whose body matches
+`[0-9a-f]{64}`. That is why **the retention section of `docs/05-deployment.md` says
+to clear that queue** — the only reason it mentions it at all. The exposure is
+bounded: an invitation expires after seven days, so the token in a dead message
+stops opening anything.
+
+**Rejected alternatives:**
+
+1. **Sending inside the request** — no token in the queue, but an unreachable SMTP
+   server then hangs or breaks issuing an invitation. That is precisely the failure
+   TODO-017 exists to prevent, and it is the one that happens on deployment day.
+2. **Storing the plain token so the worker can compose the message itself** — a
+   credential recoverable from our own backup. Hashing it is exactly what that
+   would undo.
+3. **Encrypting the message body with the application key** — the worker holds
+   `APP_SECRET` and database access, so it would protect against a reader who
+   already has both. A protection to maintain, not a property.
+4. **No retries for mails carrying a token** — it would narrow the window, at the
+   cost of the only thing that distinguishes a transient mail failure from a
+   permanent one. An invitation that did not arrive twice is an invitation a person
+   has to issue again.

@@ -147,7 +147,9 @@ routes leave the same trace.
 
 | Variable | Role |
 |---|---|
-| `WS_DOMAIN` | public domain (certificate, links in e-mails) |
+| `WS_PUBLIC_URL` | the application's public address **with a scheme** — links in e-mails are built from it; empty means e-mails carrying links are not sent (TODO-017) |
+| `MAILER_DSN` | mail server; `null://null` means nothing is sent |
+| `MAIL_FROM`, `MAIL_FROM_NAME` | the sender in the `From` header |
 | `POSTGRES_PASSWORD` | password of the database superuser role |
 | `MEMPALACE_DB_PASSWORD` | password of the `mempalace` role (schema `palace`) |
 | `WS_DB_PASSWORD` | password of the `ws_app` role (schema `ws`) |
@@ -422,6 +424,29 @@ status.
 | document revisions | indefinitely (history does not shrink) |
 | `audit_log` | 24 months, then aggregated into statistics |
 | publication batches | indefinitely (unit of undo and an audit trail) |
+| `mail_log` | 12 months (delivery metadata; there is no body to keep — D-038) |
+| the `failed` queue in `messenger_messages` | **7 days**, and not as housekeeping — see below |
 
 The server **does not store** raw session transcripts — they are mined locally
 and never arrive here (D-012).
+
+> **The `failed` queue must be cleared, because tokens sit in it.** An invitation
+> mail carries a working token, and a message that fails every retry stays in that
+> queue with its body inside (D-038 — verified by query, not assumed). The seven
+> days come from the invitation's own expiry: after that the token opens nothing.
+>
+> ```bash
+> docker compose exec backend php bin/console messenger:failed:show
+> docker compose exec backend php bin/console messenger:failed:remove --all --force
+> ```
+>
+> `messenger:failed:show` **prints the message body**, token included. Its output
+> does not belong on somebody else's screen or in a bug report.
+
+> **Mail is sent by `worker`, not by `backend`.** The request only puts a message in
+> the queue; the worker process is what talks to the mail server. Configuration that
+> differs between the two services is therefore **invisible**: verified — `backend`
+> with a real `MAILER_DSN` and `worker` with `null://null` leave the mail journal
+> saying **sent** while nothing went anywhere. `docker-compose.yml` gives both
+> services the same variables from one `.env`, so a mismatch can only come from
+> overriding one by hand — and then the only symptom is the absence of mail.

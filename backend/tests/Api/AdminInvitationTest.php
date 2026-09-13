@@ -41,8 +41,8 @@ final class AdminInvitationTest extends WebTestCase
         $this->em = $container->get(EntityManagerInterface::class);
 
         $this->em->getConnection()->executeStatement(
-            'TRUNCATE ws.agent_tokens, ws.space_members, ws.invitations, ws.audit_log, '
-            . 'ws.spaces, ws.users CASCADE'
+            'TRUNCATE ws.mail_log, ws.agent_tokens, ws.space_members, ws.invitations, '
+            . 'ws.audit_log, ws.spaces, ws.users CASCADE'
         );
 
         $issue = $container->get(IssueInvitation::class);
@@ -62,6 +62,34 @@ final class AdminInvitationTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(403);
         self::assertStringContainsString('administratora', $this->json()['error']);
+    }
+
+    /**
+     * Issuing from the panel puts a mail in the queue, addressed to the invited person.
+     *
+     * Asserted on this surface and not only where the mail itself is tested, because
+     * the requirement is about the panel: an administrator presses a button and the
+     * invitation is delivered without anybody copying a link by hand. The queueing is
+     * what the request is responsible for — the sending is the worker's, and is proven
+     * end to end in InvitationMailTest.
+     */
+    public function testIssuingFromThePanelQueuesTheInvitationMail(): void
+    {
+        $this->postJson('/api/admin/invitations', [
+            'email' => 'nowy@web-systems.pl',
+            'admin' => false,
+        ], $this->tokenFor('admin@web-systems.pl'));
+
+        self::assertResponseStatusCodeSame(201);
+
+        $row = $this->em->getConnection()->fetchAssociative(
+            'SELECT template_key, status, subject FROM ws.mail_log WHERE recipient = :email',
+            ['email' => 'nowy@web-systems.pl'],
+        );
+
+        self::assertIsArray($row, 'Wystawienie z panelu musi zostawić wpis w dzienniku maili.');
+        self::assertSame('invitation', $row['template_key']);
+        self::assertSame('queued', $row['status']);
     }
 
     public function testOrdinaryUserCannotIssueInvitations(): void

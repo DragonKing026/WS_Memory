@@ -33,3 +33,14 @@ framework:
             # na co czekać. Zadanie jest idempotentne i odrzuca zlecenia dla
             # nieaktualnej rewizji, więc kolejność dostarczenia nie ma znaczenia.
             App\Application\Document\PublishDocument: async
+            # Wysyłka maila w tle, bo niedostępny serwer poczty nie może zawieszać
+            # ani wywracać żądania, które wystawia zaproszenie. Ponowienia bierze
+            # transport (trzy próby z narastającym odstępem), a dziennik maili
+            # pokazuje ich liczbę.
+            #
+            # UWAGA: ta wiadomość zawiera działający token zaproszenia, więc jej
+            # wiersz w ws.messenger_messages jest czasową kopią poświadczenia
+            # (D-038). Wiadomość, która nie przeszła wszystkich ponowień, ląduje
+            # w kolejce `failed` i zostaje tam z tokenem w środku — dlatego
+            # retencja w docs/05-deployment.md każe tę kolejkę czyścić.
+            App\Application\Mail\SendMail: async

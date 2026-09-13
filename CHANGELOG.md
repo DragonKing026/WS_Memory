@@ -15,6 +15,108 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 20:30 — Maile naprawdę wychodzą: szablony, podstawianie miejsc, dziennik
+
+Serwerowa strona TODO-017. Zaproszenie wystawione z panelu albo z konsoli
+**wysyła maila**, a link w treści jest tym linkiem, który zakłada konto —
+sprawdzone przez prawdziwy SMTP, nie założone: skrót tokena wyjętego z treści
+wiadomości zgadza się z wierszem w `ws.invitations`.
+
+**Szablony edytuje człowiek, ale nie jest to silnik szablonów.** Podstawianie
+miejsc `{{ nazwa }}` z **zamkniętej listy na szablon**, bez pętli, warunków
+i wywołań. Konstrukcje silnika (`{% if %}`, `{{ 7 * 7 }}`) i kod trafiają do
+maila **dosłownie**, jako tekst — bo szablon edytowany w przeglądarce
+i renderowany silnikiem jest wykonywaniem cudzego kodu na serwerze. Podstawienie
+idzie jednym przebiegiem, więc wartość nie jest skanowana ponownie: treść
+zawierająca `{{ tajne }}` zostaje takim napisem.
+
+Nieznane miejsce to **błąd przy zapisie**, z komunikatem wymieniającym
+dozwolone, a nie puste miejsce w wysłanej wiadomości. Walidacja stoi
+w konstruktorze, więc szablon niepoprawny nie może zaistnieć jako obiekt —
+także przy **czytaniu** z bazy, gdzie wychwytuje wiersz, pod którym zamknięta
+lista się skurczyła.
+
+**Dziennik `ws.mail_log` nie ma kolumny na treść** i mieć nie będzie: mail
+z zaproszeniem niesie działający token, a to jest tabela otwierana swobodnie, bo
+„to tylko logi". Sprawdzone zapytaniem po całej tabeli — każda kolumna każdego
+wiersza rzutowana na tekst i przeszukana — a nie przeglądem kodu. Do tego temat,
+który dziennik zapisuje, **nie może zawierać miejsca oznaczonego jako wrażliwe**;
+bez tej reguły zdanie o braku tokena byłoby prawdziwe tylko do pierwszego
+`{{ link }}` wpisanego w temat.
+
+Wysyłka idzie przez Messenger, więc **niedostępny serwer poczty nie wywraca
+wystawienia zaproszenia** — zaproszenie istnieje, link nadal da się skopiować
+z panelu, a w dzienniku jest stan `nieudany` z powodem od serwera. Zmierzone na
+martwym porcie: cztery próby (1 + 3 ponowienia), czytelny powód, zaproszenie
+nietknięte. Bez ustawionego `WS_PUBLIC_URL` mail **nie wychodzi wcale** i dziennik
+mówi dlaczego, zamiast wieźć komuś link do jego własnego localhosta.
+
+Cena tego kształtu jest zapisana jako **D-038**: token jedzie w wierszu
+`ws.messenger_messages`, a wiadomość po wyczerpaniu ponowień zostaje w kolejce
+`failed` z treścią w środku. Sprawdziłem, że tak jest (ciało pasuje do
+`[0-9a-f]{64}`), i dlatego retencja każe tę kolejkę czyścić.
+
+Dwie rzeczy wyszły dopiero z prób i obie są opisane:
+
+- **`TRUNCATE ws.users CASCADE`**, które robi w `setUp` każdy test integracyjny,
+  kaskaduje na **każdą** tabelę z kluczem obcym do `users`. Z kluczem przy
+  szablonach pierwszy test wyczyściłby treści wgrane migracją, a każdy następny
+  mail w zestawie byłby „brak szablonu" — bez słowa wyjaśnienia. Dlatego autora
+  zmiany trzymamy jako **adres**, nie referencję do konta. Sprawdzone
+  zapytaniem: przed zmianą `mail_templates` było na liście kaskady, po zmianie
+  nie jest.
+- **Maile wysyła `worker`, nie `backend`.** Konfiguracja rozjechana między tymi
+  usługami jest niewidoczna: `backend` z prawdziwym DSN i `worker` z `null://null`
+  dają w dzienniku stan **wysłany**, choć nic nie poszło. Opisane w deploymencie.
+
+Po drodze dwie naprawy poza zakresem zadania, obie odkryte tym, że zmieniłem
+system, a nie przeglądem: `drainQueue()` w teście pałaca **liczył wszystkie**
+wiadomości, więc asercja „dokładnie jedno zlecenie publikacji" zaczęła padać,
+gdy na tym transporcie pojawił się drugi rodzaj wiadomości — liczy teraz to, co
+nazywa. A `make analiza` padało na OOM, bo PHPStan bierze tyle procesów, ile
+rdzeni (szesnaście), w kontenerze z gigabajtem pamięci; komunikat
+„Child process error (exit code 137)" nie mówił nic o kodzie.
+
+Zostają **ekrany w panelu**: lista szablonów z edycją, podglądem i wysyłką
+próbną oraz dziennik maili z filtrem. Usługi pod nie są (`SendTestMail`,
+`renderSample`, filtr dziennika), więc to warstwa prezentacji, nie logika.
+
+
+---
+## 2026-09-13 20:00 — Mailer wpuszczony do systemu, dokumentacja przestaje kłamać
+
+Pierwsza warstwa TODO-017: `symfony/mailer` jest zależnością, `MAILER_DSN`,
+`MAIL_FROM` i `MAIL_FROM_NAME` istnieją w konfiguracji, w `.env.example`
+i w `docker-compose.yml` (backend i worker). Nic jeszcze nie wysyła — to
+przyjdzie z szablonami i dziennikiem — ale transport da się skonfigurować.
+
+W środowisku testowym transport `null` jest wpisany **wprost w `when@test`**,
+nie przez `.env.test`. Zmienna środowiskowa kontenera wygrywa z `.env.test`,
+co przy D-035 wywróciło CI; wartość wpisana w konfiguracji jest jedyną, której
+nie da się nadpisać z zewnątrz. Nawet przebieg testów z prawdziwym `MAILER_DSN`
+w środowisku nie wyśle niczego do nikogo.
+
+`WS_PUBLIC_URL` zyskał **drugi parametr bez wartości zastępczej**
+(`app.mail.link_base_url`). Link wypisany w konsoli czyta człowiek przy tej
+maszynie, więc `127.0.0.1:8080` jest dla niego poprawny; link w mailu czyta ktoś
+z innego komputera, gdzie ten sam adres prowadzi do jego własnej przeglądarki.
+Pusta wartość będzie odmową wysyłki z powodem widocznym w dzienniku, a nie
+wiadomością z martwym linkiem.
+
+`docs/05-deployment.md` opisywał `WS_DOMAIN` jako „domena publiczna
+(certyfikat, **linki w mailach**)". Zmiennej o tej nazwie nie ma w żadnym pliku
+tego repozytorium i nigdy nie było, a maili nie było tym bardziej — wiersz
+opisywał dwie rzeczy nieistniejące naraz. Zastąpiony trzema, które istnieją.
+Dokumentacja jest wsadem dla agentów AI, więc nieaktualne zdanie nie jest
+kosmetyką: zostaje potraktowane jako fakt i powielone.
+
+Doszedł **mailpit za profilem `dev`** — skrzynka na próby na własnej maszynie.
+Bez niej jedynym sposobem sprawdzenia, czy zaproszenie naprawdę wychodzi i czy
+link w treści działa, byłaby wysyłka na prawdziwą skrzynkę, czyli prawdziwy
+token w cudzej infrastrukturze. `docker compose up` jej nie podnosi.
+
+
+---
 ## 2026-09-13 19:50 — Metodologia zadań zapisana tam, gdzie się jej szuka
 
 Reguły o polach wyboru i o zadaniu zrobionym w części trafiły dotąd tylko do
