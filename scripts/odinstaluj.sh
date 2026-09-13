@@ -30,6 +30,7 @@
 #   ./scripts/odinstaluj.sh --wszystko       # trzy powyższe naraz
 #   ./scripts/odinstaluj.sh --potwierdz=NAZWA
 #                                            # bez pytania (dla skryptów)
+#   ./scripts/odinstaluj.sh --projekt=NAZWA  # gdy nazwy projektu nie da się ustalić
 #
 # Kody wyjścia: 0 = zrobione, 1 = przerwane, 2 = zły argument.
 #
@@ -46,6 +47,7 @@ Z_KOPIAMI=0
 Z_MODELEM=0
 Z_OBRAZAMI=0
 POTWIERDZENIE=''
+PROJEKT_Z_ARGUMENTU=''
 
 for arg in "$@"; do
   case "${arg}" in
@@ -55,6 +57,7 @@ for arg in "$@"; do
     --z-obrazami) Z_OBRAZAMI=1 ;;
     --wszystko) Z_KOPIAMI=1; Z_MODELEM=1; Z_OBRAZAMI=1 ;;
     --potwierdz=*) POTWIERDZENIE="${arg#--potwierdz=}" ;;
+    --projekt=*) PROJEKT_Z_ARGUMENTU="${arg#--projekt=}" ;;
     -h|--help) sed -n '3,36p' "${BASH_SOURCE[0]}" | sed 's/^#\{1\} \{0,1\}//'; exit 0 ;;
     *) echo "Nieznany argument: ${arg}" >&2; exit 2 ;;
   esac
@@ -72,21 +75,26 @@ udalo()    { printf '   %s✓%s %s\n' "${ZIELONY}" "${KONIEC}" "$*"; }
 ostrzez()  { printf '   %s!%s %s\n' "${ZOLTY}" "${KONIEC}" "$*"; }
 usunie()   { printf '   %s✗%s %s\n' "${CZERWONY}" "${KONIEC}" "$*"; }
 
-# Nazwę projektu podaje Compose, a nie my.
+# Nazwę projektu ustala wspólna funkcja z scripts/wspolne/projekt.sh — ta sama,
+# której używa instalator. Historia tego kawałka to dwa błędy tej samej rodziny,
+# oba znalezione uruchomieniem, nie czytaniem: nazwa z katalogu (a plik ustawia
+# `name: ws-memory`) i `docker compose config` jako jedyne źródło (nie działa
+# bez `.env`, czyli akurat po przerwanej instalacji). Obie kończyły się tak
+# samo: filtr nie znajdował żadnego wolumenu, a skrypt meldował „odinstalowane".
 #
-# Pierwsza wersja brała nazwę katalogu — i była po prostu błędna: `docker-compose.yml`
-# ustawia `name: ws-memory`, więc katalog nazywa się inaczej niż projekt. Skutek
-# byłby najgorszy z możliwych: filtr wolumenów po złej nazwie nie znajdował
-# żadnego, deinstalator wypisywał „wolumeny danych: nie ma żadnego" i kończył
-# słowem „odinstalowane", zostawiając całą bazę wiedzy na dysku.
-#
-# `docker compose config` uwzględnia i `name:` z pliku, i `COMPOSE_PROJECT_NAME`,
-# i katalog jako ostateczność — czyli dokładnie to, czego użyje `docker compose`
-# przy kasowaniu. Nazwa katalogu zostaje wyłącznie jako ratunek, gdy Dockera nie
-# ma czym zapytać.
-PROJEKT="$(docker compose config --format json 2>/dev/null \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["name"])' 2>/dev/null \
-  || basename "${KORZEN}" | tr '[:upper:]' '[:lower:]')"
+# Gdy nie da się ustalić — odmawiamy. Skrypt, który kasuje, ma prawo nie
+# wiedzieć; nie ma prawa zgadywać.
+# shellcheck source=scripts/wspolne/projekt.sh
+. "${KORZEN}/scripts/wspolne/projekt.sh"
+
+if [ -n "${PROJEKT_Z_ARGUMENTU}" ]; then
+  PROJEKT="${PROJEKT_Z_ARGUMENTU}"
+elif ! PROJEKT="$(ustal_projekt_compose "${KORZEN}")"; then
+  printf '%sPrzerwane.%s Nie umiem ustalić nazwy projektu Compose.\n' "${CZERWONY}" "${KONIEC}" >&2
+  printf 'Podaj ją: --projekt=NAZWA (zobaczysz ją w: docker compose ls)\n' >&2
+  exit 1
+fi
+
 NAZWA="${PROJEKT}"
 
 wykonaj() {
@@ -102,7 +110,15 @@ wykonaj() {
 # Wypisujemy stan zastany, zanim cokolwiek zniknie. Deinstalator, który od razu
 # kasuje, każe potwierdzać usunięcie czegoś, czego się nie widziało.
 
-KONTENERY="$(docker compose ps -aq 2>/dev/null | wc -l | tr -d ' ')"
+# Każde z tych podstawień musi mieć `|| true`, i to nie jest ostrożność na wyrost.
+# `docker compose ps` bez `.env` kończy się błędem, a przy `set -e` całe
+# podstawienie ubijało skrypt — bez jednej linijki na wyjściu. Deinstalator
+# milczący to deinstalator, po którym nie wiadomo, czy cokolwiek zrobił.
+#
+# Kontenery liczymy po etykiecie projektu, a nie przez `docker compose ps`,
+# z tego samego powodu: etykieta działa też wtedy, gdy pliku compose nie da się
+# odczytać.
+KONTENERY="$(docker ps -aq --filter "label=com.docker.compose.project=${PROJEKT}" 2>/dev/null | wc -l | tr -d ' ' || true)"
 WOLUMENY="$(docker volume ls -q --filter "label=com.docker.compose.project=${PROJEKT}" 2>/dev/null || true)"
 OBRAZY="$(docker images -q 'ws-memory/backend' 2>/dev/null || true)"
 
@@ -260,8 +276,8 @@ if [ "${NA_SUCHO}" -eq 1 ]; then
   exit 0
 fi
 
-POZOSTALE_KONTENERY="$(docker compose ps -aq 2>/dev/null | wc -l | tr -d ' ')"
-POZOSTALE_WOLUMENY="$(docker volume ls -q --filter "label=com.docker.compose.project=${PROJEKT}" 2>/dev/null | wc -l | tr -d ' ')"
+POZOSTALE_KONTENERY="$(docker ps -aq --filter "label=com.docker.compose.project=${PROJEKT}" 2>/dev/null | wc -l | tr -d ' ' || true)"
+POZOSTALE_WOLUMENY="$(docker volume ls -q --filter "label=com.docker.compose.project=${PROJEKT}" 2>/dev/null | wc -l | tr -d ' ' || true)"
 
 powiedz "Kontenery projektu: ${POZOSTALE_KONTENERY}"
 powiedz "Wolumeny projektu:  ${POZOSTALE_WOLUMENY}"

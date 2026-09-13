@@ -95,11 +95,37 @@ odpowiedzi w obie strony, wygenerowany `.env` (prawa 600, sześć sekretów po 3
 znaki, komentarze z `.env.example` zachowane, plik daje się sourceować) oraz
 odmowa nadpisania istniejącej konfiguracji.
 
-**Czego nie sprawdziłem i dlaczego:** pełnego przebiegu na czystej maszynie.
-Wymagałby postawienia drugiego stosu obok działającego — a na tej maszynie jest
-10 GB wolnej pamięci przy potrzebnych ~8 GB na sam drugi komplet usług. To
-zostaje do zrobienia na osobnej maszynie albo w oknie, w którym można zatrzymać
-tutejszy stos.
+**Sprawdzone pełnym przebiegiem na osobnej instancji** — świeży klon,
+`COMPOSE_PROJECT_NAME=ws-memory-proba`, własne wolumeny, port 18099, obok
+działającego stosu i bez dotykania go. Instalacja: pięć sprawdzeń na pięć,
+z wyszukiwaniem znaczeniem włącznie, logowanie hasłem, które instalator wypisał.
+Świeża baza: 1 konto, 2 przestrzenie, 5 wpisów audytu, 1 szuflada w pałacu.
+Deinstalacja: kopia zapasowa (16 KB), zero kontenerów, zero wolumenów poza
+modelem, stos główny nietknięty.
+
+Przebieg znalazł **trzy błędy, których nie znalazłby żaden przegląd kodu**:
+
+1. **Świeży klon nie ma `vendor/`.** Instalator wywracał się na kluczach JWT
+   komunikatem „Dependencies are missing". `docker-compose.yml` montuje
+   `./backend` z hosta, więc nawet obraz produkcyjny dostaje swoje zależności
+   przysłonięte. Instalator uruchamia teraz `composer install` **jako UID
+   człowieka**, bo obraz dev działa jako root, a `vendor` założony rootem
+   w bind moncie to katalog, którego właściciel maszyny nie ruszy.
+2. **Instalator nie umiał dokończyć własnej przerwanej instalacji**: port
+   trzymał jego własny nginx z poprzedniego przebiegu, a kontrola portów
+   meldowała konflikt. Port zajęty przez kontener tego samego projektu nie jest
+   już konfliktem.
+3. **Sprawdzenia startowały przed pobraniem modelu.** Trzy pozycje na czerwono
+   na instancji, która była w trakcie startu — instalator kłamał w drugą stronę
+   niż zwykle, mówiąc „nie działa" o czymś, co za chwilę działa. Zmierzone:
+   346 s na same wagi ONNX. Teraz czeka na pałac i na embeddingi.
+
+Kryterium o przerwaniu w połowie odhaczone **z przebiegu, nie z założenia**:
+pierwsza próba padła na kluczach JWT, zostawiając kontenery i `.env`; kolejne
+przebiegi to dokończyły, a deinstalator posprzątał wszystko.
+
+**Czego nie sprawdziłem:** instalacji na maszynie bez Dockera w ogóle — do tego
+służy maszyna testowa z punktu 7.
 
 **Punkt 7 (instalacja w systemie) nie jest zrobiony** i skrypt mówi to wprost:
 sprawdza wymagania, wypisuje braki i kończy się kodem 3. Kod instalujący
@@ -116,14 +142,14 @@ dysku. Nazwę podaje teraz `docker compose config`.
 
 ## Kryteria ukończenia
 
-- [ ] Na czystej maszynie z Dockerem `./scripts/instaluj.sh` daje **działającą
+- [x] Na czystej maszynie z Dockerem `./scripts/instaluj.sh` daje **działającą
   instancję**, do której da się zalogować danymi, które wypisał.
 - [x] Instalator uruchomiony drugi raz na istniejącej instancji **nie niszczy
   danych** — mówi, co zastał, i pyta.
-- [ ] Przerwanie instalatora w połowie (Ctrl+C) nie zostawia stanu, którego
+- [x] Przerwanie instalatora w połowie (Ctrl+C) nie zostawia stanu, którego
   deinstalator nie umie posprzątać.
 - [x] Brakujący składnik jest zgłoszony **przed** pierwszą zmianą w systemie.
-- [ ] `./scripts/odinstaluj.sh` usuwa wszystko, co instalator utworzył, a `docker
+- [x] `./scripts/odinstaluj.sh` usuwa wszystko, co instalator utworzył, a `docker
   ps -a`, `docker volume ls` i katalog projektu nie zawierają po nim śladów
   poza tym, co jawnie zostawił.
 - [x] Deinstalator **nie usuwa kopii zapasowych** bez jawnej opcji.
