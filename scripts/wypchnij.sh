@@ -136,6 +136,28 @@ sys.exit(1 if any(r["conclusion"] not in ("success", "neutral", "skipped") for r
 WYNIK=$?
 
 if [ "${WYNIK}" -ne 0 ]; then
+  # Najpierw pytamy, czy to w ogóle nasza wina. Trzy razy jednego dnia
+  # (2026-09-13) czerwony przebieg okazał się awarią GitHuba — raz push do wiki
+  # z błędem 500, raz analiza przyrostowa CodeQL, raz wysyłka wyników padająca
+  # we wszystkich trzech językach naraz podczas krytycznej awarii Actions.
+  # Za każdym razem ustalenie tego zajmowało kilka minut grzebania w logach,
+  # w których przyczyny nie ma.
+  STATUS="$(curl -sf --max-time 10 https://www.githubstatus.com/api/v2/summary.json 2>/dev/null)" || STATUS=''
+  if [ -n "${STATUS}" ]; then
+    echo "${STATUS}" | python3 -c '
+import json, sys
+dane = json.load(sys.stdin)
+chore = [k["name"] for k in dane.get("components", []) if k.get("status") != "operational"]
+awarie = [i["name"] for i in dane.get("incidents", []) if i.get("status") != "resolved"]
+if chore or awarie:
+    print("\n  UWAGA: GitHub ma teraz problemy — sprawdź, czy to nie to.")
+    for n in chore:
+        print(f"    niesprawne: {n}")
+    for n in awarie:
+        print(f"    awaria: {n}")
+' || true
+  fi
+
   printf '\n%sCoś padło. Ogon logu:%s\n' "${CZERWONY}" "${KONIEC}"
   for id in $(gh run list --limit 20 --json headSha,databaseId,conclusion \
       --jq ".[] | select(.headSha == \"${SHA}\" and .conclusion != \"success\" and .conclusion != \"neutral\" and .conclusion != \"skipped\") | .databaseId"); do

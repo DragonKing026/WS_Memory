@@ -15,6 +15,21 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 11:33 — Skrypt pyta GitHuba, czy to jego wina
+
+**GitHub ma dziś krytyczną awarię** — od 09:16 UTC: Pull Requests niesprawne,
+Actions, API, Issues i Pages z obniżoną wydajnością. To tłumaczy wszystkie trzy
+czerwone przebiegi z tej sesji: błąd 500 przy pushu do wiki, nieudaną analizę
+przyrostową CodeQL i wysyłkę wyników padającą **we wszystkich trzech językach
+naraz** (analiza kończyła się poprawnie, umierało dopiero „Uploading results”).
+
+Po naszej stronie nie ma czego naprawiać, ale ustalenie tego zajmowało za każdym
+razem kilka minut grzebania w logach, w których przyczyny nie ma. Dlatego
+`scripts/wypchnij.sh` przy porażce **najpierw pyta o stan GitHuba** i wypisuje
+niesprawne usługi. Rozróżnienie „nasz kod jest zepsuty” od „GitHub jest zepsuty”
+jest pierwszą rzeczą, którą trzeba wiedzieć, a ostatnią, którą log podaje.
+
+---
 ## 2026-09-13 11:25 — Skrypt, który sprawdza lokalnie i czeka na CI
 
 **Szybkie sprawdzenie padło na moim własnym przeoczeniu:** w rozliczeniu

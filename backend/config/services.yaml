@@ -67,6 +67,7 @@ services:
     App\Domain\Space\SpaceCatalog: '@App\Infrastructure\Doctrine\DoctrineSpaceCatalog'
     App\Domain\Space\SpaceMembershipRepository: '@App\Infrastructure\Doctrine\DoctrineSpaceMembershipRepository'
     App\Domain\Identity\AgentTokenDirectory: '@App\Infrastructure\Doctrine\DoctrineAgentTokenDirectory'
+    App\Domain\Identity\AuthorDirectory: '@App\Infrastructure\Doctrine\DoctrineAuthorDirectory'
     App\Domain\Audit\AuditTrail: '@App\Infrastructure\Doctrine\DoctrineAuditTrail'
 
     App\Infrastructure\MemPalace\MemPalaceClient:

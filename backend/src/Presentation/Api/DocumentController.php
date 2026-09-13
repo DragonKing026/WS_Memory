@@ -6,6 +6,7 @@ namespace App\Presentation\Api;
 
 use App\Application\Document\DocumentNotFound;
 use App\Application\Document\DocumentService;
+use App\Domain\Identity\AuthorDirectory;
 use App\Application\Document\ProposalRequired;
 use App\Domain\Document\DocumentSlug;
 use App\Domain\Identity\Actor;
@@ -35,6 +36,7 @@ final readonly class DocumentController
     public function __construct(
         private Security $security,
         private DocumentService $documents,
+        private AuthorDirectory $authors,
     ) {
     }
 
@@ -71,9 +73,38 @@ final readonly class DocumentController
         return $this->guard(function () use ($space, $slug): JsonResponse {
             $document = $this->documents->require($this->actor(), new SpaceId($space), new DocumentSlug($slug));
 
+            // Names resolved in bulk, once for the whole list: a revision stores raw
+            // identifiers (deliberately — a copied name goes stale), and a column of
+            // UUIDs answers "who wrote this" with "no idea".
+            $userIds = [];
+            $tokenIds = [];
+            foreach ($document->getRevisions() as $revision) {
+                if (null !== $id = $revision->getAuthorUserId()?->toRfc4122()) {
+                    $userIds[] = $id;
+                }
+                if (null !== $id = $revision->getAuthorAgentTokenId()?->toRfc4122()) {
+                    $tokenIds[] = $id;
+                }
+            }
+
+            $names = $this->authors->namesOf($userIds);
+            $labels = $this->authors->tokenLabelsOf($tokenIds);
+
             $revisions = [];
             foreach ($document->getRevisions() as $revision) {
-                $revisions[] = $this->describeRevision($revision);
+                $userId = $revision->getAuthorUserId()?->toRfc4122();
+                $tokenId = $revision->getAuthorAgentTokenId()?->toRfc4122();
+
+                $revisions[] = $this->describeRevision($revision) + [
+                    // An account that no longer exists leaves the revision in place
+                    // with nobody named — history that loses entries when somebody
+                    // leaves is worse than history naming nobody.
+                    'authorName' => match (true) {
+                        null !== $tokenId => $labels[$tokenId] ?? 'agent (token usunięty)',
+                        null !== $userId => $names[$userId] ?? 'konto usunięte',
+                        default => 'nieznany',
+                    },
+                ];
             }
 
             return new JsonResponse([

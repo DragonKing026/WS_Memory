@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     DocumentTree: typeof import('./src/components/documents/DocumentTree.vue')['default']
+    MarkdownEditor: typeof import('./src/components/documents/MarkdownEditor.vue')['default']
     MarkdownView: typeof import('./src/components/documents/MarkdownView.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
