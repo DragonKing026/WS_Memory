@@ -121,6 +121,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Przestrzenie' },
       },
       {
+        path: 'maile',
+        name: 'admin-mail-templates',
+        component: () => import('@/pages/AdminMailTemplatesPage.vue'),
+        meta: { title: 'Szablony maili' },
+      },
+      {
+        path: 'maile/dziennik',
+        name: 'admin-mail-log',
+        component: () => import('@/pages/AdminMailLogPage.vue'),
+        meta: { title: 'Dziennik maili' },
+      },
+      {
         path: 'audyt',
         name: 'admin-audit',
         component: () => import('@/pages/AdminAuditPage.vue'),

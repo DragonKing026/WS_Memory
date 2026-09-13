@@ -15,6 +15,39 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 20:56 — Ekrany maili w panelu, TODO-017 zamknięte
+
+Dwa ekrany: **szablony** i **dziennik maili**. Obejrzane w przeglądarce, nie
+tylko przetestowane — zrzuty leżą w `TODO/zrzuty/017-*.png`.
+
+Ekran szablonów mówi wprost to, co najłatwiej zrozumieć opacznie: szablonów
+**nie dodaje się i nie usuwa**, a wszystko, co nie jest miejscem z listy, trafia
+do skrzynki adresata **dosłownie**. Obok pól stoi lista dozwolonych miejsc wraz
+z tym, w co każde się zamieni — bo pytanie „co mogę tu wpisać" nie powinno
+wymagać wywołania błędu.
+
+`{{ link }}` wpisany w temat daje ostrzeżenie **w trakcie pisania**, a zapis
+i tak odmawia — słowami backendu. Sprawdziłem oba: podpowiedź to podpowiedź,
+regułą jest serwer. Podgląd składa serwer, jednym żądaniem na przycisk, i jest
+zarazem sprawdzeniem poprawności: co odrzuci podgląd, odrzuci też zapis, tym
+samym zdaniem.
+
+Dziennik pokazuje adresata, rodzaj, stan i **powód porażki słowami serwera
+poczty** — to jest ta kolumna, po której poznaje się złe hasło w DSN od
+zamkniętego portu. Liczba prób pojawia się tylko wtedy, gdy coś znaczy: „1 próba"
+w każdym wierszu zasłaniałaby ten jeden, gdzie prób było cztery. Na zrzucie
+widać przypadek, dla którego powód porażki zostaje przy stanie „wysłany": dwie
+odmowy serwera, sukces przy trzeciej próbie.
+
+Schemat wiersza dziennika jest **ścisły** i odrzuca pole z treścią. Nie jest to
+ostrożność na wyrost: schemat, który nadmiarowe pole po cichu pomija, pozwoliłby
+backendowi zacząć je przysyłać — a wtedy działający token wyświetla się w panelu
+i nic tego nie zgłasza.
+
+**TODO-017 zamknięte**: dziesięć punktów i wszystkie kryteria.
+
+
+---
 ## 2026-09-13 20:42 — API szablonów maili i dziennika wysyłki
 
 Kontrakt pod ekrany w panelu. Lista szablonów oddaje w jednej odpowiedzi treść,

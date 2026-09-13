@@ -36,6 +36,8 @@ const sections = [
   { label: 'Konta', to: { name: 'admin-users' } },
   { label: 'Zaproszenia', to: { name: 'admin-invitations' } },
   { label: 'Przestrzenie', to: { name: 'admin-spaces' } },
+  { label: 'Szablony maili', to: { name: 'admin-mail-templates' } },
+  { label: 'Dziennik maili', to: { name: 'admin-mail-log' } },
   { label: 'Dziennik audytu', to: { name: 'admin-audit' } },
   { label: 'Zależności', to: { name: 'admin-dependencies' } },
 ] as const
