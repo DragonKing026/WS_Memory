@@ -105,6 +105,23 @@ export function isViewer(user: AdminUser, viewerId: string | null): boolean {
   return viewerId !== null && user.id === viewerId
 }
 
+/**
+ * Why an action on this row is unavailable, or null when it is available.
+ *
+ * Only the cases this screen can know **without restating a backend rule**. Acting on
+ * yourself is exactly that: the browser knows which row is yours, and it needs no copy
+ * of the reasoning to know the answer will be no.
+ *
+ * "The last administrator" deliberately stays out of here. It depends on the whole
+ * table, not on one row, and a second implementation of it would drift from the first
+ * — so that one is left to the backend and quoted from its refusal.
+ */
+export function actionUnavailableBecause(user: AdminUser, viewerId: string | null): string | null {
+  return isViewer(user, viewerId)
+    ? 'Na własnym koncie tego nie zrobisz — administrator, który odbierze rolę sobie, zamyka sobie drzwi i nie ma jak ich otworzyć.'
+    : null
+}
+
 /** Memberships and tokens as one line, with the counters in the right plural form. */
 export function resourceSummary(user: AdminUser): string {
   const spaces = `${user.spaceCount} ${pluralPl(user.spaceCount, ['przestrzeń', 'przestrzenie', 'przestrzeni'])}`

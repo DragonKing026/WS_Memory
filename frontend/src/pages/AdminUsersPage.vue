@@ -10,6 +10,7 @@ import {
   activityBadge,
   activityChangeFor,
   deactivationNotice,
+  actionUnavailableBecause,
   isViewer,
   resourceSummary,
   roleBadge,
@@ -251,7 +252,11 @@ onMounted(() => void load())
                   variant="subtle"
                   color="neutral"
                   icon="i-lucide-shield"
-                  :disabled="confirming === rowKey(user, 'role')"
+                  :disabled="
+                    confirming === rowKey(user, 'role') ||
+                    actionUnavailableBecause(user, auth.user?.id ?? null) !== null
+                  "
+                  :title="actionUnavailableBecause(user, auth.user?.id ?? null) ?? undefined"
                   @click="ask(user, 'role')"
                 >
                   {{ roleChangeFor(user).buttonLabel }}
@@ -261,13 +266,26 @@ onMounted(() => void load())
                   variant="subtle"
                   :color="user.isActive ? 'error' : 'primary'"
                   :icon="user.isActive ? 'i-lucide-ban' : 'i-lucide-rotate-ccw'"
-                  :disabled="confirming === rowKey(user, 'activity')"
+                  :disabled="
+                    confirming === rowKey(user, 'activity') ||
+                    actionUnavailableBecause(user, auth.user?.id ?? null) !== null
+                  "
+                  :title="actionUnavailableBecause(user, auth.user?.id ?? null) ?? undefined"
                   @click="ask(user, 'activity')"
                 >
                   {{ activityChangeFor(user).buttonLabel }}
                 </UButton>
               </div>
             </div>
+
+            <!-- Wyłączony przycisk bez powodu jest tak samo mylący jak przycisk, który
+                 prowadzi do odmowy — po prostu myli ciszej. -->
+            <p
+              v-if="actionUnavailableBecause(user, auth.user?.id ?? null) !== null"
+              class="mt-2 text-xs text-muted"
+            >
+              {{ actionUnavailableBecause(user, auth.user?.id ?? null) }}
+            </p>
 
             <!-- Potwierdzenie mówi, co się stanie, a nie „jesteś pewien?". Obie zmiany są
                  odwracalne i właśnie dlatego są groźne: pomyłki nie widać, dopóki nie
