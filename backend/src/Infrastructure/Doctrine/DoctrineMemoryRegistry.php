@@ -9,6 +9,7 @@ use App\Domain\Memory\EntryFacts;
 use App\Domain\Memory\MemoryKind;
 use App\Domain\Memory\MemoryRegistry;
 use App\Domain\Memory\MemoryWrite;
+use App\Domain\Memory\SourceBinding;
 use App\Domain\Space\SpaceId;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
@@ -63,7 +64,13 @@ final readonly class DoctrineMemoryRegistry implements MemoryRegistry
                 'sourceReplica' => $write->sourceReplica,
                 'sourceDrawerId' => $write->sourceDrawerId,
                 'publishBatchId' => $write->publishBatchId,
-                'createdAt' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                // The time the content was filed, which for anything written through
+                // our own surfaces is now. A publication says otherwise, and it is
+                // right to: a laptop back from a week offline sends a week of drawers
+                // at once, and dating them all today would make the browse screen —
+                // ordered by this very column — claim a week of work happened in one
+                // minute.
+                'createdAt' => ($write->filedAt ?? new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ],
         );
 
@@ -213,6 +220,124 @@ final readonly class DoctrineMemoryRegistry implements MemoryRegistry
         if (0 === $affected) {
             throw new \DomainException(\sprintf('Rejestr nie zna szuflady %s.', $from->value));
         }
+    }
+
+    public function bindingForSource(string $sourceReplica, string $sourceDrawerId): ?SourceBinding
+    {
+        $row = $this->connection->fetchAssociative(
+            <<<'SQL'
+                SELECT e.drawer_id, s.slug
+                FROM ws.memory_entries e
+                JOIN ws.spaces s ON s.id = e.space_id
+                WHERE e.source_replica = :replica AND e.source_drawer_id = :sourceDrawer
+                SQL,
+            ['replica' => $sourceReplica, 'sourceDrawer' => $sourceDrawerId],
+        );
+
+        if (false === $row) {
+            return null;
+        }
+
+        return new SourceBinding(
+            new DrawerId((string) $row['drawer_id']),
+            new SpaceId((string) $row['slug']),
+        );
+    }
+
+    public function drawerWithContent(SpaceId $space, string $contentHash): ?DrawerId
+    {
+        // Answered by idx_entries_dedup, which is why the space comes first in the
+        // query as it does in the index. Deduplication is per target space by
+        // design (D-014): three private spaces legitimately hold three copies, and
+        // that is what makes the plugin offer a mapping instead.
+        $drawer = $this->connection->fetchOne(
+            <<<'SQL'
+                SELECT e.drawer_id
+                FROM ws.memory_entries e
+                JOIN ws.spaces s ON s.id = e.space_id
+                WHERE s.slug = :slug AND e.content_hash = :hash
+                LIMIT 1
+                SQL,
+            ['slug' => $space->value, 'hash' => $contentHash],
+        );
+
+        return \is_string($drawer) ? new DrawerId($drawer) : null;
+    }
+
+    public function refresh(MemoryWrite $write): void
+    {
+        $affected = $this->connection->executeStatement(
+            <<<'SQL'
+                UPDATE ws.memory_entries
+                SET space_id = (SELECT s.id FROM ws.spaces s WHERE s.slug = :spaceSlug),
+                    title = :title,
+                    tags = CAST(:tags AS JSONB),
+                    content_hash = :contentHash,
+                    source_replica = :sourceReplica,
+                    source_drawer_id = :sourceDrawerId,
+                    publish_batch_id = :publishBatchId,
+                    created_at = :createdAt
+                WHERE drawer_id = :drawerId
+                  AND (SELECT s.id FROM ws.spaces s WHERE s.slug = :spaceSlug) IS NOT NULL
+                SQL,
+            [
+                'drawerId' => $write->drawer->value,
+                'spaceSlug' => $write->space->value,
+                'title' => $write->title,
+                'tags' => json_encode($write->tags, \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR),
+                'contentHash' => $write->contentHash,
+                'sourceReplica' => $write->sourceReplica,
+                'sourceDrawerId' => $write->sourceDrawerId,
+                'publishBatchId' => $write->publishBatchId,
+                // The local filing time wins over now(). A laptop back from a week
+                // offline sends a week of drawers at once, and dating them all today
+                // would make the browse screen — ordered by this column — claim a
+                // week of work happened in a minute.
+                'createdAt' => ($write->filedAt ?? new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ],
+        );
+
+        if (0 === $affected) {
+            // Either the drawer is unknown or the space is. Both mean the caller is
+            // about to be told a publication succeeded, and neither is survivable
+            // silently — the content is in the palace by now.
+            throw new \DomainException(\sprintf(
+                'Rejestr nie zna szuflady %s w przestrzeni „%s" — odświeżenie wpisu się nie udało.',
+                $write->drawer->value,
+                $write->space->value,
+            ));
+        }
+    }
+
+    public function drawersInBatch(string $batchId): array
+    {
+        $rows = $this->connection->fetchFirstColumn(
+            <<<'SQL'
+                SELECT drawer_id
+                FROM ws.memory_entries
+                WHERE publish_batch_id = :batch
+                ORDER BY created_at, drawer_id
+                SQL,
+            ['batch' => $batchId],
+        );
+
+        return array_map(
+            static fn (mixed $value): DrawerId => new DrawerId((string) $value),
+            $rows,
+        );
+    }
+
+    public function forget(array $drawers): int
+    {
+        if ([] === $drawers) {
+            return 0;
+        }
+
+        return (int) $this->connection->executeStatement(
+            'DELETE FROM ws.memory_entries WHERE drawer_id IN (:ids)',
+            ['ids' => array_map(static fn (DrawerId $id): string => $id->value, $drawers)],
+            ['ids' => ArrayParameterType::STRING],
+        );
     }
 
     public function countsFor(array $spaces): array

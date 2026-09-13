@@ -2,16 +2,17 @@
 tags: [ws-memory, documentation, data-model, postgres, doctrine, pgvector]
 ---
 
-> Translated from [`docs/02-model-danych.md`](../02-model-danych.md) (synced 2026-09-12).
+> Translated from [`docs/02-model-danych.md`](../02-model-danych.md) (synced 2026-09-13).
 > **The Polish version is authoritative.**
 
 # Data model
 
-Status: **partly implemented** (2026-09-12). Present in the database: `users`,
+Status: **partly implemented** (2026-09-13). Present in the database: `users`,
 `invitations`, `spaces`, `space_members`, `audit_log` (migration
 `Version20260912000002`), `memory_entries` (`Version20260912000003`),
-`agent_tokens` (`Version20260912000004`) and `documents`, `document_revisions`
-and `proposals` (`Version20260912000005`). The
+`agent_tokens` (`Version20260912000004`), `documents`, `document_revisions`
+and `proposals` (`Version20260912000005`), and `mirrors`, `publish_settings`
+and `publish_batches` (`Version20260913000005`). The
 remaining tables described below are design — each arrives with the task that
 needs it.
 
@@ -153,6 +154,15 @@ during automatic transfer).
 > second one (D-010). The replica identifier comes from the local palace's
 > `replica.json` — MemPalace keeps it stable for precisely this purpose.
 >
+> New with `Version20260913000005`: `publish_batch_id` now has a **foreign key**
+> to `ws.publish_batches` with `ON DELETE SET NULL`, and it is **deferred**
+> (`DEFERRABLE INITIALLY DEFERRED`), so it is checked at `COMMIT` rather than at
+> each `INSERT`. That is not a loosening — the constraint holds at every moment
+> observable from outside — but a permission for the batch to be written **after**
+> its drawers, with the counts that actually happened (D-036). Alongside it, a
+> partial index on `(publish_batch_id)` where the column is not null: that is how
+> an undo finds what to remove.
+>
 > `content_hash` solves a different problem: with transfer on by default
 > (D-014), three people mining the same repository would send identical content
 > three times. The index `(space_id, content_hash)` makes the second and third
@@ -162,6 +172,11 @@ during automatic transfer).
 > policy, not an invariant of the data: two people may record the same sentence
 > and the registry must not refuse them with a write error. Publishing does the
 > checking, not the table.
+>
+> For a publication, `created_at` is the time the content was filed **in the local
+> palace**, not the time we received it. A laptop back from a week offline sends a
+> week of drawers at once, and dating them all today would make the browse screen
+> — ordered by exactly this column — claim a week of work happened in one minute.
 
 > Why this table exists when the data is in the palace: **so permissions and
 > auditing work in SQL rather than on results returned by the palace.** We
@@ -170,23 +185,48 @@ during automatic transfer).
 
 ### The hybrid: local palaces and publishing
 
+Three tables, all of which **exist** (`Version20260913000005`).
+
 **`mirrors`** — a mapping of a local palace wing onto a **team space**.
 `id`, `user_id`, `source_replica`, `source_wing`, `space_id`, `excluded_rooms`
-(`JSONB`), `is_active`, `is_confirmed`, `paused_at`, `last_synced_at`,
-`last_drawer_filed_at` (the incremental watermark), `created_at`.
+(`JSONB`), `is_active` (default `true`), `is_confirmed` (default **`false`**),
+`paused_at`, `last_synced_at`, `last_drawer_filed_at` (the incremental
+watermark), `created_at`.
 
 > A mapping is needed **only to make content reach the team**. An unmapped wing
 > travels to the server anyway — into its owner's private space (D-014). That is
 > why the confirmation (`is_confirmed`) applies to the mapping and not to the
 > transfer: the mapping is what decides visibility to others.
+>
+> `is_confirmed` defaults to **false**, and that default is what decides
+> visibility. A row inserted without saying anything about confirmation routes
+> nothing to a team space; were the column to default to true, *proposing* a
+> mapping would publish to the team.
+>
+> The triple `(user_id, source_replica, source_wing)` is **unique**. Two rows
+> would make "where does this wing land?" a question with two answers, and the
+> landing rule would have to choose — silently, on every publication. The foreign
+> key to the user is `ON DELETE CASCADE` (a mapping describes somebody's machine
+> and means nothing without them), the one to the space `RESTRICT` — as everywhere
+> a space with history is archived rather than dropped.
 
 **`publish_settings`** — transfer settings per user and replica.
 `id`, `user_id`, `source_replica`, `auto_publish` (default **`true`**),
 `private_space_id` (where unmapped wings land), `last_watermark` (how far the
-transfer has got), `updated_at`.
+transfer has got), `updated_at`. The pair `(user_id, source_replica)` is unique.
+
+> Two opposite defaults side by side, deliberately: `auto_publish` defaults to
+> **true**, because transfer is the behaviour (D-014) and a knowledge base you
+> have to remember to feed stays empty; `is_confirmed` in `mirrors` defaults to
+> **false**, because visibility to the team is confirmed by a human.
+>
+> The table exists but **the server does not read it yet** — `auto_publish` is a
+> switch on the plugin's side, and points 5–7 of TODO-012 (the outbox,
+> `/ws-publish`) belong to the client.
 
 **`publish_batches`** — one publication batch, so it can be undone.
-`id`, `user_id`, `mirror_id` (`null` for selective publishing), `space_id`,
+`id`, `user_id`, `agent_token_id` (when an agent published it), `mirror_id`
+(`null` for selective publishing), `space_id`, `source_replica`,
 `mode` (`selective` / `mirror`), `drawer_count`, `skipped_count`,
 `skipped_reasons` (`JSONB` — what the secret filter rejected and why),
 `status` (`preview` / `applied` / `reverted`), `created_at`, `reverted_at`.
@@ -194,6 +234,24 @@ transfer has got), `updated_at`.
 > The batch is the unit of undo: "I pushed the wrong wing" is solved with one
 > action rather than by hunting for drawers. The skip report is part of the
 > batch, not a separate log — otherwise nobody would read it.
+>
+> `space_id` is `NOT NULL`, so a batch belongs to **one** space. That is why a
+> single `POST /api/publish` request yields one batch **per target space**
+> (D-036): the landing rule splits a send between team spaces and the private
+> one, and "take back what the team can see" must not erase a week of private
+> transcripts that went out in the same run.
+>
+> `CHECK ((status = 'reverted') = (reverted_at IS NOT NULL))` — the status and the
+> timestamp cannot disagree. The journal is read to answer "what did I undo and
+> when", and a status able to lie about its own timestamp answers it wrongly.
+>
+> `status = 'preview'` **never reaches the table** — a preview writes nothing,
+> itself included. The value exists in the `CHECK` and in the code so a report has
+> a name for what it is.
+>
+> `mirror_id` is `ON DELETE SET NULL`: deleting a mapping must not delete the
+> record of what it once published. An undo nobody can find is an undo nobody can
+> perform.
 
 ### Operations
 
@@ -233,8 +291,13 @@ a mistake in the filter would be unacceptable).
    access going forward.
 5. A `memory_entries` row without a matching drawer in the palace signals
    divergence — a scheduled job reports it (and never silently repairs it).
-6. A mirror without `is_confirmed` **publishes nothing** — it can only produce a
-   preview. Enforced in code and covered by a test.
+6. A mirror without `is_confirmed` **routes nothing to a team space**. The
+   content still travels to the server — into its owner's private space (D-014),
+   because the invariant is "everything is on the server, nothing is visible to
+   the team without a mapping". The same holds for a mirror that is deactivated,
+   paused, or excludes the room (D-036). The condition lives in
+   `Mirror::routes()` and is covered by `PublishServiceTest` and
+   `DoctrinePublishBridgeTest`.
 7. Reverting a batch removes the drawers from the palace and the
    `memory_entries` rows, but **keeps the batch itself** with status `reverted`
    — publication history does not shrink.

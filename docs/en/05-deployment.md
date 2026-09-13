@@ -295,6 +295,58 @@ What you must **not** do while upgrading: change the embedding model "while
 you're at it". That is a separate operation requiring the whole base to be
 recomputed.
 
+## Deploying the bridge from local palaces (TODO-012)
+
+Migration **`Version20260913000005`** creates `ws.mirrors`, `ws.publish_settings`
+and `ws.publish_batches`, and adds to `ws.memory_entries` the foreign key
+`fk_entries_batch` (deferred) and the partial index `idx_entries_batch`. The
+bridge's columns — `source_replica`, `source_drawer_id`, `publish_batch_id`,
+`content_hash` — have existed since `Version20260912000003` and the migration does
+not touch them.
+
+It is **reversible**: `down()` removes exactly those three tables, the foreign key
+and the index, without touching `memory_entries` data. Verified down and back up.
+
+```bash
+make migracje                                     # or:
+docker compose exec backend php bin/console doctrine:migrations:migrate
+```
+
+No new environment variable. Publishing does not depend on configuration —
+`auto_publish` lives in the database (`ws.publish_settings`), not in `.env`,
+because it is a setting **per user and replica**, not per installation.
+
+### Load on the `embeddings` service once the bridge is on
+
+This is the most important operational consequence of D-014 and deserves its own
+attention when sizing the service. The server computes vectors for the **whole**
+stream from every machine, not for selected fragments: every drawer from every
+local palace goes through `/v1/embeddings`.
+
+Two mechanisms reduce that up front, and both are in this migration:
+
+- **the source pair** (`uniq_entries_source`) — resending the same local drawer
+  updates the row, so the outbox can retry indefinitely;
+- **screening by content digest** (`idx_entries_dedup`) — three people mining the
+  same repository pay for the vector once **within the target space**. Three
+  private spaces will still hold three copies; one confirmed mapping brings them
+  down to one.
+
+A limit on the request side: **200 drawers per batch**
+(`PublishService::MAX_DRAWERS`). A larger batch gets `400` with a message to split
+the send — the transaction holds row locks for the length of every embedding
+computation in the batch, and a request that dies after fifteen minutes with
+nothing written is worse than two requests.
+
+### The route with two credentials
+
+`POST /api/publish` accepts **an agent token or a JWT**, and is the only such
+route (D-036). The prefix decides: `Authorization: Bearer wsm_…` goes to the
+agent-token authenticator, anything else to the JWT listener. When diagnosing a
+`401` on this route, check first whether the token carries that prefix — without
+it the request is treated as a JWT and bounces off an expired signature, and the
+message then describes something other than what is broken.
+
 ## Known limitation: Doctrine schema tooling
 
 `doctrine:schema:validate` (the full form) and `doctrine:migrations:diff`

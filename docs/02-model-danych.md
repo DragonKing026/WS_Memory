@@ -6,11 +6,12 @@ tags: [ws-memory, dokumentacja, model-danych, postgres, doctrine, pgvector]
 
 # Model danych
 
-Stan: **częściowo wdrożony** (2026-09-12). Istnieją w bazie: `users`,
+Stan: **częściowo wdrożony** (2026-09-13). Istnieją w bazie: `users`,
 `invitations`, `spaces`, `space_members`, `audit_log` (migracja
 `Version20260912000002`), `memory_entries` (`Version20260912000003`),
-`agent_tokens` (`Version20260912000004`) oraz `documents`,
-`document_revisions` i `proposals` (`Version20260912000005`).
+`agent_tokens` (`Version20260912000004`), `documents`,
+`document_revisions` i `proposals` (`Version20260912000005`) oraz `mirrors`,
+`publish_settings` i `publish_batches` (`Version20260913000005`).
 Reszta tabel opisanych niżej to projekt — powstaną wraz z zadaniami, które ich
 potrzebują.
 
@@ -162,6 +163,15 @@ przy automatycznej wysyłce).
 > tworzyć drugi (D-010). Identyfikator repliki bierzemy z `replica.json`
 > lokalnego pałaca — MemPalace utrzymuje go stabilnie właśnie po to.
 >
+> Nowe od `Version20260913000005`: `publish_batch_id` ma **klucz obcy** do
+> `ws.publish_batches` z `ON DELETE SET NULL` i jest **odroczony**
+> (`DEFERRABLE INITIALLY DEFERRED`), więc sprawdza się przy `COMMIT`, a nie przy
+> każdym `INSERT`. To nie jest poluzowanie — ograniczenie obowiązuje w każdej
+> chwili, którą da się zaobserwować z zewnątrz — tylko pozwolenie, by partia
+> została zapisana **po** swoich szufladach, z liczbami, które naprawdę się
+> zdarzyły (D-036). Do tego indeks częściowy `(publish_batch_id)` tam, gdzie
+> kolumna jest niepusta: po nim wycofanie znajduje, co usunąć.
+>
 > `content_hash` rozwiązuje inny problem: przy domyślnej automatycznej wysyłce
 > (D-014) trzy osoby mielące to samo repozytorium przysłałyby tę samą treść
 > trzy razy. Indeks `(space_id, content_hash)` sprawia, że druga i trzecia
@@ -171,6 +181,12 @@ przy automatycznej wysyłce).
 > publikacji, a nie niezmiennik danych: dwie osoby mogą zapisać to samo zdanie
 > i rejestr nie może im tego odmówić błędem zapisu. Sprawdzenie robi
 > publikacja, nie tabela.
+>
+> `created_at` przy publikacji to **czas zapisania w lokalnym pałacu**, nie czas
+> odebrania. Laptop po tygodniu bez sieci przysyła tydzień szuflad naraz, a
+> opatrzenie ich wszystkich dzisiejszą datą sprawiłoby, że ekran przeglądania —
+> sortowany dokładnie po tej kolumnie — twierdziłby, że tydzień pracy zdarzył
+> się w jedną minutę.
 
 > Po co ta tabela, skoro dane są w pałacu: **żeby uprawnienia i audyt działały
 > w SQL, a nie na wynikach z pałaca.** Filtrujemy przed zapytaniem
@@ -179,24 +195,50 @@ przy automatycznej wysyłce).
 
 ### Hybryda: lokalne pałace i publikacja
 
+Trzy tabele, wszystkie **istnieją** (`Version20260913000005`).
+
 **`mirrors`** — mapowanie skrzydła lokalnego pałaca na **przestrzeń
 zespołową**. `id`, `user_id`, `source_replica`, `source_wing`, `space_id`,
-`excluded_rooms` (`JSONB`), `is_active`, `is_confirmed`, `paused_at`,
-`last_synced_at`, `last_drawer_filed_at` (znacznik przyrostowości),
-`created_at`.
+`excluded_rooms` (`JSONB`), `is_active` (domyślnie `true`), `is_confirmed`
+(domyślnie **`false`**), `paused_at`, `last_synced_at`,
+`last_drawer_filed_at` (znacznik przyrostowości), `created_at`.
 
 > Mapowanie jest potrzebne **tylko po to, by treść trafiła do zespołu**.
 > Skrzydło bez mapowania i tak jedzie na serwer — do prywatnej przestrzeni
 > właściciela (D-014). Dlatego potwierdzenie (`is_confirmed`) dotyczy
 > mapowania, a nie wysyłki: to mapowanie decyduje o widoczności dla innych.
+>
+> `is_confirmed` jest domyślnie **fałszywe** i to jest wartość, która decyduje
+> o widoczności. Wiersz wstawiony bez słowa o potwierdzeniu nie kieruje niczego
+> do przestrzeni zespołowej; gdyby kolumna domyślnie była prawdziwa,
+> *zaproponowanie* mapowania publikowałoby zespołowi.
+>
+> Para `(user_id, source_replica, source_wing)` jest **unikalna**. Dwa wiersze
+> sprawiłyby, że pytanie „gdzie ląduje to skrzydło" ma dwie odpowiedzi, a
+> reguła lądowania musiałaby wybierać — po cichu, przy każdej publikacji.
+> Klucz obcy do użytkownika ma `ON DELETE CASCADE` (mapowanie opisuje czyjąś
+> maszynę i bez niej nic nie znaczy), a do przestrzeni `RESTRICT` — jak wszędzie
+> tam, gdzie przestrzeń z historią się archiwizuje, nie usuwa.
 
 **`publish_settings`** — ustawienia wysyłki per użytkownik i replika.
 `id`, `user_id`, `source_replica`, `auto_publish` (domyślnie **`true`**),
 `private_space_id` (gdzie lądują skrzydła bez mapowania),
-`last_watermark` (do której chwili wysłano), `updated_at`.
+`last_watermark` (do której chwili wysłano), `updated_at`. Para
+`(user_id, source_replica)` unikalna.
+
+> Dwa przeciwne domyślne ustawienia obok siebie, celowo: `auto_publish`
+> domyślnie **prawdziwe**, bo wysyłka jest zachowaniem (D-014) i baza wiedzy,
+> którą trzeba pamiętać, żeby nakarmić, zostaje pusta; `is_confirmed` w
+> `mirrors` domyślnie **fałszywe**, bo widoczność dla zespołu potwierdza
+> człowiek.
+>
+> Tabela istnieje, ale **serwer jej jeszcze nie czyta** — `auto_publish` jest
+> przełącznikiem po stronie wtyczki, a punkty 5–7 zadania TODO-012 (kolejka
+> wyjściowa, `/ws-publish`) należą do klienta.
 
 **`publish_batches`** — jedna partia publikacji, żeby dało się ją wycofać.
-`id`, `user_id`, `mirror_id` (`null` przy publikacji selektywnej), `space_id`,
+`id`, `user_id`, `agent_token_id` (gdy publikował agent), `mirror_id`
+(`null` przy publikacji selektywnej), `space_id`, `source_replica`,
 `mode` (`selective` / `mirror`), `drawer_count`, `skipped_count`,
 `skipped_reasons` (`JSONB` — co odrzucił filtr sekretów i dlaczego),
 `status` (`preview` / `applied` / `reverted`), `created_at`, `reverted_at`.
@@ -204,6 +246,25 @@ zespołową**. `id`, `user_id`, `source_replica`, `source_wing`, `space_id`,
 > Partia jest jednostką wycofania: „wypchnąłem nie to skrzydło" rozwiązuje się
 > jednym działaniem, a nie ręcznym szukaniem szuflad. Raport pominięć jest
 > częścią partii, nie osobnym dziennikiem — inaczej nikt by go nie czytał.
+>
+> `space_id` jest `NOT NULL`, więc partia należy do **jednej** przestrzeni.
+> Dlatego jedno żądanie `POST /api/publish` daje jedną partię **na przestrzeń
+> docelową** (D-036): reguła lądowania rozdziela wysyłkę na zespołowe i
+> prywatną, a „zabierz to, co widzi zespół" nie może kasować tygodnia
+> prywatnych transkryptów, które poleciały tym samym przebiegiem.
+>
+> `CHECK ((status = 'reverted') = (reverted_at IS NOT NULL))` — stan i znacznik
+> czasu nie mogą się rozjechać. Dziennik czyta się po to, by odpowiedzieć „co
+> cofnąłem i kiedy”, a status, który może kłamać o swoim własnym znaczniku,
+> odpowiada na to źle.
+>
+> `status = 'preview'` **nie trafia do tabeli** — podgląd nie zapisuje niczego,
+> w tym siebie. Wartość istnieje w `CHECK` i w kodzie, żeby raport miał jak się
+> nazwać.
+>
+> `mirror_id` ma `ON DELETE SET NULL`: usunięcie mapowania nie może usunąć
+> zapisu o tym, co kiedyś opublikowało. Wycofania, którego nikt już nie
+> znajdzie, nikt nie wykona.
 
 ### Operacje
 
@@ -242,8 +303,12 @@ gdzie błąd w filtrze byłby nieakceptowalny).
    dostęp na przyszłość.
 5. `memory_entries` bez odpowiadającej szuflady w pałacu to sygnał rozjazdu
    — zadanie cykliczne to raportuje (nie naprawia po cichu).
-6. Lustro bez `is_confirmed` **nie wykonuje publikacji** — może tylko
-   wygenerować podgląd. Warunek sprawdzany w kodzie i pokryty testem.
+6. Lustro bez `is_confirmed` **nie kieruje niczego do przestrzeni zespołowej**.
+   Treść i tak jedzie na serwer — do prywatnej przestrzeni właściciela (D-014),
+   bo niezmiennikiem jest „wszystko jest na serwerze, nic nie jest widoczne dla
+   zespołu bez mapowania". To samo dotyczy lustra wyłączonego, wstrzymanego i
+   wykluczonego pokoju (D-036). Warunek jest w `Mirror::routes()`, pokryty
+   testami `PublishServiceTest` i `DoctrinePublishBridgeTest`.
 7. Wycofanie partii usuwa szuflady z pałaca i wiersze `memory_entries`, ale
    **zostawia samą partię** ze statusem `reverted` — historia publikacji się
    nie kurczy.

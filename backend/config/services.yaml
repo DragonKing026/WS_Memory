@@ -109,6 +109,14 @@ services:
     App\Domain\Identity\UserRoster: '@App\Infrastructure\Doctrine\DoctrineUserRoster'
     App\Domain\Identity\InvitationRoster: '@App\Infrastructure\Doctrine\DoctrineInvitationRoster'
     App\Domain\Instruction\InstructionLibrary: '@App\Infrastructure\Instruction\FileInstructionLibrary'
+    App\Domain\Publishing\MirrorDirectory: '@App\Infrastructure\Doctrine\DoctrineMirrorDirectory'
+    App\Domain\Publishing\PublishBatchRepository: '@App\Infrastructure\Doctrine\DoctrinePublishBatchRepository'
+    # The secret filter is a rule of this business, not plumbing — it depends on
+    # nothing outside PHP — so the implementation lives in Domain next to its port.
+    # The port is there for the reason ports are: an organisation-specific pattern
+    # list, or an allowance for a space that legitimately holds configuration
+    # samples, becomes another adapter rather than another branch inside this one.
+    App\Domain\Publishing\SecretScanner: '@App\Domain\Publishing\PatternSecretScanner'
     App\Domain\Audit\AuditTrail: '@App\Infrastructure\Doctrine\DoctrineAuditTrail'
     App\Domain\Audit\AuditJournal: '@App\Infrastructure\Doctrine\DoctrineAuditJournal'
     App\Domain\Dependency\ReleaseCatalog: '@App\Infrastructure\PyPi\PyPiReleaseCatalog'
@@ -209,6 +217,17 @@ when@test:
             public: true
         App\Application\Memory\MemoryService:
             public: true
+        # The bridge from a local palace. Reached directly by the tests that prove
+        # the landing rule and the batch transaction, neither of which is visible
+        # through HTTP: one is about which space content ends up in, the other about
+        # what survives a failure halfway through a batch.
+        App\Application\Publishing\PublishService:
+            public: true
+        App\Domain\Publishing\MirrorDirectory: '@App\Infrastructure\Doctrine\DoctrineMirrorDirectory'
+        App\Domain\Publishing\PublishBatchRepository: '@App\Infrastructure\Doctrine\DoctrinePublishBatchRepository'
+        App\Infrastructure\Doctrine\DoctrinePublishBatchRepository:
+            public: true
+        App\Domain\Publishing\SecretScanner: '@App\Domain\Publishing\PatternSecretScanner'
         App\Application\AgentToken\IssueAgentToken:
             public: true
         App\Application\AgentToken\RevokeAgentToken:

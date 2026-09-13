@@ -289,6 +289,59 @@ interwencja, a agent wypisuje w dzienniku gotowe polecenie `pg_restore`.
 Czego przy aktualizacji **nie wolno**: zmienić modelu embeddingów „przy okazji".
 To osobna operacja z przeliczeniem całej bazy.
 
+## Wdrożenie mostka z lokalnych pałaców (TODO-012)
+
+Migracja **`Version20260913000005`** zakłada `ws.mirrors`, `ws.publish_settings`
+i `ws.publish_batches` oraz dokłada do `ws.memory_entries` klucz obcy
+`fk_entries_batch` (odroczony) i indeks częściowy `idx_entries_batch`. Kolumny
+mostka — `source_replica`, `source_drawer_id`, `publish_batch_id`,
+`content_hash` — istnieją od `Version20260912000003` i migracja ich nie rusza.
+
+Jest **wstecznie odwracalna**: `down()` zdejmuje dokładnie te trzy tabele, klucz
+obcy i indeks, nie dotykając danych `memory_entries`. Sprawdzone w dół i z
+powrotem w górę.
+
+```bash
+make migracje                                     # albo:
+docker compose exec backend php bin/console doctrine:migrations:migrate
+```
+
+Żadnej nowej zmiennej środowiskowej. Publikacja nie zależy od konfiguracji —
+`auto_publish` mieszka w bazie (`ws.publish_settings`), a nie w `.env`, bo jest
+ustawieniem **na użytkownika i replikę**, nie na instalację.
+
+### Obciążenie usługi `embeddings` po włączeniu mostka
+
+To najważniejszy skutek operacyjny D-014 i wart osobnej uwagi przy doborze mocy.
+Serwer liczy wektory dla **całego** strumienia z wszystkich maszyn, nie dla
+wybranych fragmentów: każda szuflada z każdego lokalnego pałaca przechodzi przez
+`/v1/embeddings`.
+
+Dwa mechanizmy zmniejszają to z góry, i oba są w tej migracji:
+
+- **para źródłowa** (`uniq_entries_source`) — powtórna wysyłka tej samej
+  lokalnej szuflady aktualizuje wiersz, więc kolejka wyjściowa może ponawiać
+  bez końca;
+- **odsiew po skrócie treści** (`idx_entries_dedup`) — trzy osoby mielące to
+  samo repozytorium płacą za wektor raz **w obrębie przestrzeni docelowej**.
+  W trzech prywatnych przestrzeniach nadal będą trzy kopie; jedno potwierdzone
+  mapowanie sprowadza je do jednej.
+
+Ograniczenie po stronie żądania: **200 szuflad na partię**
+(`PublishService::MAX_DRAWERS`). Większa partia dostaje `400` z komunikatem, żeby
+podzielić wysyłkę — transakcja trzyma blokady wierszy przez czas liczenia
+wszystkich wektorów w partii, a żądanie, które po kwadransie odpada z niczym
+zapisanym, jest gorsze niż dwa żądania.
+
+### Trasa z dwoma poświadczeniami
+
+`POST /api/publish` przyjmuje **token agenta albo JWT**, i jest jedyną taką
+trasą (D-036). Decyduje prefiks: `Authorization: Bearer wsm_…` idzie do
+authenticatora tokenów agenta, cokolwiek innego do listenera JWT. Przy diagnozie
+`401` na tej trasie warto sprawdzić najpierw, czy token ma ten prefiks — bez
+niego żądanie jest traktowane jako JWT i odbija się o wygasły podpis, a komunikat
+mówi wtedy o czymś innym, niż jest zepsute.
+
 ## Znane ograniczenie: narzędzia schematu Doctrine
 
 `doctrine:schema:validate` (pełny) i `doctrine:migrations:diff` **nie działają**

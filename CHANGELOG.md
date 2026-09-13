@@ -15,6 +15,45 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 19:21 — Serwer przyjmuje publikację z lokalnego pałaca (TODO-012, punkty 1–4)
+
+`POST /api/publish` to jedyna droga, którą wiedza z lokalnego pałaca wchodzi do
+wspólnej bazy poza pisaniem w wiki — i od D-014 jeździ **sama, bez udziału
+użytkownika**. Powstała serwerowa połowa mostka: migracja `Version20260913000005`
+z tabelami `mirrors`, `publish_settings` i `publish_batches`, reguła lądowania,
+filtr sekretów, endpoint publikacji i wycofanie partii. Kolumny mostka
+w `memory_entries` istniały już od `Version20260912000003`; brakowało wszystkiego
+wokół nich.
+
+Trzy rzeczy są tu ważniejsze od samego endpointu. **Serwer nie ufa klientowi**:
+wtyczka filtruje sekrety przed wysłaniem, serwer filtruje po odebraniu — filtr,
+który działa wyłącznie na laptopie, działa czasami. **Powtórna wysyłka jest
+darmowa**: para (replika, szuflada źródłowa) jest unikalna, więc kolejka wyjściowa
+może ponawiać bez końca, a odsiew po skrócie treści łapie drugi rodzaj powtórzenia
+— trzy osoby mielące to samo repozytorium. **Partia jest niepodzielna**: jedna
+transakcja obejmuje wiersze rejestru i partię, która za nie odpowiada, bo osiem
+wierszy bez partii to treść, której nikt nie cofnie.
+
+Filtr sekretów rozpoznaje **wartości zastępcze**, bo bez tego odrzuciłby własny
+`.env.example` — plik istniejący po to, żeby nikt nie zapisywał prawdziwych haseł.
+Skłania się przy tym do odmowy: pominięcie zapisuje sekret do wspólnej,
+indeksowanej i backupowanej bazy, a fałszywy alarm kosztuje jedną szufladę
+wymienioną w raporcie, bo lokalny oryginał zostaje.
+
+`/api/publish` przyjmuje **token agenta** i jest to jedyne wyłamanie z reguły
+„agenci na `/mcp`, ludzie na `/api`". Nadawcą jest kolejka wyjściowa działająca
+bez nadzoru na czyimś laptopie (D-015), a ośmiogodzinny JWT nie jest
+poświadczeniem, które coś takiego może trzymać. Osłona jest wąska: żądanie zostaje
+przejęte tylko gdy ścieżka to `/api/publish` **i** nagłówek zaczyna się od
+`Bearer wsm_`, więc żądanie zalogowanej osoby przechodzi dalej do JWT. Ta granica
+dostała własny test jednostkowy sprawdzony sabotażem — test przez HTTP wymaga
+żywego pałaca i nie chodziłby na zwykłych commitach.
+
+Klient — wtyczka, kolejka wyjściowa, `/ws-publish` — jest osobnym zadaniem; do tego
+czasu endpointu nie ma kto zawołać poza testami. Rozstrzygnięcia, których D-014 nie
+zawiera, zapisano jako **D-036**.
+
+---
 ## 2026-09-13 19:11 — Testy integracyjne przestały zaśmiecać pałac (D-037)
 
 Trzy klasy z grupy `integracja` pisały do prawdziwego pałaca i nie kasowały po

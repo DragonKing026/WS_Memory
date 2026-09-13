@@ -69,6 +69,28 @@ interface MemoryStore
     ): DrawerId;
 
     /**
+     * Removes a drawer from the engine for good.
+     *
+     * Exists for undoing a publication (TODO-012), and it has to go through this
+     * port rather than through SQL against the `palace` schema — that would be the
+     * same mistake in the opposite direction as writing there (D-004): our
+     * connection can read those tables, so deleting a row would appear to work
+     * while leaving the vector, the graph edges and whatever else MemPalace keys
+     * off that drawer behind. The engine is a black box (D-001); asking it to
+     * forget is the only way to be sure it has.
+     *
+     * A drawer that is not there is not an error. Undoing is retried after a
+     * partial failure, and the second attempt finds the first attempt's work
+     * already done — treating that as a failure would make undo unrepeatable
+     * exactly when it needs repeating.
+     *
+     * @return bool whether the engine held it
+     *
+     * @throws MemoryUnavailable
+     */
+    public function forget(DrawerId $drawer): bool;
+
+    /**
      * @param 'outgoing'|'incoming'|'both'|null $direction
      *
      * @return list<KnowledgeFact>

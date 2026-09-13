@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Security;
 
+use App\Application\AgentToken\IssueAgentToken;
 use App\Domain\Identity\AgentTokenDirectory;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -21,11 +22,17 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 
 /**
- * Authenticates /mcp with an agent token instead of a JWT.
+ * Authenticates /mcp — and /api/publish — with an agent token instead of a JWT.
  *
  * A separate authenticator rather than the JWT firewall, for the reasons in
  * docs/03: an agent's credential has to be revocable at once, live for months and
  * carry a narrowing scope. A JWT does none of those.
+ *
+ * `/api/publish` was added deliberately and is the only crack in "agents on /mcp,
+ * people on /api" (D-036). The sender there is an outbox on somebody's laptop
+ * running with nobody watching (D-015), and an eight-hour JWT is not something it
+ * can hold. See self::supports() for how the two credentials share one route
+ * without either answering for the other.
  *
  * The resolved identity is placed on the request as an attribute — that is how the
  * controller learns which token called. The Symfony token carries only the owner,
@@ -41,6 +48,9 @@ final class AgentTokenAuthenticator extends AbstractAuthenticator
     /** Where the controller finds the resolved identity. */
     public const IDENTITY_ATTRIBUTE = 'ws_agent_identity';
 
+    /** The route outside /mcp that an unattended agent has to be able to reach. */
+    public const PUBLISH_PATH = '/api/publish';
+
     public function __construct(
         private readonly AgentTokenDirectory $directory,
         private readonly EntityManagerInterface $entityManager,
@@ -50,10 +60,33 @@ final class AgentTokenAuthenticator extends AbstractAuthenticator
     /**
      * Narrowed from the interface's ?bool: null there means "decide lazily", and
      * the path prefix is knowable at once.
+     *
+     * `/mcp` is claimed unconditionally — it accepts nothing else, so a request
+     * without a credential should be told about the credential it is missing.
+     *
+     * `/api/publish` is the one exception to "agents on /mcp, people on /api", and
+     * it is claimed only when the credential presented is visibly an agent token
+     * (D-036). It has to be an exception: the sender is an outbox running unattended
+     * on somebody's laptop (D-015), and a JWT that expires after a day of work is
+     * not a credential such a thing can hold. It has to be a narrow one: this
+     * authenticator shares the firewall with the JWT listener, and claiming any
+     * request with a Bearer header would make it answer for every signed-in person
+     * on the route. The `wsm_` prefix is what keeps the two apart, which is the
+     * second job that prefix was given (see IssueAgentToken).
      */
     public function supports(Request $request): bool
     {
-        return str_starts_with($request->getPathInfo(), '/mcp');
+        $path = $request->getPathInfo();
+
+        if (str_starts_with($path, '/mcp')) {
+            return true;
+        }
+
+        if (self::PUBLISH_PATH !== $path && !str_starts_with($path, self::PUBLISH_PATH . '/')) {
+            return false;
+        }
+
+        return str_starts_with($request->headers->get('Authorization', ''), 'Bearer ' . IssueAgentToken::PREFIX);
     }
 
     public function authenticate(Request $request): Passport

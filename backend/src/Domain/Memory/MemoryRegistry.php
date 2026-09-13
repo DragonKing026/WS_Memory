@@ -72,6 +72,66 @@ interface MemoryRegistry
     public function rebind(DrawerId $from, DrawerId $to): void;
 
     /**
+     * The row a local drawer already has here, if it has one.
+     *
+     * The lookup that makes republishing safe. `ws.memory_entries` holds the pair
+     * (replica, local drawer id) unique where both halves are set, so this either
+     * finds the row a second publication must update or says there is none. Asked
+     * before writing rather than discovering it through a constraint violation,
+     * because the violation would abort a whole batch over its most ordinary
+     * event: an outbox resending something that already arrived (D-015).
+     */
+    public function bindingForSource(string $sourceReplica, string $sourceDrawerId): ?SourceBinding;
+
+    /**
+     * Whether this space already holds content with this hash.
+     *
+     * Answered by the `(space_id, content_hash)` index, which is deliberately not
+     * unique: dropping duplicates is a publishing policy (D-014), not an invariant
+     * of the data. Two people recording the same sentence through the wiki must
+     * not meet a failed write — so the check lives here, at the one call site that
+     * wants it, rather than in the table where it would apply to everybody.
+     */
+    public function drawerWithContent(SpaceId $space, string $contentHash): ?DrawerId;
+
+    /**
+     * Rewrites the row of a drawer we already know, matched by its identifier.
+     *
+     * Kept apart from register() for the same reason rebind() is: the ordinary
+     * path must not be able to overwrite a row by accident. This one is reached
+     * only when bindingForSource() has already found something to update.
+     *
+     * @throws \DomainException if there is no such row
+     */
+    public function refresh(MemoryWrite $write): void;
+
+    /**
+     * Every drawer booked as part of one publication batch.
+     *
+     * The batch is the unit of undoing (D-014), and this is how undoing finds what
+     * to remove. Ordered so that a partial failure retries in the same order and
+     * makes progress, rather than starting somewhere new each time.
+     *
+     * @return list<DrawerId>
+     */
+    public function drawersInBatch(string $batchId): array;
+
+    /**
+     * Unbooks these drawers.
+     *
+     * Only ever called after the palace has been asked to delete them, and that
+     * order is deliberate. A row pointing at a drawer that is gone is a search
+     * result nobody can open; a drawer no row points at is invisible, because the
+     * second filtering layer drops what the registry does not know (D-020). Of the
+     * two halves of an interrupted deletion, the second is the survivable one.
+     *
+     * @param list<DrawerId> $drawers
+     *
+     * @return int how many rows went
+     */
+    public function forget(array $drawers): int;
+
+    /**
      * How many entries each of these spaces holds.
      *
      * Answered from our own table rather than from the palace, which is the whole

@@ -151,6 +151,24 @@ final readonly class McpMemoryStore implements MemoryStore
         return $drawer;
     }
 
+    public function forget(DrawerId $drawer): bool
+    {
+        // Not retryable, and for once that is not about duplicate writes: a repeated
+        // delete is harmless. It is about the answer — a retry that succeeds after a
+        // timeout would report "gone" for a call whose first attempt may still be
+        // running, and the caller is about to delete the registry row on the
+        // strength of that. Undoing is itself retryable, so one attempt is enough.
+        $outcome = $this->client->tryCall('mempalace_delete_drawer', ['drawer_id' => $drawer->value]);
+
+        if ($outcome->isMissing()) {
+            return false;
+        }
+
+        $outcome->payloadOrFail();
+
+        return true;
+    }
+
     public function queryFacts(string $entity, ?string $direction = null): array
     {
         $arguments = ['entity' => $entity];

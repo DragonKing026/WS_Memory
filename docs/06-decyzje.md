@@ -1486,6 +1486,158 @@ cokolwiek znaczyć.
 
 ---
 
+<<<<<<< HEAD
+## D-036 — Kształt serwerowej strony mostka: partia na przestrzeń, filtr w Domain, jeden wyjątek w firewallu
+
+**Data:** 2026-09-13 18:40 · **Stan:** Przyjęta · **Doprecyzowuje D-010, D-014, D-015**
+
+D-014 mówi, **że** wszystko jedzie na serwer i **gdzie** ląduje. Nie mówi, jak
+ma wyglądać endpoint, który to przyjmuje. Przy implementacji (TODO-012, punkty
+1–4) trzeba było rozstrzygnąć osiem rzeczy; żadna nie jest na tyle duża, by być
+osobną decyzją, a każda zmienia zachowanie systemu na tyle, że musi być
+zapisana.
+
+### 1. Jedno żądanie daje jedną partię **na przestrzeń docelową**
+
+Reguła lądowania rozdziela jedną wysyłkę: skrzydła zmapowane idą do przestrzeni
+zespołowych, reszta do prywatnej. `publish_batches.space_id` jest `NOT NULL`,
+więc partia należy do jednej przestrzeni, a żądanie obejmujące trzy skrzydła
+daje dwie albo trzy partie.
+
+**Dlaczego:** partia jest jednostką wycofania. „Zabierz to, co widzi zespół"
+musi dać się zrobić bez kasowania tygodnia prywatnych transkryptów, które
+poleciały tym samym przebiegiem.
+
+**Odrzucono:** *`space_id` dopuszczające `NULL` dla partii mieszanej* — jedna
+partia na żądanie jest prostsza w raporcie i niemożliwa do wycofania częściowo.
+
+### 2. Filtr sekretów: port w `Domain/`, implementacja **też** w `Domain/`
+
+`SecretScanner` to interfejs, `PatternSecretScanner` to implementacja wzorcowa,
+i obie mieszkają w `Domain/Publishing/`.
+
+**Dlaczego:** filtr nie zależy od niczego poza PHP — ani HTTP, ani bazy, ani
+zegara. To, co uznajemy za sekret, jest **regułą biznesową**, dokładnie jak
+„zapis bez przestrzeni ląduje w prywatnej". Port stoi obok niej po to, po co
+stoją porty: własna lista wzorców organizacji albo wyjątek dla przestrzeni, w
+której legalnie trzymamy próbki konfiguracji, będzie **kolejnym adapterem**, a
+nie kolejnym `if`-em w tym jednym.
+
+**Konsekwencja, którą trzeba nazwać:** filtr celowo skłania się do odmowy, bo
+pominięcie zapisuje sekret do wspólnej, indeksowanej i backupowanej bazy, a
+fałszywy alarm kosztuje jedną szufladę wymienioną w raporcie partii (lokalny
+oryginał zostaje — D-015). Użyteczność ratuje **rozpoznawanie wartości
+zastępczych**: `postgres://ws_app:USTAW_W_COMPOSE@db` to dokumentacja, a
+`postgres://ws_app:8fd1…@db` to incydent. Bez tego rozróżnienia filtr
+odrzuciłby własny `.env.example` — czyli plik istniejący po to, żeby nikt nie
+zapisywał prawdziwych haseł.
+
+**Odrzucono:** *ocena entropii zamiast prefiksów* — flaguje skróty, UUID-y,
+zminifikowany kod i obrazy w base64, czyli w systemie, którego głównym
+wolumenem są zmielone repozytoria, flaguje większość treści.
+
+### 3. Mapowanie, które nie zadziałało, kieruje treść **prywatnie**, nie w niebyt
+
+Mapowanie niepotwierdzone, wyłączone, wstrzymane albo wykluczające dany pokój
+nie wysyła do przestrzeni zespołowej — ale treść nadal ląduje w prywatnej
+przestrzeni właściciela.
+
+**Dlaczego:** niezmiennik D-014 brzmi „wszystko jest na serwerze zawsze, nic nie
+staje się widoczne dla zespołu bez mapowania". Wykluczenie pokoju jest
+wypowiedzią o **widoczności dla zespołu**, nie o kopii zapasowej. Raport podaje
+osobny powód dla każdego z czterech przypadków, bo wszystkie kończą się tak
+samo, a wymagają zupełnie różnych reakcji — i nadawca, który ich nie rozróżnia,
+dochodzi do wniosku, że mapowanie jest zepsute.
+
+**Odrzucono:** *pokój wykluczony = nie wysyłamy wcale* — łamie „wszystko jest na
+serwerze", a użytkownik traci kopię zapasową w zamian za coś, o co nie prosił.
+
+### 4. Pokój źródłowy służy do kierowania, nie do składowania
+
+Szuflada z lokalnego pałaca ląduje jako `kind = transcript`, czyli w pokoju
+`general`. Pokój źródłowy jest przyjmowany i używany wyłącznie do sprawdzenia
+wykluczeń lustra.
+
+**Dlaczego:** mapowanie klasy wiedzy na pokój ma **jednego właściciela**
+(`MemoryKind`), a jego rozjazd nie powoduje błędu — powoduje, że treść leży
+tam, gdzie nikt nie szuka. Wpuszczenie cudzej taksonomii pokoi zniszczyłoby ten
+niezmiennik na rzecz informacji, której po stronie serwera nikt nie odpytuje.
+
+**Odrzucono:** *kolumna `source_room` w `memory_entries`* — do rozważenia, gdy
+pojawi się ekran, który jej potrzebuje. Dziś byłaby kolumną pisaną i nigdy
+czytaną.
+
+### 5. `/api/publish` przyjmuje **token agenta** — jedyny wyjątek od podziału powierzchni
+
+Authenticator tokenów agenta obsługuje `/mcp` bezwarunkowo, a `/api/publish`
+tylko wtedy, gdy nagłówek `Authorization: Bearer` ma prefiks `wsm_`.
+
+**Dlaczego:** nadawcą jest kolejka wyjściowa działająca bez nadzoru na laptopie
+(D-015). Ośmiogodzinny JWT (D-017) nie jest poświadczeniem, które taki proces
+może utrzymać. Wyjątek jest wąski, bo authenticator dzieli firewall z listenerem
+JWT: przejęcie każdego żądania z nagłówkiem `Bearer` sprawiłoby, że odpowiadałby
+za każdą zalogowaną osobę na tej trasie. Prefiks `wsm_` rozdziela oba
+poświadczenia — i to jest **drugie** zadanie, jakie ten prefiks dostał, obok
+rozpoznawania własnych tokenów przez filtr sekretów.
+
+**Odrzucono:**
+- *publikacja jako narzędzie MCP* — zachowałaby podział, ale zlecenie mówi
+  wprost `POST /api/publish`, a partia wymaga raportu na szuflada-po-szufladzie,
+  czego kontrakt narzędzia MCP nie oddaje wygodnie;
+- *osobny firewall na `^/api/publish`* — ta sama zmiana, rozpisana w dwóch
+  miejscach zamiast jednego warunku w `supports()`.
+
+### 6. Wycofanie usuwa **najpierw z pałaca**, potem wiersze
+
+Odwrotnie niż zapis, który księguje po zapisaniu do pałaca.
+
+**Dlaczego:** przerwane usuwanie zostawia albo wiersze wskazujące na szuflady,
+których nie ma, albo szuflady, na które nic nie wskazuje. Pierwsze jest
+**wykrywalne** (reguła integralności 5 raportuje dokładnie to) i kolejne
+wycofanie kończy pracę, bo pałac zapytany dwa razy o usunięcie tej samej
+szuflady mówi „nie ma" i jedzie dalej. Drugie to niewidzialna treść w bazie,
+którą ktoś kazał wyczyścić, i nic już jej nie zauważy.
+
+Usuwamy **przez API MemPalace**, nigdy SQL-em w schemacie `palace` — to D-004
+czytana w drugą stronę. Nasze połączenie te tabele czyta, więc `DELETE`
+wyglądałby na udany, zostawiając wektor i krawędzie grafu.
+
+### 7. Klucz obcy partii jest **odroczony** (`DEFERRABLE INITIALLY DEFERRED`)
+
+`memory_entries.publish_batch_id` sprawdza się przy `COMMIT`, nie przy każdym
+`INSERT`.
+
+**Dlaczego:** partia może wtedy zostać zapisana **po** swoich szufladach, z
+liczbami, które naprawdę się zdarzyły. Sprawdzany natychmiast wymusiłby kolejność
+odwrotną — wiersz partii wstawiany z licznikami, których jeszcze nie zna, i druga
+`UPDATE` poprawiająca je. Jeden z tych dwóch kształtów potrafi skłamać po awarii;
+to jest ten drugi. Ograniczenie nadal obowiązuje w każdej chwili, którą da się
+zaobserwować z zewnątrz.
+
+### 8. Wycofanie autoryzuje **własność partii**, nie rola w przestrzeni
+
+**Dlaczego:** wycofanie istnieje na moment, w którym ktoś zauważył, że treść
+poszła nie tam. Wymaganie roli `writer` zablokowałoby dokładnie tę osobę, która
+tego potrzebuje najbardziej: publikującego przez pomyłkę, któremu pierwszą
+reakcją odebrano dostęp. Cudza partia odpowiada `404`, nie `403` — informacja, że
+partia istnieje, ale należy do kogoś innego, jest sama w sobie ujawnieniem
+(reguła nienaruszalna 7).
+
+### 9. Powtórna publikacja **przenosi** szufladę, gdy skrzydło zostało w tym czasie zmapowane
+
+Para źródłowa jest tożsamością szuflady, a reguła lądowania jest rozstrzygająca.
+Potwierdzenie mapowania i ponowna wysyłka przenoszą treść z prywatnej
+przestrzeni do zespołowej: jeden wiersz, zmienione `space_id`, zmienione
+skrzydło w pałacu.
+
+**Dlaczego:** inaczej potwierdzone mapowanie działałoby połowicznie — nowe
+szuflady widoczne dla zespołu, starsze niewidoczne, bez żadnego śladu dlaczego.
+Przeniesienie musi objąć **oba** miejsca naraz, bo `MemoryService::get()`
+odmawia wydania szuflady, której skrzydło w pałacu nie zgadza się z
+autoryzowaną przestrzenią. Zmiana widoczności ma osobny klucz w dzienniku
+audytu (`movedFrom`), bo to jedyna rzecz w tym przepływie, o którą ktoś może
+chcieć zapytać audyt po fakcie.
+=======
 ## D-037 — Testy integracyjne kasują z pałaca to, co zapisały, po rejestrze
 
 **Data:** 2026-09-13 18:56 · **Stan:** Przyjęta
@@ -1544,3 +1696,4 @@ zostawałaby na zawsze.
 **Jak to się sprawdza.** `mempalace_status` przed przebiegiem grupy i po nim ma
 podać tę samą liczbę `total_drawers`. Zmierzone: 1689 → 1689 (przed zmianą ten
 sam przebieg dokładał 14 szuflad).
+>>>>>>> main
