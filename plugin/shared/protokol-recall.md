@@ -1,6 +1,9 @@
 ---
-name: ws-memory-recall
-description: Protokół odtwarzania wiedzy — szukaj w firmowej bazie, zanim odpowiesz o przeszłych ustaleniach, decyzjach, osobach albo projektach. Użyj, gdy pytanie dotyczy czegoś, co mogło już zostać ustalone.
+noteId: "3e6e5ff0af8811f18a50cfad3ca0cc8a"
+tags: []
+name: "ws-memory-recall"
+description: "Protokół odtwarzania wiedzy — szukaj w firmowej bazie, zanim odpowiesz o przeszłych ustaleniach, decyzjach, osobach albo projektach. Użyj, gdy pytanie dotyczy czegoś, co mogło już zostać ustalone."
+
 ---
 
 # Szukaj, zanim odpowiesz
