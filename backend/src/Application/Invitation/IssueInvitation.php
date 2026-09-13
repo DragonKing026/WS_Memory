@@ -43,12 +43,15 @@ final readonly class IssueInvitation
     }
 
     /**
+     * @param bool $announce whether to mail the invitation to its recipient
+     *
      * @throws AdministrationRefused
      */
     public function __invoke(
         string $email,
         bool $grantsGlobalAdmin = false,
         ?User $invitedBy = null,
+        bool $announce = true,
     ): IssuedInvitation {
         $email = strtolower(trim($email));
 
@@ -103,7 +106,16 @@ final readonly class IssueInvitation
         // unreachable mail server is a worker's problem rather than this request's,
         // and the link is returned to the caller either way. That ordering is the
         // whole reason this system can be installed without an SMTP server at all.
-        ($this->mail)($issued, $invitedBy);
+        //
+        // `announce` is false for exactly one caller: `ws:user:create`, which
+        // accepts the invitation in the same breath and prints the password. There
+        // is nobody to notify there — the mail would invite somebody to create an
+        // account that already exists, with a link already spent — and on a fresh
+        // installation with no SMTP it would leave a failed row in the mail journal
+        // as the first thing an administrator ever sees there.
+        if ($announce) {
+            ($this->mail)($issued, $invitedBy);
+        }
 
         return $issued;
     }

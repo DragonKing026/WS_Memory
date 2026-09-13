@@ -15,6 +15,35 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 21:07 — `ws:user:create`: konto od razu, bez chodzenia po linku
+
+Pierwszy kawałek TODO-018, bo instalator potrzebuje czegoś, czego nie było.
+`ws:user:invite` wypisuje link, który ktoś musi otworzyć w przeglądarce — to
+właściwe przy zapraszaniu kolegi i **niewłaściwe przy pierwszym koncie świeżej
+instalacji**: w tej chwili może nie być jeszcze osiągalnego adresu, a osoba
+uruchamiająca skrypt jest tą samą, która będzie z konta korzystać. Dwa kroki
+z przeglądarką pośrodku to dokładnie ta droga, na której końcu **nikt nie znał
+hasła administratora** — co się tu już raz zdarzyło.
+
+Polecenie idzie **przez** `IssueInvitation` i `AcceptInvitation`, a nie obok:
+te same odmowy przy istniejącym adresie, ta sama przestrzeń prywatna, ta sama
+wspólna (D-035), te same wpisy w audycie. Skrót prosto do `new User` byłby drugą
+definicją tego, czym jest konto, i pierwszą rzeczą, o której by zapomniał, jest
+przynależność do przestrzeni. Test tego pilnuje — sprawdza dwie przestrzenie,
+nie sam fakt istnienia wiersza.
+
+Jedno odstępstwo: **nie wysyła maila**. Zaproszenie jest przyjmowane w tej samej
+chwili, więc wiadomość zapraszałaby do założenia konta, które już istnieje,
+linkiem już zużytym — a na instancji bez SMTP zostawiłaby wpis „nieudany" jako
+pierwszą rzecz w dzienniku maili. `IssueInvitation` dostało parametr `announce`,
+którego używa wyłącznie to jedno miejsce; osobny test pilnuje, że
+`ws:user:invite` nadal zawiadamia.
+
+Hasło generowane domyślnie, `--password` jako wyjątek — z tego samego powodu, co
+przy `ws:user:password`: hasło podane w argumencie zostaje w historii powłoki.
+
+
+---
 ## 2026-09-13 20:56 — Ekrany maili w panelu, TODO-017 zamknięte
 
 Dwa ekrany: **szablony** i **dziennik maili**. Obejrzane w przeglądarce, nie
