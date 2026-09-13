@@ -15,6 +15,31 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 11:15 — Publikacja wiki ponawia push, CodeQL wyjaśniony
+
+**Publikacja wiki padła na błędzie 500 GitHuba.** Nie po naszej stronie: commit
+powstał poprawnie (5 plików), a odrzucił go serwer — `remote: Internal Server
+Error`, z identyfikatorem żądania. Ponowienie bez żadnej zmiany treści przeszło,
+co potwierdza, że to chwilowa awaria usługi wiki.
+
+Workflow ponawia teraz push trzy razy, z rosnącą przerwą i `git pull --rebase`
+między próbami (ktoś mógł w tym czasie zapisać stronę przez interfejs). Bez tego
+chwilowa awaria zostawia wiki nieaktualną i czerwony przebieg, o którym po
+tygodniu nikt już nie wie, czy coś znaczył.
+
+**Czerwony CodeQL wyjaśniony i sam się rozwiązał.** Awaria wędrowała po
+językach: najpierw padły `javascript-typescript` i `actions`, potem `python`,
+a trzeci przebieg był w pełni zielony. Każdy język zapisuje nieudaną analizę
+przyrostową w cache Actions osobno i przy kolejnym uruchomieniu leci bez niej —
+więc po tym, jak wszystkie trzy ją odnotowały, problem zniknął. Nasz kod nie miał
+z tym nic wspólnego.
+
+**Sprzątnięte po pomiarze:** 10 000 dokumentów testowych, 10 037 wpisów rejestru
+i przestrzeń „Test wydajności" usunięte, token agenta unieważniony, tymczasowe
+podniesienie limitu tempa (`backend/.env.local`) skasowane. Szuflady z pałaca
+kasowane przez jego własne API, nie po tabelach (D-004).
+
+---
 ## 2026-09-13 11:10 — Surowa pamięć na własnym ekranie i pomiar wydajności
 
 Ekran `/memory` z `GET /api/memory`: przeglądanie wszystkiego, co trafiło do

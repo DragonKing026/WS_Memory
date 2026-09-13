@@ -77,4 +77,25 @@ jobs:
           fi
 
           git commit -m "Wiki z ${{ github.sha }}"
-          git push
+
+          # Ponawiamy, bo usługa wiki GitHuba potrafi odrzucić push błędem 500
+          # („remote: Internal Server Error”) bez żadnego powodu po naszej stronie —
+          # zdarzyło się to 2026-09-13, a samo ponowienie bez zmiany treści przeszło.
+          # Bez tego chwilowa awaria zostawia wiki nieaktualną i czerwony przebieg,
+          # który po tygodniu nikt już nie wie, czy coś znaczył.
+          for proba in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+
+            if [ "${proba}" -lt 3 ]; then
+              echo "Push odrzucony (próba ${proba}/3) — czekam i ponawiam."
+              sleep $((proba * 15))
+              # Ktoś mógł w tym czasie zapisać stronę przez interfejs; bez tego
+              # ponowienie odbiłoby się o nieaktualny wskaźnik zamiast o awarię.
+              git pull --rebase --autostash || true
+            fi
+          done
+
+          echo "::error::Nie udało się wypchnąć wiki po trzech próbach."
+          exit 1
