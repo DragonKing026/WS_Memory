@@ -15,6 +15,49 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 13:29 — Sprawdzenia zawężone ścieżkami; pełne sprawdzenie przed scaleniem
+
+Domknięcie D-031. Zadanie `Zakres zmian` porównuje gałąź z `main` i wystawia dwie
+flagi, więc poprawka wyłącznie we frontendzie nie budzi już Postgresa, Composera
+ani PHPStana, a zmiana samej dokumentacji nie budzi żadnego z nich. Pliki wspólne
+(`docker-compose.yml`, workflowy, `Makefile`, `.env.example`) trafiają do **obu**
+zakresów, bo potrafią zepsuć każdą ze stron.
+
+Porównanie idzie do punktu rozejścia (`git diff origin/main...HEAD`), a nie do
+listy plików ostatniego pusha: gałąź zadania ma kilkanaście commitów i liczy się
+jej całość, inaczej push poprawiający literówkę skasowałby fakt, że dziesięć
+commitów wcześniej zmieniono backend. Logika sprawdzona lokalnie na dziesięciu
+przypadkach, zanim pojechała na CI.
+
+**Dwie poprawki wyzwalaczy, obie z realnego potknięcia dzisiejszego dnia.**
+
+Szybkie sprawdzenie miało `branches: [main]`, więc push na gałąź zadania nie
+uruchamiał **niczego** aż do otwarcia pull requesta — feedback znikał dokładnie
+wtedy, gdy jest najbardziej potrzebny. Teraz rusza na każdej gałęzi. Wyzwalacza
+`pull_request` nie ma i to jest świadome: statusy przypinają się do commita, więc
+przebieg z pusha widać w pull requeście dla tego samego SHA, a drugi wyzwalacz
+dawałby dwa identyczne przebiegi. Skutek uboczny do zapamiętania: pull request
+z forka nie dostanie tu sprawdzenia i nie da się go scalić — blokada zamiast
+cichego przepuszczenia.
+
+Pełne sprawdzenie ruszało wyłącznie po scaleniu na `main` i to było gorsze.
+Zmiana dotykająca testów E2E i konfiguracji frontendu poszła do scalenia **bez
+ani jednego uruchomienia pełnego stosu**, bo jedyne, co potrafiło ją sprawdzić,
+chodziło dopiero po fakcie. Usterka integracyjna wykryta minutę po scaleniu jest
+już usterką na main-ie. Teraz rusza na pull requeście, a po scaleniu również —
+bo pull request sprawdza commit scalający, którego na `main` już nie ma.
+
+Ruleset wymaga od teraz jednego checka: `Wynik sprawdzenia`. Musiało to zostać
+zrobione ręcznie w interfejsie GitHuba — `PATCH /repos/.../rulesets/{id}` zwraca
+404 dla tokenu z `gh auth login`, mimo zakresu `repo` i uprawnień administratora.
+Odczyt tego samego zasobu działa; zapisu GitHub nie dopuszcza dla tokenów
+aplikacji OAuth.
+
+Potwierdzone przy okazji: pełne sprawdzenie na `main` przeszło (5 min 55 s,
+z testami E2E), a cache modelu zapisał się **pierwszy raz w historii tego
+repozytorium** — `embeddings-BAAI-bge-m3-v2`, 1278 MB.
+
+---
 ## 2026-09-13 13:01 — Gałąź na zadanie; koniec omijania ochrony main-a (D-031)
 
 Ruleset „Ochrona gałęzi głównej" istniał i wymagał pull requesta oraz zielonych

@@ -19,15 +19,15 @@
 name: Pełne sprawdzenie
 
 on:
+  # Przed scaleniem, nie po nim. Początkowo ten przebieg ruszał wyłącznie na
+  # main-ie i było to złe rozwiązanie: zmiana dotykająca testów E2E i konfiguracji
+  # frontendu poszła do scalenia bez ani jednego uruchomienia pełnego stosu, bo
+  # jedyne, co potrafi ją sprawdzić, chodziło dopiero po fakcie. Usterka
+  # integracyjna wykryta minutę po scaleniu jest już usterką na main-ie.
+  pull_request:
+  # Po scaleniu również. Pull request sprawdza commit scalający, którego po
+  # scaleniu na main-ie nie ma — a interesuje nas stan, który obowiązuje.
   push:
-    # Tylko main, czyli po scaleniu pull requesta. Pełny stos jest odpowiedzią
-    # na pytanie „czy to wszystko razem wstaje", a to pytanie ma sens dla stanu,
-    # który faktycznie obowiązuje — nie dla każdej gałęzi zadania z osobna.
-    #
-    # Skutek uboczny jest realny i trzeba go znać: usterka integracyjna trafia
-    # na main i dowiadujemy się o niej kilka minut po scaleniu, a nie przed nim.
-    # Przy gałęzi zadania da się ją sprawdzić wcześniej ręcznie:
-    #   gh workflow run pelne.yml --ref <gałąź>
     branches: [main]
   schedule:
     # 03:17 UTC — nie o pełnej godzinie, bo wtedy kolejki GitHuba są najdłuższe.

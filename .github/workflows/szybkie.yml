@@ -1,16 +1,25 @@
-# Szybki przebieg — chodzi przy każdym pushu i pull requeście.
+# Szybkie sprawdzenie — chodzi przy każdym pushu, na każdej gałęzi.
 #
-# Celowo NIE stawia serwera embeddingów: pobranie modelu bge-m3 to ~2 GB i
-# 6-8 minut, a sprawdza założenie zmieniające się raz na kwartał. Robi to
-# pełne sprawdzenie (pelne.yml). Tutaj liczy się czas odpowiedzi — poniżej pięciu
-# minut, żeby wynik przyszedł, zanim autor zdąży przełączyć kontekst.
+# Celowo NIE stawia serwera embeddingów ani całego stosu: od tego jest „Pełne
+# sprawdzenie" (pelne.yml), które rusza na pull requeście i po scaleniu. Tutaj
+# liczy się czas odpowiedzi — wynik ma przyjść, zanim autor przełączy kontekst.
+#
+# Wyzwalacz obejmuje wszystkie gałęzie, nie tylko main, i to jest istotne przy
+# modelu „gałąź na zadanie" (D-031). Wcześniej stało tu `branches: [main]`, więc
+# push na gałąź zadania nie uruchamiał niczego aż do otwarcia pull requesta —
+# czyli feedback znikał dokładnie w chwili, gdy jest najbardziej potrzebny.
+#
+# Nie ma wyzwalacza `pull_request` i to również jest świadome: status przypina
+# się do commita, więc przebieg z pusha widać w pull requeście dla tego samego
+# SHA. Dodanie drugiego wyzwalacza dałoby dwa identyczne przebiegi na każdą
+# zmianę. Skutek uboczny: pull request z **forka** nie dostanie tu żadnego
+# sprawdzenia, a więc i nie da się go scalić. Kierunek jest bezpieczny, a gdy
+# pojawią się zewnętrzni współautorzy, wyzwalacz wróci.
 
 name: Szybkie sprawdzenie
 
 on:
   push:
-    branches: [main]
-  pull_request:
 
 # Pull request z forka nie dostaje żadnych uprawnień poza odczytem.
 permissions:
@@ -23,8 +32,77 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  zakres:
+    # Co właściwie zmieniła ta gałąź — żeby poprawka w samym frontendzie nie
+    # budziła Postgresa, Composera i PHPStana.
+    #
+    # Liczone z różnicy wobec `main` (trzy kropki: od punktu rozejścia), a nie
+    # z listy plików pojedynczego pusha. Gałąź zadania ma zwykle kilkanaście
+    # commitów i liczy się jej całość: push poprawiający literówkę w README nie
+    # może skasować faktu, że dziesięć commitów wcześniej zmieniono backend.
+    name: Zakres zmian
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filtr.outputs.backend }}
+      frontend: ${{ steps.filtr.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Pełna historia, inaczej nie ma jak wyznaczyć punktu rozejścia z main.
+          fetch-depth: 0
+
+      - name: Wyznacz zakres
+        id: filtr
+        run: |
+          # Na main-ie nie ma się z czym porównywać i nie ma po co: stan gałęzi
+          # głównej sprawdzamy w całości.
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            echo 'Gałąź główna — uruchamiam wszystko.'
+            echo 'backend=true' >> "$GITHUB_OUTPUT"
+            echo 'frontend=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch origin main --quiet
+          pliki=$(git diff --name-only origin/main...HEAD)
+
+          if [ -z "$pliki" ]; then
+            # Brak różnicy wobec main-a nie powinien się zdarzyć, ale gdyby —
+            # sprawdzamy wszystko. Milczące pominięcie byłoby gorsze.
+            echo 'Brak różnicy wobec main — uruchamiam wszystko na wszelki wypadek.'
+            echo 'backend=true' >> "$GITHUB_OUTPUT"
+            echo 'frontend=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo 'Zmienione pliki:'
+          echo "$pliki" | sed 's/^/  /'
+
+          # docker-compose.yml i workflowy trafiają do OBU zakresów: potrafią
+          # zepsuć każdą ze stron i nie ma jak z góry powiedzieć której.
+          wzorzec_wspolny='^(docker-compose\.yml|\.github/workflows/|Makefile|\.env\.example)'
+
+          if echo "$pliki" | grep -qE "^(backend/|docker/backend/|docker/postgres/)|$wzorzec_wspolny"; then
+            echo 'backend=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'backend=false' >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$pliki" | grep -qE "^(frontend/|docker/frontend/|docker/nginx/)|$wzorzec_wspolny"; then
+            echo 'frontend=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'frontend=false' >> "$GITHUB_OUTPUT"
+          fi
+
+          echo
+          echo 'Zakres:'
+          grep -E '^(backend|frontend)=' "$GITHUB_OUTPUT" | sed 's/^/  /'
+
   backend:
     name: Testy backendu
+    needs: zakres
+    if: needs.zakres.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -141,6 +219,8 @@ jobs:
 
   frontend:
     name: Testy frontendu
+    needs: zakres
+    if: needs.zakres.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -248,7 +328,7 @@ jobs:
     # w porządku, a porażka nie.
     name: Wynik sprawdzenia
     if: always()
-    needs: [backend, frontend, porzadek]
+    needs: [zakres, backend, frontend, porzadek]
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -256,6 +336,7 @@ jobs:
       - name: Zbierz wyniki
         env:
           WYNIKI: |
+            Zakres zmian=${{ needs.zakres.result }}
             Testy backendu=${{ needs.backend.result }}
             Testy frontendu=${{ needs.frontend.result }}
             Dokumentacja i zadania=${{ needs.porzadek.result }}
