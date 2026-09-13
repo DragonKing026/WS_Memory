@@ -1,0 +1,35 @@
+{
+  // Znaczniki własne Symfony, których ogólny serwer języka YAML nie zna.
+  //
+  // Bez tego edytor podkreśla `!tagged_iterator` w `backend/config/services.yaml`
+  // jako „Unresolved tag" i pokazuje błędy w pliku, który jest poprawny. Prawdziwym
+  // walidatorem jest `php bin/console lint:yaml config --parse-tags` — rozumie te
+  // znaczniki i w CI przechodzi. Zwykły parser YAML zgłasza je jako błąd składni
+  // i dlatego szybki przebieg celowo NIE sprawdza nim konfiguracji Symfony
+  // (patrz docs/09-ci.md).
+  //
+  // Fałszywy alarm w edytorze jest kosztowny nie dlatego, że boli, tylko dlatego,
+  // że uczy ignorować listę problemów — a wtedy ginie w niej ten prawdziwy.
+  "yaml.customTags": [
+    "!tagged_iterator scalar",
+    "!tagged_iterator mapping",
+    "!tagged_locator scalar",
+    "!tagged_locator mapping",
+    "!service mapping",
+    "!service_locator mapping",
+    "!service_closure mapping",
+    "!closure mapping",
+    "!abstract scalar",
+    "!iterator sequence",
+    "!php/const scalar",
+    "!php/object scalar",
+    "!php/enum scalar",
+    "!when scalar",
+    "!returns_clone mapping"
+  ],
+
+  // Pliki konfiguracji Symfony nie są zwykłym YAML-em — wyłączenie walidacji
+  // schematem zapobiega drugiej fali fałszywych alarmów.
+  "yaml.validate": true,
+  "yaml.schemas": {}
+}
