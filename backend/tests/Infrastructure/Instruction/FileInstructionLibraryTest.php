@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Infrastructure\Instruction;
 
-use App\Domain\Instruction\Instruction;
 use App\Domain\Instruction\InstructionLibrary;
 use App\Domain\Instruction\InstructionUnavailable;
 use App\Domain\Instruction\UnknownInstruction;
@@ -164,9 +163,10 @@ final class FileInstructionLibraryTest extends KernelTestCase
             'brudnopis.md' => "Notatka, która wpadła do katalogu.\n",
         ]);
 
-        $uris = array_map(static fn (Instruction $instruction): string => $instruction->uri, $library->all());
-
-        self::assertNotContains('ws-memory://brudnopis', $uris);
+        // Nothing reaches it under any URI derived from its name — the catalogue
+        // is the constant in the adapter, not the contents of the directory.
+        $this->expectException(UnknownInstruction::class);
+        $library->read('ws-memory://brudnopis');
     }
 
     // ------------------------------------------------------------------ setup
