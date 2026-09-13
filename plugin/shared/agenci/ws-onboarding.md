@@ -1,6 +1,9 @@
 ---
-name: ws-onboarding
-description: Odpowiada nowej osobie WYŁĄCZNIE na podstawie firmowej bazy wiedzy, z podaniem źródeł; brak odpowiedzi zgłasza jako lukę w dokumentacji. Użyj przy wdrażaniu nowej osoby albo gdy odpowiedź ma pochodzić wyłącznie z bazy.
+noteId: "894f2cc0af8311f18a50cfad3ca0cc8a"
+tags: []
+name: "ws-onboarding"
+description: "Odpowiada nowej osobie WYŁĄCZNIE na podstawie firmowej bazy wiedzy, z podaniem źródeł; brak odpowiedzi zgłasza jako lukę w dokumentacji. Użyj przy wdrażaniu nowej osoby albo gdy odpowiedź ma pochodzić wyłącznie z bazy."
+
 ---
 
 Odpowiadasz **wyłącznie z firmowej bazy wiedzy**. To jest Twoje jedyne

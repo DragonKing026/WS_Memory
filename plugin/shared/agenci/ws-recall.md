@@ -1,6 +1,9 @@
 ---
-name: ws-recall
-description: Głębokie przeszukanie firmowej bazy wiedzy przed decyzją — zbiera wszystkie wcześniejsze ustalenia w temacie, także te sprzeczne. Użyj przed zmianą architektury, wyborem technologii albo zmianą konwencji.
+noteId: "894f53d2af8311f18a50cfad3ca0cc8a"
+tags: []
+name: "ws-recall"
+description: "Głębokie przeszukanie firmowej bazy wiedzy przed decyzją — zbiera wszystkie wcześniejsze ustalenia w temacie, także te sprzeczne. Użyj przed zmianą architektury, wyborem technologii albo zmianą konwencji."
+
 ---
 
 Zbierasz **całość tego, co już ustalono**, zanim ktoś podejmie decyzję.

@@ -1,6 +1,9 @@
 ---
-name: ws-memory-setup
-description: Konfiguracja połączenia z firmową bazą wiedzy Web Systems — wystawienie tokena agenta i sprawdzenie, czy działa. Użyj, gdy narzędzia ws_* odmawiają, nie odpowiadają albo gdy ktoś podłącza WS_Memory pierwszy raz.
+noteId: "894f53d0af8311f18a50cfad3ca0cc8a"
+tags: []
+name: "ws-memory-setup"
+description: "Konfiguracja połączenia z firmową bazą wiedzy Web Systems — wystawienie tokena agenta i sprawdzenie, czy działa. Użyj, gdy narzędzia ws_* odmawiają, nie odpowiadają albo gdy ktoś podłącza WS_Memory pierwszy raz."
+
 ---
 
 # Podłączenie do WS_Memory
@@ -8,6 +11,28 @@ description: Konfiguracja połączenia z firmową bazą wiedzy Web Systems — w
 Wtyczka pyta o dwie rzeczy przy włączeniu: **adres instancji** i **token
 agenta**. Obie zostają w konfiguracji klienta AI — nie w repozytorium, nie
 w zmiennych środowiskowych ustawianych ręcznie, nie w żadnym pliku projektu.
+
+## Najpierw lokalny pałac
+
+Wtyczka WS_Memory **wymaga wtyczki MemPalace** i deklaruje to jako zależność,
+więc klient AI dociągnie ją sam. Sama wtyczka to jednak tylko manifest —
+serwer MCP `mempalace` uruchamia **pakiet Pythona**, i ten trzeba mieć:
+
+```bash
+pip install "mempalace[extract]"
+mempalace init
+```
+
+Wariant `extract` dokłada mielenie PDF-ów i DOCX-ów. Bez pakietu narzędzia
+`ws_*` będą działać, a `mempalace_*` nie — i to jest pierwsza rzecz do
+sprawdzenia, gdy brakuje tylko połowy narzędzi.
+
+Mielenie projektów robisz u siebie i **kod nie opuszcza laptopa**:
+
+```bash
+mempalace init ~/projekty/nowy-projekt
+mempalace mine ~/projekty/nowy-projekt
+```
 
 ## Skąd wziąć token
 

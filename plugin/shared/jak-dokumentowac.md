@@ -1,6 +1,9 @@
 ---
-name: ws-memory-document
-description: Jak pisać firmową dokumentację Web Systems — co jest notatką, co dokumentem, jak nazwać adres, co napisać w opisie zmiany. Użyj, gdy masz coś zapisać do wspólnej bazy wiedzy.
+noteId: "894f53d1af8311f18a50cfad3ca0cc8a"
+tags: []
+name: "ws-memory-document"
+description: "Jak pisać firmową dokumentację Web Systems — co jest notatką, co dokumentem, jak nazwać adres, co napisać w opisie zmiany. Użyj, gdy masz coś zapisać do wspólnej bazy wiedzy."
+
 ---
 
 # Jak pisać do firmowej bazy wiedzy

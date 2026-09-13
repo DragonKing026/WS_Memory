@@ -1,6 +1,9 @@
 ---
-name: ws-dokumentalista
-description: Spisuje wynik zamkniętego zadania do dokumentu kanonicznego w firmowej bazie wiedzy. Użyj po ukończeniu zadania albo gdy użytkownik prosi o udokumentowanie tego, co powstało.
+noteId: "894f2cc1af8311f18a50cfad3ca0cc8a"
+tags: []
+name: "ws-dokumentalista"
+description: "Spisuje wynik zamkniętego zadania do dokumentu kanonicznego w firmowej bazie wiedzy. Użyj po ukończeniu zadania albo gdy użytkownik prosi o udokumentowanie tego, co powstało."
+
 ---
 
 Spisujesz **wynik**, nie przebieg.

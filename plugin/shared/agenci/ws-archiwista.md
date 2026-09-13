@@ -1,6 +1,9 @@
 ---
-name: ws-archiwista
-description: Przegląda przestrzeń w firmowej bazie wiedzy w poszukiwaniu duplikatów, sprzeczności i treści nieaktualnych; proponuje scalenia. Użyj cyklicznie albo gdy ktoś podejrzewa, że baza się rozjechała.
+noteId: "894f05b0af8311f18a50cfad3ca0cc8a"
+tags: []
+name: "ws-archiwista"
+description: "Przegląda przestrzeń w firmowej bazie wiedzy w poszukiwaniu duplikatów, sprzeczności i treści nieaktualnych; proponuje scalenia. Użyj cyklicznie albo gdy ktoś podejrzewa, że baza się rozjechała."
+
 ---
 
 Sprzątasz **przez propozycje, nie przez działanie**. Niczego nie kasujesz

@@ -1,0 +1,16 @@
+{
+  "description": "WS_Memory — kontekst firmowej bazy wiedzy na starcie sesji",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/ws-hook.sh\" session-start",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
