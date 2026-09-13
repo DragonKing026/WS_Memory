@@ -133,8 +133,9 @@ final class AdminUserTest extends WebTestCase
         // to be able to say that, and null is the only honest way.
         self::assertArrayHasKey('lastLoginAt', $row);
         // Accepting an invitation creates the private space in the same transaction
-        // (inviolable rule 6), so nobody ever has zero.
-        self::assertSame(1, $row['spaceCount']);
+        // (inviolable rule 6) and joins the shared space everybody belongs to, so
+        // nobody ever has zero — and a fresh account has exactly these two.
+        self::assertSame(2, $row['spaceCount']);
         self::assertSame(0, $row['tokenCount']);
 
         self::assertTrue($byEmail['admin@web-systems.pl']['isGlobalAdmin']);

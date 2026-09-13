@@ -75,6 +75,9 @@ Konto administratora powstanie razem z zarządzaniem użytkownikami (TODO-002).
 | `MEMPALACE_TIMEOUT` | limit czasu na jedno wywołanie narzędzia pałaca, w sekundach (domyślnie 15, ustawiany w `backend/.env`) |
 | `MCP_CALLS_PER_MINUTE` | ile wywołań na minutę może wykonać jeden token agenta (domyślnie 120, `backend/.env`) |
 | `WS_INSTRUCTIONS_DIR` | katalog z treścią instrukcji wystawianą jako zasoby MCP — patrz niżej |
+| `WS_DEFAULT_SPACE_SLUG` | wspólna przestrzeń, do której trafia **każde** nowe konto (domyślnie `wiedza`); pusta wartość wyłącza mechanizm — D-035 |
+| `WS_DEFAULT_SPACE_NAME` | jej nazwa widoczna w interfejsie (domyślnie `Baza wiedzy`) |
+| `WS_DEFAULT_SPACE_ROLE` | rola, z jaką konto do niej wchodzi (domyślnie `writer`; nieczytelna wartość degraduje się do `reader`) |
 | `FRONTEND_TARGET` | `dev` (Vite z przeładowaniem na gorąco) albo `prod` (statyczne `dist/` w nginxie) |
 | `WS_DEV_PORT` | port, pod którym przeglądarka widzi aplikację; websocket HMR musi być ogłoszony na nim, nie na porcie Vite |
 

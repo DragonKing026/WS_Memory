@@ -1436,3 +1436,64 @@ that is how it is to be written down.
 The third is of the worst kind: nothing breaks, half the plugin simply does not
 exist. That is why the final check is **counting the components** in `claude
 plugin details`, not a green validator.
+
+---
+
+## D-035 — One shared space that every account belongs to from the start
+
+**Date:** 2026-09-13 18:05 · **Status:** Accepted
+
+A new account joins **one team space** straight away (`wiedza` / `Baza wiedzy` by
+default), with the `writer` role. The space creates itself along with the first
+account. An empty `WS_DEFAULT_SPACE_SLUG` switches the mechanism off.
+
+**Why:** previously an account was created with nothing but its private space, so
+the first thing a newcomer saw was the sentence **"you do not belong to any team
+space yet"** — next to a knowledge base that stood right there and was invisible
+to them. Somebody with an administrator role had to add them by hand. For one
+person that is a trifle; as a rule it is an invitation to a situation in which the
+knowledge base is by default unavailable to the very people who have just been
+invited to it.
+
+It came to light exactly like this: a freshly created global administrator account
+logged in and could not see the existing `wiedza` space, despite holding the
+highest permissions in the system.
+
+**Does this not conflict with D-016?** No, and it is worth saying why. D-016
+forbids an administrator from reaching into a space **silently** — what it is
+about is an exception made without a trace. Here it is the opposite: an explicit
+rule applied to everybody in the same way, recorded in the audit log like any
+other granting of access. The difference is between an invisible exception and a
+visible rule.
+
+**The audit entry has no actor.** Nobody granted this. Entering the new account as
+the actor would read as "it let itself in", and entering the inviter is
+impossible: an invitation issued from the console **has no inviter** (the
+`invited_by` field is empty, which separately broke the invitations screen the
+same day). So the `target` holds `reason: default_space` — the rule let them in.
+
+**Why `writer` and not `reader`:** the point is that somebody can add something to
+the base on the day they arrive. An administrator can narrow one person down
+later; requiring an administrator **before anybody writes anything** is exactly
+what this decision removes. An incorrect value in the configuration degrades to
+`reader`, not to `writer` — a mistake should take access away, not hand it out.
+
+**Why the space is created along with the first account rather than by a
+migration:** a migration would have to hard-code the slug, and the slug is
+configurable. An instance that never accepts an invitation does not need that
+space.
+
+**What was rejected:**
+
+- **Joining *all* team spaces automatically** — that is not a default, it is the
+  abolition of permissions. A space exists so that something can be kept
+  separately.
+- **The `admin` role in the default space** — everybody could then hand out access
+  to the shared base, so the rule "an administrator grants access" would stop
+  meaning anything.
+- **Creating the space with a data migration** — the reason is above.
+
+**The cost, stated plainly:** the property "a fresh account has exactly its own
+private space" stopped holding, and it was written down explicitly in the tests.
+They were rewritten so that they tell the truth about the new state, rather than
+so that they stopped meaning anything.

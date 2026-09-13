@@ -119,9 +119,15 @@ final class SpaceAdministrationTest extends WebTestCase
             'role' => 'reader',
         ], $this->tokenFor('szef@web-systems.pl'));
 
+        // Narrowed to alfa, because "the newest space.member_added" no longer names
+        // this grant. Creating the three accounts in setUp admits each of them to the
+        // shared space, which writes an actorless entry of the same action, and
+        // `created_at` is a TIMESTAMP(0) — within one second the rows tie and the
+        // ordering picks whichever it likes.
         $entry = $this->em->getConnection()->fetchAssociative(
             "SELECT actor_user_id, space_slug FROM ws.audit_log
-             WHERE action = 'space.member_added' ORDER BY created_at DESC LIMIT 1"
+             WHERE action = 'space.member_added' AND space_slug = 'alfa'
+             ORDER BY created_at DESC LIMIT 1"
         );
 
         self::assertNotFalse($entry);

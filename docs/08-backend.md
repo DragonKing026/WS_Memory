@@ -219,6 +219,27 @@ bazie, jawny token raz na wyjściu) → osoba otwiera link →
 konto, prywatną przestrzeń i członkostwo w jednej transakcji → wpis
 `invitation.accepted`.
 
+W tej samej transakcji konto **wchodzi do wspólnej przestrzeni zespołowej**
+(`SharedSpaceForEveryone`, D-035). Domyślnie `wiedza` z rolą `writer`;
+konfiguracja: `WS_DEFAULT_SPACE_SLUG`, `WS_DEFAULT_SPACE_NAME`,
+`WS_DEFAULT_SPACE_ROLE`, pusty slug wyłącza mechanizm. Przestrzeń powstaje przy
+pierwszym koncie, jeśli jeszcze jej nie ma.
+
+Dwie rzeczy w tym miejscu są nieoczywiste i obie są celowe:
+
+- **Wpis audytu `space.member_added` nie ma aktora.** Nikt tego nie nadał.
+  Nowe konto jako aktor czytałoby się jak „sam się wpuścił", a zapraszający
+  bywa nieznany, bo zaproszenie z konsoli go nie ma. W `target` stoi
+  `reason: default_space`.
+- **Nic tu się nie flushuje.** Wcześniejsza wersja zapisywała nową przestrzeń od
+  razu, żeby złapać kolizję klucza i doczytać cudzy wiersz. Nie da się: Doctrine
+  **zamyka** EntityManagera po nieudanym `flush`, więc ścieżka ratunkowa działała
+  już na zamkniętym managerze, a konto zostawało utworzone w połowie. Zgłosiło to
+  naraz kilkadziesiąt testów. Przestrzeń jest więc tylko `persist`-owana i idzie
+  jednym `flush`-em razem z kontem; prawdziwy wyścig (dwa zaproszenia przyjęte w
+  tej samej sekundzie na instancji bez tej przestrzeni) odrzuca indeks unikalny,
+  a osoba ponawia.
+
 ### Szukanie w pamięci
 
 1. Wołający (REST albo MCP) buduje `Actor` i `MemoryQuery`. **Zapytanie nie ma
