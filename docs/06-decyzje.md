@@ -1426,6 +1426,66 @@ w `claude plugin details`, a nie zielony walidator.
 
 ---
 
+## D-035 — Jedna wspólna przestrzeń, do której każde konto należy od początku
+
+**Data:** 2026-09-13 18:05 · **Stan:** Przyjęta
+
+Nowe konto trafia od razu do **jednej przestrzeni zespołowej** (domyślnie
+`wiedza` / „Baza wiedzy"), z rolą `writer`. Przestrzeń powstaje sama przy
+pierwszym koncie. Pusty `WS_DEFAULT_SPACE_SLUG` wyłącza mechanizm.
+
+**Dlaczego:** wcześniej konto powstawało z samą przestrzenią prywatną, więc
+pierwszą rzeczą, jaką widziała nowa osoba, było zdanie **„nie należysz jeszcze
+do żadnej przestrzeni zespołowej"** — przy bazie wiedzy, która stała obok
+i była dla niej niewidoczna. Ktoś z rolą administratora musiał dopisać ją
+ręcznie. Jedna osoba to drobiazg; jako reguła to zaproszenie do sytuacji, w
+której baza wiedzy jest domyślnie niedostępna dla ludzi, którzy właśnie zostali
+do niej zaproszeni.
+
+Wyszło to na jaw dokładnie tak: świeżo utworzone konto administratora globalnego
+zalogowało się i nie widziało istniejącej przestrzeni `wiedza`, mimo że miało
+najwyższe uprawnienia w systemie.
+
+**Czy to nie kłóci się z D-016?** Nie, i warto powiedzieć czemu. D-016 zabrania
+administratorowi **cichego** sięgania do przestrzeni — chodzi o wyjątek zrobiony
+bez śladu. Tutaj jest odwrotnie: to jawna reguła stosowana do wszystkich tak
+samo, zapisywana w dzienniku audytu jak każde inne nadanie dostępu. Różnica jest
+między niewidocznym wyjątkiem a widoczną regułą.
+
+**Wpis audytu nie ma aktora.** Nikt tego nie nadał. Wpisanie nowego konta jako
+aktora czytałoby się jak „sam się wpuścił", a wpisanie zapraszającego jest
+niemożliwe: zaproszenie z konsoli **nie ma zapraszającego** (pole `invited_by`
+jest puste, co osobno wywróciło ekran zaproszeń tego samego dnia). W `target`
+stoi więc `reason: default_space` — regułą wpuściła.
+
+**Dlaczego `writer`, a nie `reader`:** sens jest taki, żeby ktoś mógł dorzucić
+coś do bazy w dniu, w którym przyszedł. Zawężenie jednej osoby administrator
+zrobi później; wymaganie administratora, **zanim ktokolwiek cokolwiek napisze**,
+jest dokładnie tym, co ta decyzja usuwa. Niepoprawna wartość w konfiguracji
+degraduje się do `reader`, nie do `writer` — pomyłka ma zabierać dostęp, nie
+rozdawać go.
+
+**Dlaczego przestrzeń powstaje przy pierwszym koncie, a nie migracją:** migracja
+musiałaby zaszyć slug na sztywno, a ten jest konfigurowalny. Instancja, która
+nigdy nie przyjmie zaproszenia, nie potrzebuje tej przestrzeni.
+
+**Co odrzucono:**
+
+- **Automatyczne dołączanie do *wszystkich* przestrzeni zespołowych** — to nie
+  jest domyślność, tylko zniesienie uprawnień. Przestrzeń istnieje po to, żeby
+  dało się coś trzymać osobno.
+- **Rola `admin` w domyślnej przestrzeni** — każdy mógłby wtedy rozdawać dostęp
+  do wspólnej bazy, więc reguła „dostęp nadaje administrator" przestałaby
+  cokolwiek znaczyć.
+- **Zakładanie przestrzeni migracją danych** — powód wyżej.
+
+**Koszt, który trzeba nazwać:** własność „świeże konto ma dokładnie swoją
+przestrzeń prywatną" przestała obowiązywać, a była wprost zapisana w testach.
+Zostały przepisane tak, żeby mówiły prawdę o nowym stanie, a nie żeby przestały
+cokolwiek znaczyć.
+
+---
+
 ## D-036 — Kształt serwerowej strony mostka: partia na przestrzeń, filtr w Domain, jeden wyjątek w firewallu
 
 **Data:** 2026-09-13 18:40 · **Stan:** Przyjęta · **Doprecyzowuje D-010, D-014, D-015**

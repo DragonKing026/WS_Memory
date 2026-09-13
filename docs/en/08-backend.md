@@ -223,6 +223,28 @@ database, plain token once on the way out) → the person opens the link →
 creates the account, the private space and the membership in one transaction →
 an `invitation.accepted` entry.
 
+In the same transaction the account **joins the shared team space**
+(`SharedSpaceForEveryone`, D-035). By default `wiedza` with the `writer` role;
+the configuration is `WS_DEFAULT_SPACE_SLUG`, `WS_DEFAULT_SPACE_NAME`,
+`WS_DEFAULT_SPACE_ROLE`, and an empty slug switches the mechanism off. The space
+is created along with the first account if it does not exist yet.
+
+Two things here are not obvious, and both are deliberate:
+
+- **The `space.member_added` audit entry has no actor.** Nobody granted this. The
+  new account as the actor would read as "let itself in", and the inviter is
+  sometimes unknown, because an invitation issued from the console has none. The
+  `target` holds `reason: default_space`.
+- **Nothing is flushed here.** An earlier version saved the new space straight
+  away, in order to catch a key collision and re-read somebody else's row. That
+  cannot be done: Doctrine **closes** the EntityManager after a failed `flush`, so
+  the rescue path was already operating on a closed manager and the account was
+  left half-created. Several dozen tests reported this at once. The space is
+  therefore only `persist`-ed and goes out in a single `flush` together with the
+  account; a genuine race (two invitations accepted in the same second on an
+  instance without that space) is rejected by the unique index, and the person
+  retries.
+
 ### Searching memory
 
 1. The caller (REST or MCP) builds an `Actor` and a `MemoryQuery`. **The query

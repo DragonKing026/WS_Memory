@@ -76,6 +76,9 @@ The administrator account arrives together with user management (TODO-002).
 | `MEMPALACE_TIMEOUT` | timeout for one palace tool call, in seconds (15 by default, set in `backend/.env`) |
 | `MCP_CALLS_PER_MINUTE` | calls per minute one agent token may make (120 by default, `backend/.env`) |
 | `WS_INSTRUCTIONS_DIR` | directory holding the instruction content published as MCP resources — see below |
+| `WS_DEFAULT_SPACE_SLUG` | the shared space **every** new account joins (`wiedza` by default); an empty value switches the mechanism off — D-035 |
+| `WS_DEFAULT_SPACE_NAME` | its name as shown in the interface (`Baza wiedzy` by default) |
+| `WS_DEFAULT_SPACE_ROLE` | the role the account joins it with (`writer` by default; an unreadable value degrades to `reader`) |
 | `FRONTEND_TARGET` | `dev` (Vite with hot reload) or `prod` (static `dist/` served by nginx) |
 | `WS_DEV_PORT` | the port the browser reaches the application on; the HMR websocket must be advertised there, not on Vite's port |
 

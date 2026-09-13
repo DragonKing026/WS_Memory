@@ -29,13 +29,22 @@ final class SpaceAccessTest extends WebTestCase
     private KernelBrowser $client;
     private EntityManagerInterface $em;
     private User $member;
+    private User $stranger;
     private Space $teamSpace;
+    private string $sharedSlug;
 
     protected function setUp(): void
     {
         $this->client = static::createClient();
         $container = static::getContainer();
         $this->em = $container->get(EntityManagerInterface::class);
+
+        // The slug of the space every account joins is configuration, and the test
+        // environment sets a different one than production.
+        $slug = $container->getParameter('app.default_space.slug');
+        self::assertIsString($slug);
+
+        $this->sharedSlug = $slug;
 
         $this->em->getConnection()->executeStatement(
             'TRUNCATE ws.space_members, ws.invitations, ws.audit_log, ws.spaces, ws.users CASCADE'
@@ -45,7 +54,7 @@ final class SpaceAccessTest extends WebTestCase
         $accept = $container->get(AcceptInvitation::class);
 
         $this->member = ($accept)(($issue)('czlonek@web-systems.pl')->plainToken, 'Członek', self::PASSWORD);
-        ($accept)(($issue)('obcy@web-systems.pl')->plainToken, 'Obcy', self::PASSWORD);
+        $this->stranger = ($accept)(($issue)('obcy@web-systems.pl')->plainToken, 'Obcy', self::PASSWORD);
 
         $this->teamSpace = new Space('alfa', 'Alfa');
         $this->em->persist($this->teamSpace);
@@ -96,8 +105,17 @@ final class SpaceAccessTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $slugs = array_column($this->json()['spaces'], 'slug');
 
-        self::assertNotContains('alfa', $slugs);
-        self::assertCount(1, $slugs, 'only their own private space');
+        self::assertNotContains('alfa', $slugs, 'a space they are not a member of must not appear');
+
+        // Named in full rather than counted. Every account now also belongs to the
+        // shared space, so the list is longer than it was — but the property under
+        // test never changed: what is here is exactly what this account belongs to.
+        // A count would have gone on passing while an extra foreign space slipped in.
+        sort($slugs);
+        $expected = ['priv_' . $this->stranger->getId()->toRfc4122(), $this->sharedSlug];
+        sort($expected);
+
+        self::assertSame($expected, $slugs, 'their own private space and the shared one, nothing more');
     }
 
     public function testRevokingMembershipCutsAccessImmediately(): void

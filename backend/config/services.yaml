@@ -43,6 +43,20 @@ parameters:
     # catalogue reports "nie udało się sprawdzić" rather than "brak aktualizacji".
     pypi.base_url: '%env(default:pypi_default_base_url:PYPI_URL)%'
     pypi_default_base_url: 'https://pypi.org/pypi'
+    # The shared space every new account joins, and the role it joins with.
+    # A knowledge base whose default state is "you belong to nothing" needs a
+    # human to finish creating every account by hand; this is the company policy
+    # spelled out as configuration. An empty slug switches it off, and accounts
+    # then arrive with their private space only.
+    app.default_space.slug: '%env(default:app_default_space_slug:WS_DEFAULT_SPACE_SLUG)%'
+    app_default_space_slug: 'wiedza'
+    app.default_space.name: '%env(default:app_default_space_name:WS_DEFAULT_SPACE_NAME)%'
+    app_default_space_name: 'Baza wiedzy'
+    # `writer`, because the point is that somebody can contribute the day they
+    # arrive. An administrator can narrow one person afterwards; needing an
+    # administrator before anybody can write is the thing being fixed.
+    app.default_space.role: '%env(default:app_default_space_role:WS_DEFAULT_SPACE_ROLE)%'
+    app_default_space_role: 'writer'
     # Short, because an administrator is watching a spinner and the scheduler has
     # nothing to gain from waiting longer. A check that hangs reads as a broken
     # panel; one that fails says to try again.
@@ -153,7 +167,36 @@ services:
         arguments:
             $publicBaseUrl: '%app.public_base_url%'
 
+    # Skalarów nie da się autowirować, więc te trzy muszą być podane wprost.
+    #
+    # Definicja jest TYLKO tutaj i tak ma zostać. Powtórzenie jej w `when@test`
+    # (choćby po to, żeby dopisać `public: true`) **zastępuje** ten wpis, zamiast
+    # się z nim scalić — usługa traci wtedy argumenty i cały zestaw testów pada na
+    # autowiringu. W drugą stronę było tak samo: wpisana najpierw wyłącznie w
+    # `when@test`, przechodziła testy i wywracała dev przy pierwszym żądaniu.
+    # Upublicznianie jest tu zresztą niepotrzebne: usługę referencjonuje
+    # `AcceptInvitation`, więc Symfony jej nie usunie jako nieużywanej.
+    App\Application\Invitation\SharedSpaceForEveryone:
+        arguments:
+            $slug: '%app.default_space.slug%'
+            $name: '%app.default_space.name%'
+            $role: '%app.default_space.role%'
+
 when@test:
+    parameters:
+        # Wartość WPISANA, nie z `%env()%`, i to jest sedno.
+        #
+        # Testy tworzą własną przestrzeń zespołową o slugu `wiedza` i sprawdzają na
+        # niej dostęp. Gdyby mechanizm domyślnej przestrzeni tworzył ją także, testy
+        # sprawdzałyby zderzenie fikstur zamiast reguły dostępu — 58 błędów naraz.
+        #
+        # Wersja z `WS_DEFAULT_SPACE_SLUG` w `backend/.env.test` tego nie załatwiała:
+        # zmienna środowiskowa kontenera **wygrywa** z plikiem `.env.test`, więc na
+        # pełnym stosie w CI testy i tak dostawały `wiedza` z compose i padały. Wpis
+        # tutaj nie zależy od środowiska, w którym akurat lecą.
+        app.default_space.slug: 'wspolna'
+        app.default_space.name: 'Wspólna baza'
+
     services:
         _defaults:
             autowire: true
