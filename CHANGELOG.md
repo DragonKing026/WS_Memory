@@ -15,6 +15,15 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 18:24 — Wartość ze spacją w `.env.example` wywróciła CI
+
+`WS_DEFAULT_SPACE_NAME=Baza wiedzy` bez cudzysłowów. Docker Compose czyta taki
+plik poprawnie, ale krok CI **sourceuje go jak skrypt powłoki** — i „wiedzy"
+stało się poleceniem: `./.env: line 79: wiedzy: command not found`, wyjście 127.
+
+Jedyna taka wartość w pliku. Sprawdzone `source`-em po poprawce.
+
+---
 ## 2026-09-13 18:20 — Jedna wspólna przestrzeń dla każdego nowego konta (D-035)
 
 Konto trafia od razu do **Bazy wiedzy** z rolą `writer`. Przestrzeń powstaje sama
