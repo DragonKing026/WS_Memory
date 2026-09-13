@@ -58,9 +58,9 @@ The first administrator account is created from the console:
 
 ## Administrative operations from the console
 
-An installation has states the interface cannot lead out of — the one where
-nobody has an account yet, for a start. That is what the backend console is for;
-every command runs inside its container:
+An installation has states the interface cannot lead out of: nobody has an
+account yet, or nobody can sign in any more. That is what the backend console is
+for — every command runs inside its container:
 
 ```bash
 docker compose exec backend php bin/console <command>
@@ -69,11 +69,50 @@ docker compose exec backend php bin/console <command>
 | Command | When it is used |
 |---|---|
 | `ws:user:invite <email> [--admin]` | the first account in an installation and every one after it; it prints the link, because the first invitation is usually issued before the mailer is configured |
+| `ws:user:password <email> [--haslo=…]` | **regaining access to an installation** — the password of an account nobody remembers |
 | `ws:agent:token <email> <label> [--space=…] [--expires=…]` | connecting an AI agent; prints a ready `claude mcp add` together with the token, once |
 | `ws:agent:list <email>` | what this account has to revoke: identifier, label, last use, state |
 | `ws:agent:revoke <email> <identifier>` | **cleaning up after a token** issued for one piece of console work |
 | `ws:dependency:check` | checking here and now which MemPalace version is running and which is the latest |
 | `ws:updater:claim`, `ws:updater:finish`, `ws:updater:heartbeat` | the conversation with the update agent on the host (D-032), not for manual use |
+
+### Regaining access: `ws:user:password`
+
+```bash
+docker compose exec backend php bin/console ws:user:password you@company.com
+```
+
+Used when there is no way into the installation: an administrator account whose
+password is gone, a mailer not configured yet, or a mailbox nobody reads any
+more. Before this command existed, the only way out was issuing an invitation to
+a different address — the old account stayed locked and a second one appeared
+beside it.
+
+Four things the invocation does not show:
+
+- **Without `--haslo` the command generates the password** and prints it once.
+  That is protection rather than convenience: a password passed as an argument
+  stays in the shell history of the machine it was typed on and outlives every
+  reason it was set. `--haslo` exists, but as the exception — and the command
+  then says out loud that the history needs cleaning.
+- **The password rule is the same one as when accepting an invitation**: at least
+  12 characters and nothing known from a public breach. One class enforces it
+  (`PasswordPolicy`) rather than two copies that would eventually drift. A
+  refused password exits with code 2 and **changes nothing**.
+- **Changing the password signs nobody out.** JWT is stateless (D-017), so tokens
+  already issued keep working until they expire, and the account's agent tokens
+  keep working just the same. To cut access immediately, **deactivate the
+  account** — that revokes every one of its agent tokens.
+- **A deactivated account does get the password** but will not sign in with it,
+  and the command says so. Refusing would be worse: the password is half of
+  getting that person back and grants no access on its own, so the audit entry
+  has nothing to overstate. (Unlike granting a role to a deactivated account,
+  which is refused — there the entry would speak of access nobody has.)
+
+The audit trail gets a `user.password_reset` action **with no actor**: nobody is
+signed in on a console, and naming the account itself would read as "they reset
+their own password". Its `target` carries the address and whether the account was
+active at that moment.
 
 ### Cleaning up after an agent token: `ws:agent:list` and `ws:agent:revoke`
 
