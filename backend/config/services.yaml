@@ -188,6 +188,15 @@ services:
             $linkBaseUrl: '%app.mail.link_base_url%'
             $instanceName: '%app.mail.from_name%'
 
+    # Token agenta nie jest JWT i biblioteka JWT ma się o nim nie wypowiadać.
+    # Bez tego dekoratora `/api/publish` nie działa dla żadnego agenta —
+    # uwierzytelnienie się udaje, a potem Lexik wyrzuca wynik i odsyła
+    # „Invalid JWT Token". Cała historia jest w docblocku dekoratora.
+    App\Infrastructure\Security\AgentTokensAreNotJwt:
+        decorates: lexik_jwt_authentication.extractor.authorization_header_extractor
+        arguments:
+            $biblioteczny: '@.inner'
+
     App\Presentation\Console\InviteUserCommand:
         arguments:
             $publicBaseUrl: '%app.public_base_url%'

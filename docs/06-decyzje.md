@@ -1743,3 +1743,51 @@ siedmiu dniach, więc token z martwej wiadomości przestaje cokolwiek otwierać.
    kosztem jedynej rzeczy, po której poznaje się chwilową awarię poczty od
    trwałej. Zaproszenie, które nie doszło i nie doszło po raz drugi, to
    zaproszenie do wystawienia od nowa przez człowieka.
+
+---
+## D-039 — Token agenta nie jest JWT i biblioteka JWT ma o nim milczeć
+
+**Data:** 2026-09-13 22:32 · **Stan:** Przyjęta
+
+`/api/publish` **nie działał dla żadnego agenta** — i nie tak, że odmawiał:
+uwierzytelnienie się udawało, po czym wynik był wyrzucany.
+
+Firewall `api` ma dwa autentykatory: nasz (token agenta) i JWT, bo ta trasa
+przyjmuje oba poświadczenia (D-036). Symfony zbiera **wszystkie**, których
+`supports()` nie zwróci `false`, i wykonuje po kolei, aż któryś zwróci
+odpowiedź (`AuthenticatorManager::executeAuthenticators`). Nasz autentykator
+uwierzytelnia poprawnie i — jak każdy, który nie przerywa żądania — zwraca
+z `onAuthenticationSuccess()` `null`, czyli „nie mam odpowiedzi, niech leci do
+kontrolera". Pętla rozumie to inaczej: brak odpowiedzi znaczy dla niej „próbuj
+następnego". Następny jest Lexik, który na ciągu `wsm_…` wywraca się
+komunikatem **„Invalid JWT Token"** — i to jego 401 wraca do klienta.
+
+Objaw kłamie na dwa sposoby: mówi o JWT, choć nikt JWT nie przysłał, i mówi
+„nieprawidłowy", choć poświadczenie było prawidłowe.
+
+**Rozstrzygnięcie.** `JWTAuthenticator::supports()` sprowadza się do
+`false !== $ekstraktor->extract($request)`, więc ekstraktor jest jedynym
+miejscem, w którym da się powiedzieć „to nie do ciebie" **zanim** Lexik dołączy
+do listy. Dekorator `AgentTokensAreNotJwt` zwraca `false` dla nagłówka
+z prefiksem `wsm_`, a resztę oddaje ekstraktorowi biblioteki.
+
+**Jak to zostało znalezione i dlaczego tak późno.** Strona serwerowa mostka
+była przetestowana **wołaniem `PublishService` wprost**; droga HTTP — firewall,
+kolejność autentykatorów, kontroler — nie była przejechana ani razu. Błąd
+ujawnił się przy pierwszym prawdziwym kliencie. Test `PublishOverHttpTest`
+uderza teraz tam, gdzie uderza klient, i to on pilnuje tej regresji.
+
+Ślad diagnostyczny wstawiony tymczasowo w autentykatorze pokazał sedno:
+`supports()` przechodzi, `authenticate()` się wykonuje, tożsamość jest
+rozwiązana, a nasze `onAuthenticationFailure()` **nie jest wołane ani razu**.
+
+**Odrzucone alternatywy:**
+
+1. **Osobny firewall na `/api/publish` tylko z naszym autentykatorem** —
+   zabrałby tę trasę zalogowanemu człowiekowi, a ona ma przyjmować oba
+   poświadczenia (D-036).
+2. **Odwrócenie kolejności autentykatorów** — wtedy Lexik wywraca się pierwszy
+   i odsyła swoje 401, zanim nasz w ogóle zobaczy żądanie.
+3. **Zwracanie odpowiedzi z `onAuthenticationSuccess()`** — pętla by się
+   zatrzymała, ale kontroler nigdy by się nie wykonał. To sposób na
+   przekierowanie po zalogowaniu, nie na wpuszczenie żądania dalej.

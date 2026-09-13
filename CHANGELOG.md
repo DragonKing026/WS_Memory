@@ -15,6 +15,53 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 22:32 — Wiedza z lokalnego pałaca jest w aplikacji
+
+**23 szuflady z lokalnego pałaca są w przestrzeni `baza-wiedzy`** i znajdują
+się wyszukiwaniem znaczeniem. Wysłała je wtyczka — zainstalowana, skonfigurowana
+adresem i tokenem agenta, poleceniem `/ws-publish`. To jest ta rzecz, na którą
+czekała cała reszta.
+
+Doszły dwie części klienta, których brakowało: `plugin/skrypty/wyslij.py`
+i polecenie `/ws-publish`, które go woła. Skrypt rozmawia z lokalnym pałacem
+**przez jego własny serwer MCP**, a nie przez otwarcie jego bazy Chroma —
+schemat pałaca należy do MemPalace (D-004). Treść bierze po jednej szufladzie
+(`mempalace_get_drawer`), bo lista zwraca **ucięty podgląd**, a wysłanie
+podglądu zamiast treści dałoby bazę pełną urwanych zdań wyglądających
+identycznie jak dane prawdziwe.
+
+Po drodze pierwszy prawdziwy klient znalazł błąd, który **zamykał mostek
+całkowicie** — i nie dało się go znaleźć inaczej.
+
+`/api/publish` nie działał dla żadnego agenta. Nie tak, że odmawiał:
+uwierzytelnienie się udawało, po czym wynik był wyrzucany. Firewall ma dwa
+autentykatory, bo trasa przyjmuje oba poświadczenia (D-036), a Symfony wykonuje
+je po kolei, aż któryś zwróci odpowiedź. Nasz uwierzytelniał poprawnie i zwracał
+`null` — „nie mam odpowiedzi, niech leci do kontrolera". Pętla czyta to jako
+„próbuj następnego", więc szło do Lexika, który na ciągu `wsm_…` wywracał się
+komunikatem **„Invalid JWT Token"**. Objaw kłamał dwa razy: mówił o JWT, choć
+nikt JWT nie przysłał, i mówił „nieprawidłowy" o poświadczeniu prawidłowym.
+
+Powód, dla którego wyszło dopiero teraz, jest wart zapamiętania: strona
+serwerowa mostka była przetestowana **wołaniem usługi wprost**, a droga HTTP nie
+była przejechana ani razu. `PublishOverHttpTest` uderza teraz tam, gdzie uderza
+klient. Rozstrzygnięcie i odrzucone alternatywy: **D-039**.
+
+Przy okazji wyszedł **drugi błąd trybu prod**: kontener działa jako `www-data`,
+a `backend/` jest montowany z hosta jako właściciel maszyny, więc aplikacja
+**nie mogła pisać do `var/cache`**. Skutek jest podstępny — żadna zmiana
+konfiguracji nie wchodzi w życie, a `debug:container` pokazuje stan sprzed
+zmiany. Do tego obraz prod ma `opcache.preload`, więc po przebudowaniu cache
+konieczny jest restart usługi. Na razie odblokowane prawami; właściwe
+rozwiązanie to nie montować kodu z hosta w trybie prod — do osobnego zadania.
+
+Ostatnia rzecz z tej serii: skrypt czytał z raportu pole `stored`, którego
+`PublishReport` nie ma, i po **udanej** wysyłce dwudziestu dwóch szuflad
+wypisywał „zapisanych 0". Kłamstwo w najgorszą stronę, bo każe powtarzać coś,
+co się udało. Czyta teraz `written` i `skipped`.
+
+
+---
 ## 2026-09-13 21:58 — Sprawdzenia frontendu przestały zależeć od trybu instancji
 
 Skrypt wypychający padał na trzech sprawdzeniach naraz: `pnpm: executable file

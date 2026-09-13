@@ -6,7 +6,7 @@ tags: [ws-memory, todo, hybryda, mempalace, publikacja, lustro]
 
 # TODO-012 — Mostek: lokalny pałac → wspólna baza (hybryda)
 
-**Utworzono:** 2026-09-12 16:39 · **Stan:** 🔵 **W TOKU — punkty 1–4 z 12** (2026-09-13 19:33) · **Zależności:** 004, 009 · **Przejmuje zakres anulowanego** TODO-010
+**Utworzono:** 2026-09-12 16:39 · **Stan:** 🔵 **W TOKU — punkty 1–4, 7, 10 i 11 z 12** (2026-09-13 22:32) · **Zależności:** 004, 009 · **Przejmuje zakres anulowanego** TODO-010
 
 ## Powód
 
@@ -85,15 +85,15 @@ audyt — odrzucone w D-010.
 - [ ] **6.** **Kolejka wyjściowa** w `~/.ws-memory/outbox/`: nieudana wysyłka nie gubi
       niczego i nie przerywa pracy; ponowienie z narastającym odstępem, znacznik
       przesuwa się dopiero po potwierdzeniu przez serwer.
-- [ ] **7.** Komenda `/ws-publish` — dla trybu ręcznego: filtr (skrzydło / temat /
+- [x] **7.** Komenda `/ws-publish` — dla trybu ręcznego: filtr (skrzydło / temat /
       zakres daty), podgląd, potwierdzenie, wysyłka z widocznym postępem.
 - [ ] **8.** Propozycja mapowania, gdy nazwa lokalnego skrzydła odpowiada istniejącej
       przestrzeni zespołowej użytkownika.
 - [ ] **9.** Lustra: CRUD w `/api`, ekran w interfejsie (mapowanie skrzydło → przestrzeń,
       wykluczenia pokoi, pauza, wyłącznik), pierwszy przebieg jako podgląd.
-- [ ] **10.** Lokalny agent wysyłki w pluginie: uruchamiany hookiem `SessionEnd` albo
+- [x] **10.** Lokalny agent wysyłki w pluginie: uruchamiany hookiem `SessionEnd` albo
       ręcznie, publikuje przyrostowo szuflady nowsze niż `last_drawer_filed_at`.
-- [ ] **11.** Skill `ws-memory-recall` uzupełniony o kolejność dwóch źródeł: najpierw
+- [x] **11.** Skill `ws-memory-recall` uzupełniony o kolejność dwóch źródeł: najpierw
       `ws_search` (wspólna baza), potem lokalny `mempalace_search`.
 - [ ] **12.** Dokumentacja dla dewelopera: jak postawić lokalny pałac i podłączyć oba
       serwery MCP naraz.
@@ -112,13 +112,23 @@ nadpisywała wtedy jego szufladę i przenosiła ją do własnej przestrzeni
 **Punkt 11 był już zrobiony** przy TODO-009 — skill `ws-memory-recall` narzuca
 kolejność dwóch źródeł od początku.
 
-Konsekwencja obecnego stanu, warta powiedzenia wprost: strona serwera działa
-i jest przetestowana, ale **endpointu nie ma kto zawołać poza testami**. Wiedza
-z lokalnego pałaca nie jedzie nigdzie, dopóki nie powstaną punkty 5–10.
+**Mostek przejechany od końca do końca.** 23 szuflady z lokalnego pałaca
+(`wing_websystems`, `wing_claude-code-ws-memory`) są w przestrzeni
+`baza-wiedzy`, z `source_replica = laptop-artur` i oryginalnymi
+identyfikatorami, i znajdują się wyszukiwaniem znaczeniem. Wysłał je
+`plugin/skrypty/wyslij.py`, wołany z **zainstalowanej wtyczki**, poleceniem
+`/ws-publish`.
+
+Pierwszy prawdziwy klient znalazł błąd, który zamykał mostek całkowicie —
+opisany niżej i w D-039. Dopóki jedynym „klientem" były testy wołające
+`PublishService` wprost, nie miał prawa się ujawnić.
+
+Zostają punkty **5, 6, 8, 9 i 12**: wysyłka automatyczna po sesji, kolejka
+wyjściowa, propozycja mapowania, ekran luster i dokumentacja dla dewelopera.
 
 ## Kryteria ukończenia
 
-- [ ] Deweloper z lokalnym pałacem publikuje szufladę i widzi ją w interfejsie
+- [x] Deweloper z lokalnym pałacem publikuje szufladę i widzi ją w interfejsie
   z własnym autorstwem oraz oznaczeniem, z której repliki przyszła.
 - [x] Powtórna publikacja tej samej szuflady **nie** tworzy duplikatu (liczba
   szuflad w przestrzeni bez zmian, wiersz zaktualizowany).

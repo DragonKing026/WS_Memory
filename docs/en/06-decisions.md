@@ -1754,3 +1754,52 @@ stops opening anything.
    cost of the only thing that distinguishes a transient mail failure from a
    permanent one. An invitation that did not arrive twice is an invitation a person
    has to issue again.
+
+---
+## D-039 — An agent token is not a JWT, and the JWT library must stay silent about it
+
+**Date:** 2026-09-13 22:32 · **Status:** Accepted
+
+`/api/publish` **did not work for any agent** — and not by refusing:
+authentication succeeded and the result was then thrown away.
+
+The `api` firewall has two authenticators: ours (agent token) and JWT, because
+this route accepts both credentials (D-036). Symfony collects **every**
+authenticator whose `supports()` does not return `false` and runs them in order
+until one returns a response (`AuthenticatorManager::executeAuthenticators`).
+Ours authenticates correctly and — like any authenticator that does not
+interrupt the request — returns `null` from `onAuthenticationSuccess()`, meaning
+"I have no response, let it reach the controller". The loop reads that
+differently: no response means "try the next one". The next one is Lexik, which
+chokes on a `wsm_…` string with **"Invalid JWT Token"** — and its 401 is what
+the client receives.
+
+The symptom lies twice over: it names JWT although no JWT was sent, and it says
+"invalid" although the credential was valid.
+
+**Decision.** `JWTAuthenticator::supports()` reduces to
+`false !== $extractor->extract($request)`, so the extractor is the only place
+where "this is not for you" can be said **before** Lexik joins the list. The
+`AgentTokensAreNotJwt` decorator returns `false` for a header carrying the
+`wsm_` prefix and delegates everything else to the library's extractor.
+
+**How it was found, and why so late.** The server side of the bridge was tested
+by **calling `PublishService` directly**; the HTTP path — firewall, authenticator
+order, controller — had never been driven once. The bug surfaced with the first
+real client. `PublishOverHttpTest` now hits what a client hits, and it is what
+guards this regression.
+
+A temporary trace inside the authenticator showed the heart of it: `supports()`
+passes, `authenticate()` runs, the identity resolves, and our
+`onAuthenticationFailure()` is **never called**.
+
+**Rejected alternatives:**
+
+1. **A separate firewall for `/api/publish` with only our authenticator** — it
+   would take the route away from a signed-in person, and the route is meant to
+   accept both credentials (D-036).
+2. **Reversing the authenticator order** — Lexik then fails first and returns
+   its 401 before ours ever sees the request.
+3. **Returning a response from `onAuthenticationSuccess()`** — the loop would
+   stop, but the controller would never run. That is how you redirect after a
+   login, not how you let a request through.
