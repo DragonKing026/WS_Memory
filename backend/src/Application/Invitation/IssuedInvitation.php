@@ -23,6 +23,20 @@ final readonly class IssuedInvitation
 
     public function acceptUrl(string $baseUrl): string
     {
-        return rtrim($baseUrl, '/') . '/zaproszenie/' . $this->plainToken;
+        return rtrim($baseUrl, '/') . $this->acceptPath();
+    }
+
+    /**
+     * The same link without a host, for a caller that already has one.
+     *
+     * The administration screen is served from the same origin as the API, so an
+     * absolute URL there would be the configured public address rather than the one
+     * the administrator is actually looking at — and when those two differ (a
+     * tunnel, a staging host, a reverse proxy added later) the absolute form is the
+     * broken one. A path is correct in every case, and the browser resolves it.
+     */
+    public function acceptPath(): string
+    {
+        return '/zaproszenie/' . $this->plainToken;
     }
 }

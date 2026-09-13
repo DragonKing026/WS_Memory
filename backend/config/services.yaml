@@ -84,6 +84,8 @@ services:
     App\Domain\Space\SpaceMembershipRepository: '@App\Infrastructure\Doctrine\DoctrineSpaceMembershipRepository'
     App\Domain\Identity\AgentTokenDirectory: '@App\Infrastructure\Doctrine\DoctrineAgentTokenDirectory'
     App\Domain\Identity\AuthorDirectory: '@App\Infrastructure\Doctrine\DoctrineAuthorDirectory'
+    App\Domain\Identity\UserRoster: '@App\Infrastructure\Doctrine\DoctrineUserRoster'
+    App\Domain\Identity\InvitationRoster: '@App\Infrastructure\Doctrine\DoctrineInvitationRoster'
     App\Domain\Audit\AuditTrail: '@App\Infrastructure\Doctrine\DoctrineAuditTrail'
     App\Domain\Dependency\ReleaseCatalog: '@App\Infrastructure\PyPi\PyPiReleaseCatalog'
     App\Domain\Dependency\RunningVersion: '@App\Infrastructure\MemPalace\MemPalaceRunningVersion'

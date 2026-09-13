@@ -6,6 +6,7 @@ namespace App\Application\Invitation;
 
 use App\Domain\Audit\AuditTrail;
 use App\Domain\Identity\Actor;
+use App\Domain\Identity\AdministrationRefused;
 use App\Entity\Invitation;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,6 +16,12 @@ use Doctrine\ORM\EntityManagerInterface;
  *
  * The token is random and stored hashed. The plain value is returned once and
  * never persisted, so a leaked database yields no usable invitations.
+ *
+ * Two entry points share this: `ws:user:invite` on the console, which is how the
+ * first account of an installation comes into existence, and the administration
+ * screen. They must not drift, which is why the three refusals below live here and
+ * not in either caller — a second copy of "is there already an invitation for this
+ * address" would eventually answer differently from the first.
  */
 final readonly class IssueInvitation
 {
@@ -27,6 +34,9 @@ final readonly class IssueInvitation
     ) {
     }
 
+    /**
+     * @throws AdministrationRefused
+     */
     public function __invoke(
         string $email,
         bool $grantsGlobalAdmin = false,
@@ -34,10 +44,22 @@ final readonly class IssueInvitation
     ): IssuedInvitation {
         $email = strtolower(trim($email));
 
+        // Checked first, because the two conflict rules below both search by address
+        // and an address that is not one would make their answers meaningless. The
+        // invitation is delivered to this string — an unsendable one produces a
+        // token nobody can ever use and a row nobody will understand later.
+        if (!filter_var($email, \FILTER_VALIDATE_EMAIL)) {
+            throw AdministrationRefused::malformedEmail($email);
+        }
+
         $existing = $this->entityManager->getRepository(User::class)
             ->findOneBy(['email' => $email]);
         if (null !== $existing) {
-            throw new \DomainException("Konto {$email} już istnieje.");
+            throw AdministrationRefused::accountExists($email);
+        }
+
+        if (null !== $this->pendingFor($email)) {
+            throw AdministrationRefused::invitationPending($email);
         }
 
         $plainToken = bin2hex(random_bytes(self::TOKEN_BYTES));
@@ -67,5 +89,29 @@ final readonly class IssueInvitation
             plainToken: $plainToken,
             expiresAt: $expiresAt,
         );
+    }
+
+    /**
+     * An invitation to this address that somebody could still accept.
+     *
+     * Filtered in PHP through `isUsable()` rather than expressed as a WHERE clause
+     * on `expires_at`, because that method is where "usable" is defined once for
+     * every reader of the table — AcceptInvitation asks the same question, and a
+     * second definition in SQL here is exactly how the two would come to disagree
+     * about an invitation on its last day. The set being filtered is every
+     * invitation ever issued to one address, which is a handful.
+     */
+    private function pendingFor(string $email): ?Invitation
+    {
+        $candidates = $this->entityManager->getRepository(Invitation::class)
+            ->findBy(['email' => $email, 'acceptedAt' => null]);
+
+        foreach ($candidates as $candidate) {
+            if ($candidate->isUsable()) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }
