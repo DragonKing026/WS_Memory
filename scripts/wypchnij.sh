@@ -28,6 +28,9 @@
 set -euo pipefail
 
 KORZEN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# shellcheck source=scripts/wspolne/projekt.sh
+. "${KORZEN}/scripts/wspolne/projekt.sh"
 cd "${KORZEN}"
 
 TYLKO_LOKALNIE=0
@@ -199,6 +202,42 @@ elif [ -n "${GALAZ_Z_ARGUMENTU}" ] && [ "${GALAZ_Z_ARGUMENTU}" != "${GALAZ}" ]; 
     "${SZARY}" "${GALAZ}" "${GALAZ_Z_ARGUMENTU}" "${KONIEC}"
 fi
 
+# Sprawdzenia frontendu nie mogą zależeć od tego, w jakim trybie stoi instancja.
+#
+# Przy `FRONTEND_TARGET=prod` kontener frontendu to nginx ze statycznym `dist/`
+# — nie ma w nim ani Node'a, ani pnpm, więc trzy sprawdzenia padały na
+# „executable file not found in $PATH" i skrypt odmawiał wypchnięcia. Padały
+# przy tym z powodu, który nie ma nic wspólnego z jakością zmiany, a to jest
+# najgorszy rodzaj czerwonego światła: uczy ignorowania czerwonych świateł.
+#
+# Gdy pnpm jest na miejscu, korzystamy z działającego kontenera (szybciej,
+# `node_modules` już rozpakowane). Gdy go nie ma — jednorazowy kontener
+# z obrazu dev, z tym samym wolumenem `node_modules`. Nie jest to pominięcie
+# sprawdzenia: to samo polecenie, inne miejsce uruchomienia.
+w_frontendzie() {
+  if docker compose exec -T frontend sh -c 'command -v pnpm' >/dev/null 2>&1; then
+    docker compose exec -T frontend pnpm "$@"
+    return
+  fi
+
+  local projekt
+  projekt="$(ustal_projekt_compose "${KORZEN}" 2>/dev/null || echo ws-memory)"
+
+  # Nazwa OBRAZU jest w `docker-compose.yml` wpisana na stałe (`ws-memory/frontend`)
+  # i nie zależy od nazwy projektu — w przeciwieństwie do nazwy WOLUMENU, którą
+  # Compose prefiksuje projektem. Pomylenie tych dwóch daje błąd „no such image"
+  # na instancji o innej nazwie projektu.
+  if ! docker image inspect ws-memory/frontend:dev >/dev/null 2>&1; then
+    echo "Brak obrazu ws-memory/frontend:dev — zbuduj go: docker compose build frontend" >&2
+    return 1
+  fi
+
+  docker run --rm --entrypoint pnpm \
+    -v "${KORZEN}/frontend:/app" \
+    -v "${projekt}_frontend_node_modules:/app/node_modules" \
+    -w /app ws-memory/frontend:dev "$@"
+}
+
 # ─── Krok 4: sprawdzenia lokalne ─────────────────────────────────────────────
 echo "Sprawdzenia lokalne (to samo, co „Szybkie sprawdzenie” w CI):"
 
@@ -209,9 +248,9 @@ sprawdz "składnia PHP" docker compose exec -T backend sh -c \
 sprawdz "PHPUnit" docker compose exec -T backend php vendor/bin/phpunit
 sprawdz "PHPStan" docker compose exec -T backend php -d memory_limit=1G vendor/bin/phpstan analyse --no-progress
 sprawdz "składnia konfiguracji Symfony" docker compose exec -T backend php bin/console lint:yaml config --parse-tags
-sprawdz "typy frontendu" docker compose exec -T frontend pnpm typecheck
-sprawdz "testy frontendu" docker compose exec -T frontend pnpm test
-sprawdz "budowanie frontendu" docker compose exec -T frontend pnpm build
+sprawdz "typy frontendu" w_frontendzie typecheck
+sprawdz "testy frontendu" w_frontendzie test
+sprawdz "budowanie frontendu" w_frontendzie build
 sprawdz "spójność dokumentacji" ./scripts/sprawdz-dokumentacje.py
 sprawdz "rozliczenia zadań" ./scripts/sprawdz-zadania.py
 sprawdz "składnia YAML workflowów" python3 -c "

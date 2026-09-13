@@ -15,6 +15,30 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 21:58 — Sprawdzenia frontendu przestały zależeć od trybu instancji
+
+Skrypt wypychający padał na trzech sprawdzeniach naraz: `pnpm: executable file
+not found`. Powód nie ma nic wspólnego z jakością zmiany — po instalacji
+w trybie `prod` kontener frontendu to **nginx ze statycznym `dist/`**, więc nie
+ma w nim ani Node'a, ani pnpm.
+
+To jest najgorszy rodzaj czerwonego światła: takie, które zapala się z powodu
+niezwiązanego z tym, co się właśnie zmieniło. Uczy ignorowania czerwonych
+świateł, a wtedy przestają działać także te prawdziwe.
+
+Sprawdzenia frontendu idą teraz przez `w_frontendzie`: gdy pnpm jest
+w działającym kontenerze, korzystamy z niego (szybciej, `node_modules` już
+rozpakowane); gdy go nie ma — jednorazowy kontener z obrazu dev, z tym samym
+wolumenem `node_modules`. **To nie jest pominięcie sprawdzenia**: to samo
+polecenie, inne miejsce uruchomienia.
+
+Przy okazji pułapka warta zapisania: nazwa **obrazu** jest w compose wpisana na
+stałe (`ws-memory/frontend`), a nazwę **wolumenu** Compose prefiksuje nazwą
+projektu. Pomylenie tych dwóch daje „no such image" na instancji o innej nazwie
+projektu — a taka istnieje, bo na niej testowałem instalator.
+
+
+---
 ## 2026-09-13 21:53 — Pierwsza prawdziwa instalacja w trybie prod: obraz produkcyjny nigdy się nie zbudował
 
 Instalacja na instancji rozwojowej, w trybie **prod** (wybór domyślny), znalazła
