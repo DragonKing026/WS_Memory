@@ -44,6 +44,12 @@ jobs:
     # z zapasem, ale nie nieskończony — zawieszony przebieg ma się skończyć.
     timeout-minutes: 30
 
+    env:
+      # Katalog hosta zamiast wolumenu nazwanego — jedyne, co `actions/cache`
+      # umie zapamiętać. Na poziomie zadania, bo czyta to każde wywołanie
+      # `docker compose`, także `down -v` przy sprzątaniu.
+      EMBEDDING_CACHE_DIR: /tmp/model-embeddingow
+
     steps:
       - uses: actions/checkout@v7
 
@@ -52,14 +58,35 @@ jobs:
           cp .env.example .env
           ./docker/wygeneruj-sekrety.sh
 
+      - name: Nazwa modelu do klucza cache
+        # Czytana z pliku, nie wpisana na sztywno. Poprzednio w kluczu stało
+        # „bge-m3”, podczas gdy model bierze się z EMBEDDING_MODEL — zmiana
+        # modelu nie unieważniłaby cache i przebieg sprawdzałby polską
+        # semantykę na wagach poprzedniego modelu.
+        id: model
+        run: |
+          nazwa=$(grep -E '^EMBEDDING_MODEL=' .env.example | cut -d= -f2- | tr '/' '-')
+          test -n "$nazwa" || { echo "Brak EMBEDDING_MODEL w .env.example"; exit 1; }
+          echo "klucz=$nazwa" >> "$GITHUB_OUTPUT"
+
+      - name: Katalog na wagi modelu
+        # Musi istnieć przed `actions/cache`, bo przy trafieniu akcja rozpakowuje
+        # do niego, a przy pudle zapisuje go na końcu przebiegu. Serwer
+        # embeddingów chodzi jako root, więc o prawa nie ma sporu.
+        run: mkdir -p /tmp/model-embeddingow
+
       - name: Cache modelu embeddingów
-        # Bez tego każdy przebieg pobiera 2 GB z Hugging Face. Klucz zawiera
-        # nazwę modelu, więc jego zmiana unieważnia cache — i słusznie, bo
-        # zmiana modelu unieważnia też wszystkie wektory (D-003).
+        # Bez tego każdy przebieg pobiera ~2,3 GB z Hugging Face.
+        #
+        # Krok istniał już wcześniej i **nie działał**: wskazywał katalog hosta,
+        # a model lądował w wolumenie nazwanym Dockera, którego `actions/cache`
+        # nie widzi. Zapisywał więc pusty katalog przez cały czas — w liście
+        # cache'ów repozytorium nie było ani jednego wpisu dla embeddingów.
+        # Teraz `EMBEDDING_CACHE_DIR` niżej montuje ten katalog do kontenera.
         uses: actions/cache@v6
         with:
           path: /tmp/model-embeddingow
-          key: embeddings-bge-m3-v1
+          key: embeddings-${{ steps.model.outputs.klucz }}-v2
 
       - name: Podnieś stos
         run: |

@@ -15,6 +15,44 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 12:22 — Cache modelu, który od początku zapisywał pustkę
+
+Pytanie brzmiało, czy przebieg nocny musi pobierać 2 GB za każdym razem.
+Odpowiedź: nie musiał, ale pobierał — i to od pierwszego dnia.
+
+Krok cache istniał i wyglądał poprawnie:
+
+```yaml
+path: /tmp/model-embeddingow
+key: embeddings-bge-m3-v1
+```
+
+tyle że serwer embeddingów trzyma wagi w `embeddings-cache:/data`, czyli
+w **wolumenie nazwanym Dockera**, którego `actions/cache` nie widzi. Wskazany
+katalog był pusty przez cały czas, więc krok zapisywał pustkę i przy każdym
+przebiegu nie miał czego przywrócić. Dowód nie z rozumowania, tylko z listy
+cache'ów repozytorium: 46 wpisów — `composer`, `pnpm`, CodeQL — i **ani jednego**
+dla embeddingów.
+
+Poprawki:
+
+- ścieżka wag jest teraz konfigurowalna (`EMBEDDING_CACHE_DIR`). Domyślnie
+  wolumen nazwany, bo nikt nie chce 2,3 GB w katalogu projektu; przebieg nocny
+  ustawia katalog hosta, który cache potrafi objąć;
+- klucz cache bierze nazwę modelu **z `.env.example`** zamiast wpisanej na
+  sztywno. Poprzedni klucz mówił „bge-m3”, a model bierze się z
+  `EMBEDDING_MODEL` — po jego zmianie przebieg sprawdzałby polską semantykę na
+  wagach poprzedniego modelu i przeszedłby.
+
+Osobno, bo pytanie padło wprost: **„environment” w GitHub Actions tu nie pomoże.**
+To mechanizm kontroli dostępu i sekretów — reguły zatwierdzania, ograniczenie
+gałęzi — a nie pamięć podręczna. Nic nie przechowuje między przebiegami.
+
+Morał wart zapamiętania: **krok cache, który nigdy nie trafia, wygląda dokładnie
+tak samo jak krok, który działa.** Nie ma ostrzeżenia, nie ma czerwonego światła;
+jest tylko czas przebiegu, którego nikt nie mierzył.
+
+---
 ## 2026-09-13 12:17 — Pusty ekran edytora: 504 z optymalizatora Vite
 
 Przebieg nocny poszedł na czerwono, a oba testy E2E przewróciły się na tym samym:

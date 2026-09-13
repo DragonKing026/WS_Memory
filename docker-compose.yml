@@ -63,7 +63,14 @@ services:
       - "${EMBEDDING_TOKENIZATION_WORKERS:-2}"
       - "--auto-truncate"
     volumes:
-      - embeddings-cache:/data
+      # Domyślnie wolumen nazwany — na maszynie dewelopera model ma przetrwać
+      # `docker compose down` i nikt nie chce 2,3 GB w katalogu projektu.
+      #
+      # Maszyna przebiegu ustawia tu katalog hosta, bo `actions/cache` potrafi
+      # zapisać katalog, a wolumenu Dockera nie widzi. Bez tego przebieg nocny
+      # pobierał model za każdym razem: krok cache istniał i wskazywał ścieżkę,
+      # do której nic nigdy nie trafiało, więc zapisywał pustkę.
+      - ${EMBEDDING_CACHE_DIR:-embeddings-cache}:/data
     # Twardy limit pamięci. Gdyby mimo strojenia usługa chciała więcej, ma
     # zginąć sama, a nie zabrać ze sobą maszynę. Kontener bez limitu weźmie
     # tyle, ile jest — i dokładnie to się stało przy pierwszym uruchomieniu.
