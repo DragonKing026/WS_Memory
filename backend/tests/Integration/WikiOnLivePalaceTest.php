@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Application\AgentToken\IssueAgentToken;
+use App\Application\Document\PublishDocument;
 use App\Application\Invitation\AcceptInvitation;
 use App\Application\Invitation\IssueInvitation;
 use App\Domain\Memory\MemoryRegistry;
@@ -232,6 +233,15 @@ final class WikiOnLivePalaceTest extends WebTestCase
      * Through the real transport rather than by calling the handler: the ordering
      * guard is a property of what the worker sees, and calling the handler directly
      * would test the guard against arguments this test chose itself.
+     *
+     * Everything in the queue is handled, but only publication jobs are counted —
+     * which is what every caller's assertion means by the number it compares against.
+     * It used to count envelopes, and that quietly became wrong the moment a second
+     * kind of message started travelling on this transport: creating the fixture
+     * accounts queues an invitation mail each, so "exactly one publication job" began
+     * failing with an off-by-the-number-of-invitations.
+     *
+     * @return int publication jobs handled
      */
     private function drainQueue(bool $newestFirst = false): int
     {
@@ -262,13 +272,19 @@ final class WikiOnLivePalaceTest extends WebTestCase
             $envelopes = array_reverse($envelopes);
         }
 
+        $publications = 0;
         foreach ($envelopes as $envelope) {
+            $message = $envelope->getMessage();
             // ReceivedStamp so the bus handles it here instead of queueing it again.
-            $bus->dispatch($envelope->getMessage(), [new ReceivedStamp('async')]);
+            $bus->dispatch($message, [new ReceivedStamp('async')]);
             $transport->ack($envelope);
+
+            if ($message instanceof PublishDocument) {
+                ++$publications;
+            }
         }
 
-        return \count($envelopes);
+        return $publications;
     }
 
     private function registryRowsForDocuments(): int

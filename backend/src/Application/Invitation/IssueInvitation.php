@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Invitation;
 
+use App\Application\Mail\SendInvitationMail;
 use App\Domain\Audit\AuditTrail;
 use App\Domain\Identity\Actor;
 use App\Domain\Identity\AdministrationRefused;
@@ -22,6 +23,12 @@ use Doctrine\ORM\EntityManagerInterface;
  * screen. They must not drift, which is why the three refusals below live here and
  * not in either caller — a second copy of "is there already an invitation for this
  * address" would eventually answer differently from the first.
+ *
+ * Sending the mail is the last thing that happens, after the flush, and it cannot
+ * fail this operation: an invitation exists whether or not the message goes out, and
+ * its link is returned to the caller either way. That is what lets this system be
+ * installed with no mail server at all — the panel keeps working exactly as it did
+ * before it could send anything.
  */
 final readonly class IssueInvitation
 {
@@ -31,6 +38,7 @@ final readonly class IssueInvitation
     public function __construct(
         private EntityManagerInterface $entityManager,
         private AuditTrail $audit,
+        private SendInvitationMail $mail,
     ) {
     }
 
@@ -83,12 +91,21 @@ final readonly class IssueInvitation
 
         $this->entityManager->flush();
 
-        return new IssuedInvitation(
+        $issued = new IssuedInvitation(
             invitationId: $invitation->getId()->toRfc4122(),
             email: $email,
             plainToken: $plainToken,
             expiresAt: $expiresAt,
         );
+
+        // After the flush, and deliberately last. The invitation exists whatever
+        // happens to the mail: queueing cannot throw (QueueMail says why), an
+        // unreachable mail server is a worker's problem rather than this request's,
+        // and the link is returned to the caller either way. That ordering is the
+        // whole reason this system can be installed without an SMTP server at all.
+        ($this->mail)($issued, $invitedBy);
+
+        return $issued;
     }
 
     /**

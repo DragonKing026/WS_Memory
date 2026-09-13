@@ -15,6 +15,74 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 20:30 — Maile naprawdę wychodzą: szablony, podstawianie miejsc, dziennik
+
+Serwerowa strona TODO-017. Zaproszenie wystawione z panelu albo z konsoli
+**wysyła maila**, a link w treści jest tym linkiem, który zakłada konto —
+sprawdzone przez prawdziwy SMTP, nie założone: skrót tokena wyjętego z treści
+wiadomości zgadza się z wierszem w `ws.invitations`.
+
+**Szablony edytuje człowiek, ale nie jest to silnik szablonów.** Podstawianie
+miejsc `{{ nazwa }}` z **zamkniętej listy na szablon**, bez pętli, warunków
+i wywołań. Konstrukcje silnika (`{% if %}`, `{{ 7 * 7 }}`) i kod trafiają do
+maila **dosłownie**, jako tekst — bo szablon edytowany w przeglądarce
+i renderowany silnikiem jest wykonywaniem cudzego kodu na serwerze. Podstawienie
+idzie jednym przebiegiem, więc wartość nie jest skanowana ponownie: treść
+zawierająca `{{ tajne }}` zostaje takim napisem.
+
+Nieznane miejsce to **błąd przy zapisie**, z komunikatem wymieniającym
+dozwolone, a nie puste miejsce w wysłanej wiadomości. Walidacja stoi
+w konstruktorze, więc szablon niepoprawny nie może zaistnieć jako obiekt —
+także przy **czytaniu** z bazy, gdzie wychwytuje wiersz, pod którym zamknięta
+lista się skurczyła.
+
+**Dziennik `ws.mail_log` nie ma kolumny na treść** i mieć nie będzie: mail
+z zaproszeniem niesie działający token, a to jest tabela otwierana swobodnie, bo
+„to tylko logi". Sprawdzone zapytaniem po całej tabeli — każda kolumna każdego
+wiersza rzutowana na tekst i przeszukana — a nie przeglądem kodu. Do tego temat,
+który dziennik zapisuje, **nie może zawierać miejsca oznaczonego jako wrażliwe**;
+bez tej reguły zdanie o braku tokena byłoby prawdziwe tylko do pierwszego
+`{{ link }}` wpisanego w temat.
+
+Wysyłka idzie przez Messenger, więc **niedostępny serwer poczty nie wywraca
+wystawienia zaproszenia** — zaproszenie istnieje, link nadal da się skopiować
+z panelu, a w dzienniku jest stan `nieudany` z powodem od serwera. Zmierzone na
+martwym porcie: cztery próby (1 + 3 ponowienia), czytelny powód, zaproszenie
+nietknięte. Bez ustawionego `WS_PUBLIC_URL` mail **nie wychodzi wcale** i dziennik
+mówi dlaczego, zamiast wieźć komuś link do jego własnego localhosta.
+
+Cena tego kształtu jest zapisana jako **D-038**: token jedzie w wierszu
+`ws.messenger_messages`, a wiadomość po wyczerpaniu ponowień zostaje w kolejce
+`failed` z treścią w środku. Sprawdziłem, że tak jest (ciało pasuje do
+`[0-9a-f]{64}`), i dlatego retencja każe tę kolejkę czyścić.
+
+Dwie rzeczy wyszły dopiero z prób i obie są opisane:
+
+- **`TRUNCATE ws.users CASCADE`**, które robi w `setUp` każdy test integracyjny,
+  kaskaduje na **każdą** tabelę z kluczem obcym do `users`. Z kluczem przy
+  szablonach pierwszy test wyczyściłby treści wgrane migracją, a każdy następny
+  mail w zestawie byłby „brak szablonu" — bez słowa wyjaśnienia. Dlatego autora
+  zmiany trzymamy jako **adres**, nie referencję do konta. Sprawdzone
+  zapytaniem: przed zmianą `mail_templates` było na liście kaskady, po zmianie
+  nie jest.
+- **Maile wysyła `worker`, nie `backend`.** Konfiguracja rozjechana między tymi
+  usługami jest niewidoczna: `backend` z prawdziwym DSN i `worker` z `null://null`
+  dają w dzienniku stan **wysłany**, choć nic nie poszło. Opisane w deploymencie.
+
+Po drodze dwie naprawy poza zakresem zadania, obie odkryte tym, że zmieniłem
+system, a nie przeglądem: `drainQueue()` w teście pałaca **liczył wszystkie**
+wiadomości, więc asercja „dokładnie jedno zlecenie publikacji" zaczęła padać,
+gdy na tym transporcie pojawił się drugi rodzaj wiadomości — liczy teraz to, co
+nazywa. A `make analiza` padało na OOM, bo PHPStan bierze tyle procesów, ile
+rdzeni (szesnaście), w kontenerze z gigabajtem pamięci; komunikat
+„Child process error (exit code 137)" nie mówił nic o kodzie.
+
+Zostają **ekrany w panelu**: lista szablonów z edycją, podglądem i wysyłką
+próbną oraz dziennik maili z filtrem. Usługi pod nie są (`SendTestMail`,
+`renderSample`, filtr dziennika), więc to warstwa prezentacji, nie logika.
+
+
+---
 ## 2026-09-13 20:00 — Mailer wpuszczony do systemu, dokumentacja przestaje kłamać
 
 Pierwsza warstwa TODO-017: `symfony/mailer` jest zależnością, `MAILER_DSN`,

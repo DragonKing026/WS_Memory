@@ -22,3 +22,12 @@ parameters:
 
     # Encje Doctrine mają pola inicjalizowane przez ORM, nie przez konstruktor.
     checkUninitializedProperties: false
+
+    parallel:
+        # Kontener backendu ma 1 GiB (`BACKEND_MEM_LIMIT`), a PHPStan bierze
+        # domyślnie tyle procesów, ile rdzeni ma maszyna — tu szesnaście, każdy
+        # z `-d memory_limit=1G` z Makefile'a. Jądro zabijało workery i analiza
+        # kończyła się komunikatem „Child process error (exit code 137)”, czyli
+        # wynikiem, który nie mówi **nic** o kodzie i wygląda jak awaria
+        # narzędzia. Dwa procesy mieszczą się w limicie kontenera.
+        maximumNumberOfProcesses: 2

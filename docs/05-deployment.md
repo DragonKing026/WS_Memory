@@ -413,6 +413,30 @@ monitorowanie musi sprawdzać treść odpowiedzi, nie sam kod HTTP.
 | rewizje dokumentów | bezterminowo (historia się nie skraca) |
 | `audit_log` | 24 miesiące, potem agregacja do statystyk |
 | partie publikacji | bezterminowo (jednostka wycofania i ślad audytowy) |
+| `mail_log` | 12 miesięcy (metadane wysyłki; treści i tak nie ma — D-038) |
+| kolejka `failed` w `messenger_messages` | **7 dni**, i to nie jest porządkowanie — patrz niżej |
 
 Surowych transkryptów sesji serwer **nie przechowuje** — mielą się lokalnie
 i nigdy tu nie trafiają (D-012).
+
+> **Kolejkę `failed` trzeba czyścić, bo leżą w niej tokeny.** Mail z zaproszeniem
+> niesie działający token, a wiadomość, która nie przeszła wszystkich ponowień,
+> zostaje w tej kolejce z treścią w środku (D-038 — sprawdzone zapytaniem, nie
+> założone). Siedem dni bierze się z terminu ważności zaproszenia: po nim token
+> i tak nic nie otwiera.
+>
+> ```bash
+> docker compose exec backend php bin/console messenger:failed:show
+> docker compose exec backend php bin/console messenger:failed:remove --all --force
+> ```
+>
+> `messenger:failed:show` **wypisuje treść wiadomości**, czyli i token. Na cudzym
+> ekranie ani w zgłoszeniu błędu jego wynik nie ma czego szukać.
+
+> **Maile wysyła `worker`, nie `backend`.** Żądanie tylko wkłada wiadomość do
+> kolejki; łączy się z serwerem poczty proces roboczy. Konfiguracja rozjechana
+> między tymi dwiema usługami jest przez to **niewidoczna**: sprawdzone —
+> `backend` z prawdziwym `MAILER_DSN` i `worker` z `null://null` dają w dzienniku
+> maili stan **wysłany**, mimo że nic nigdzie nie poszło. `docker-compose.yml`
+> podaje obu usługom te same zmienne z jednego `.env`, więc rozjazd bierze się
+> tylko z ręcznego nadpisania — i wtedy jedynym objawem jest brak maili.
