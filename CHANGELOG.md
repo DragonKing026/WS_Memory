@@ -15,6 +15,23 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 16:58 — Treść instrukcji dla agentów: jedno źródło w `plugin/shared/`
+
+Siedem plików z treścią, którą wtyczka WS_Memory ma podawać agentom: protokół
+odtwarzania wiedzy (szukaj, zanim odpowiesz), zasady pisania firmowej
+dokumentacji, konfiguracja tokena i opisy czterech podagentów.
+
+Leżą w `plugin/shared/`, bo **treść ma istnieć w repozytorium raz** (D-013).
+Pakowania dla poszczególnych klientów AI będą ją zaciągać, a nie kopiować —
+inaczej po pierwszej poprawce protokołu Claude i Codex mówiłyby co innego.
+
+Dwie rzeczy zapisane wprost, bo wynikają z tego, jak ta baza ma działać:
+kolejność szukania to **najpierw wspólna baza, potem lokalny pałac** (notatka
+jest zapisem czyjegoś myślenia, dokument jest ustaleniem), a `ws-onboarding`
+ma zakaz odpowiadania z wiedzy ogólnej — bo nowa osoba nie odróżni firmowej
+praktyki od domysłu modelu, zapamięta go i powtórzy jako zasadę.
+
+---
 ## 2026-09-13 16:32 — Ekrany administracyjne; TODO-008 zamknięte
 
 Cztery ekrany pod `/admin`: konta, zaproszenia, przestrzenie i dziennik audytu.
