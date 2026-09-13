@@ -83,7 +83,12 @@ jobs:
           # zepsuć każdą ze stron i nie ma jak z góry powiedzieć której.
           wzorzec_wspolny='^(docker-compose\.yml|\.github/workflows/|Makefile|\.env\.example)'
 
-          if echo "$pliki" | grep -qE "^(backend/|docker/backend/|docker/postgres/)|$wzorzec_wspolny"; then
+          # plugin/ jest w zakresie backendu, choć nie ma w nim ani linii PHP:
+          # treść instrukcji z plugin/shared jest wystawiana przez gateway jako
+          # zasoby MCP, a testy backendu porównują zasób z prawdziwym plikiem.
+          # Zmiana samej instrukcji potrafi więc wywrócić PHPUnita — i musi to
+          # zrobić na gałęzi, nie po scaleniu.
+          if echo "$pliki" | grep -qE "^(backend/|docker/backend/|docker/postgres/|plugin/)|$wzorzec_wspolny"; then
             echo 'backend=true' >> "$GITHUB_OUTPUT"
           else
             echo 'backend=false' >> "$GITHUB_OUTPUT"

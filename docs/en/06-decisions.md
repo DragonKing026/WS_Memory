@@ -1311,3 +1311,128 @@ interface.
 The second cost: a click gives no immediate result, only a request picked up
 within a minute. The panel shows the state and the log, so the wait is visible
 rather than mysterious.
+
+---
+
+## D-033 — The plugin lives in this repository, the marketplace points at a subdirectory
+
+**Date:** 2026-09-13 17:12 · **Status:** Accepted
+
+`plugin/` is a subdirectory of WS_Memory, and `.claude-plugin/marketplace.json`
+in the repository root points at it with a `"source": "./plugin"` entry. **No
+submodule and no second repository.**
+
+**What was checked before this was settled** (in the installed plugin
+directory, not in the documentation): most entries in Anthropic's official
+catalogue are subdirectories of a single repository
+(`"./plugins/agent-sdk-dev"`). The supported source forms are otherwise
+`git-subdir` (a subdirectory of **somebody else's** repository), `url`,
+`github`, `npm`, `archive` and `command`. On top of that, `claude plugin
+marketplace add` has a `--sparse <paths>` flag, described outright as "for
+monorepos" — it limits the download to the directories given.
+
+So both of the worries that motivated a separate repository are moot: the
+plugin **can** be kept in a subdirectory, and whoever installs it **does not
+have to** download the whole application.
+
+**Why not a submodule:**
+
+1. **This repository's rules turn it into double work.** Every change has an
+   entry in `CHANGELOG.md` and documentation in two languages in the same
+   commit. A change in the plugin would therefore always be a commit in the
+   plugin **plus** a commit in the main repository (the changelog,
+   `docs/04-plugin.md`, `docs/en/04-plugin.md`, bumping the pointer). Two pull
+   requests for one thought — exactly the cost for which we rejected permanent
+   layer branches in D-031.
+2. **The backend reads `plugin/shared/` while building the image**, because it
+   exposes that content as MCP resources (D-013). With a submodule, CI would
+   have to fetch it recursively, and **a pointer left unmoved would mean a
+   server serving out-of-date instructions** — a silent failure, visible only
+   after an agent has behaved according to the old protocol.
+3. The symbolic links from `plugin/skills/` and `plugin/agents/` into
+   `plugin/shared/` (D-013: the content exists once) have to point **inside the
+   downloaded tree**. With `plugin/` as a whole, that works with a sparse
+   download as well.
+
+**What was rejected:**
+
+- **A separate repository from the start** — today the plugin is a thin shell
+  over the gateway and changes together with it. A separate repository makes
+  sense once the two start living at different speeds; today it would add
+  synchronisation for no benefit whatsoever.
+- **A submodule** — the reasons are above.
+
+**The way out, should the plugin ever have to go outside:** `git subtree split
+--prefix=plugin` preserves the directory's history, and the marketplace entry
+swaps `"./plugin"` for `git-subdir` or a separate repository. That is a manifest
+change, not a move — and that is precisely why this decision can be deferred.
+
+---
+
+## D-034 — The plugin mechanics are checked with the tool, not by reading
+
+**Date:** 2026-09-13 17:12 · **Status:** Accepted · **Corrects D-012**
+
+D-012 listed **three** Claude Code mechanisms as "checked in the documentation",
+and `TODO-009` added a **fourth** assumption on top of them: a `pre-compact`
+hook. While implementing, we checked all four with the tooling — `claude plugin
+validate`, the installed plugin directory, the event documentation.
+
+**Two were confirmed. Two were not.**
+
+| Assumption | From | How it actually is |
+|---|---|---|
+| `dependencies: ["mempalace"]` | D-012 | **The field is confirmed**, and it also accepts `{"name": …, "version": "~2.1.0"}`. The bare name turned out not to be enough, though — see item 2 below |
+| `userConfig` with `sensitive: true`, available as `${user_config.KEY}` in MCP and `CLAUDE_PLUGIN_OPTION_*` in hooks | D-012 | **Confirmed**, including substitution inside the `headers` object |
+| `source: {"type": "command"}` — a command run **before installation**, the place for `pip install mempalace[extract]` and `mempalace init` | D-012 | **Wrong twice over.** The key is called `source`, not `type`, and the source itself **is not an installation hook**: it is a command that **prints the path to the plugin directory**. There is no room there for installing somebody else's package |
+| a `pre-compact` hook writing a summary | TODO-009 | **The `PreCompact` event does not appear in the documented list of events** (which includes `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `Stop`). `PreCompact` hooks do in fact run — the MemPalace plugin uses one — but there is no documented way for such a hook to **add anything to the context** |
+
+**What follows from this for the plugin:**
+
+1. **Installing the `mempalace` package stays on the human's side**, described
+   in the `ws-memory-setup` skill and in `docs/04-plugin.md`. The MemPalace
+   plugin does not do it either — its marketplace entry carries no command. We
+   do not pretend to have an installation step that cannot be expressed.
+2. **There is no `pre-compact` hook.** And even if the event were documented,
+   our hook could send the server nothing but the **raw conversation** — a shell
+   script does not summarise. That is outright forbidden (D-012: not a single
+   byte of the raw conversation goes to the server). The summary is for the
+   model to write, and the recall protocol tells it so. Mining the transcript
+   **into the local palace** is handled by the MemPalace hook, which comes with
+   the dependency.
+3. **There is no `session-end` hook.** Mirror publication is `TODO-012` and does
+   not exist yet. A hook that does nothing is worse than no hook: it looks like
+   a working feature.
+4. **There is no `auto_publish` switch in `userConfig`.** It would control
+   something that does not exist. It will arrive together with publication.
+
+**Why this is a separate decision rather than a fix in D-012:** we do not edit
+old decisions. But above all, the discrepancy is itself a finding.
+
+D-012 described the mechanisms as "checked in the documentation, not assumed" —
+and **the confirmation consisted of reading their description, not of running
+anything**. Half of them did not survive first contact with the validator, and
+the very point that was meant to take work off the user's hands (installing the
+package automatically) turned out to be a mechanism for an entirely different
+purpose.
+
+A rule for the future: **an external tool's mechanism goes into a decision only
+after we have run it.** "Checked in the documentation" now means "read", and
+that is how it is to be written down.
+
+**The rule proved itself in the very hour it was written.** The plugin passed
+`claude plugin validate` without a single complaint. The real installation
+(`claude plugin install`) caught three things the validator does not see:
+
+1. `"hooks": "./hooks/hooks.json"` in the manifest is a **loading error** —
+   `hooks/hooks.json` loads on its own, and the field is there for additional
+   files;
+2. `dependencies: ["mempalace"]` looks for the dependency in **its own**
+   marketplace; it has to be `["mempalace@mempalace"]`;
+3. symbolic links to **files** in `agents/` **do not load at all** — no error,
+   no warning, simply `Agents (0)`. A symlink to the **directory** works. In
+   `skills/`, symlinks to files work normally.
+
+The third is of the worst kind: nothing breaks, half the plugin simply does not
+exist. That is why the final check is **counting the components** in `claude
+plugin details`, not a green validator.

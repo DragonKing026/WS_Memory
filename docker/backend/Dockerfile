@@ -64,4 +64,13 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-script
     && composer dump-env prod \
     && php bin/console cache:warmup --env=prod \
     && chown -R www-data:www-data /app/var
+
+# Instrukcje dla agentów AI — jedno źródło w plugin/shared (D-013), wystawiane
+# przez gateway jako zasoby MCP. Kontekst budowania to korzeń repozytorium, więc
+# katalog wchodzi tu wprost; w obrazie dev ta sama ścieżka jest wolumenem z hosta.
+# Kopia, nie wolumen: obraz produkcyjny ma być samowystarczalny, a instrukcja
+# wczytana z katalogu, którego ktoś zapomniał podmontować, byłaby pustym zasobem.
+COPY plugin/shared/ /opt/ws-memory/instrukcje/
+ENV WS_INSTRUCTIONS_DIR=/opt/ws-memory/instrukcje
+
 USER www-data

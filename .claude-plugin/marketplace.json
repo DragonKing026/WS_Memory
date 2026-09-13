@@ -1,0 +1,19 @@
+{
+  "name": "web-systems",
+  "owner": {
+    "name": "Web Systems",
+    "url": "https://web-systems.pl"
+  },
+  "metadata": {
+    "description": "Wtyczki firmowe Web Systems dla klientów AI."
+  },
+  "plugins": [
+    {
+      "name": "ws-memory",
+      "source": "./plugin",
+      "description": "Firmowa baza wiedzy Web Systems — wspólna dla ludzi i modeli AI.",
+      "version": "0.1.0",
+      "author": { "name": "Web Systems" }
+    }
+  ]
+}

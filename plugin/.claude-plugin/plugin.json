@@ -1,0 +1,34 @@
+{
+  "name": "ws-memory",
+  "version": "0.1.0",
+  "description": "Firmowa baza wiedzy Web Systems — wspólna dla ludzi i modeli AI. Szukaj w niej, zanim odpowiesz; pisz do niej dokumentację, którą przeczyta człowiek.",
+  "author": {
+    "name": "Web Systems",
+    "url": "https://web-systems.pl"
+  },
+  "license": "proprietary",
+  "keywords": ["memory", "knowledge-base", "mcp", "documentation", "web-systems"],
+  "dependencies": ["mempalace@mempalace"],
+  "userConfig": {
+    "url": {
+      "type": "string",
+      "title": "Adres WS_Memory",
+      "description": "Adres firmowej instancji, na przykład https://wiedza.web-systems.pl"
+    },
+    "token": {
+      "type": "string",
+      "title": "Token agenta",
+      "description": "Wystawisz go w WS_Memory → Ustawienia → Tokeny agentów. Pokazuje się raz.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "ws_memory": {
+      "type": "http",
+      "url": "${user_config.url}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${user_config.token}"
+      }
+    }
+  }
+}

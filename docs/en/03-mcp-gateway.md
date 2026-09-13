@@ -9,7 +9,9 @@ tags: [ws-memory, documentation, mcp, permissions, ai-agents, security]
 
 Status: **working** (2026-09-12, `TODO-004` and `TODO-005`). Eleven tools, agent
 tokens, a rate limit and an audit entry for every call. The set is complete — further
-tools arrive only with the bridge to local palaces (`TODO-012`).
+tools arrive only with the bridge to local palaces (`TODO-012`). Since `TODO-009` the gateway
+additionally publishes **MCP resources** carrying the instruction content for
+agents — see "Resources".
 
 The backend exposes an MCP server over HTTP (JSON-RPC 2.0) at `/mcp` with a
 **curated set of company tools** — it does not pass MemPalace's 44 tools
@@ -18,8 +20,9 @@ straight through (D-007). The tool boundary **is** the permission boundary.
 ## Protocol
 
 `POST /mcp`, JSON-RPC 2.0, header `Authorization: Bearer <agent token>`.
-Supported methods: `initialize`, `tools/list`, `tools/call`, `ping`, plus the
-`notifications/initialized` and `notifications/cancelled` notifications.
+Supported methods: `initialize`, `tools/list`, `tools/call`, `resources/list`,
+`resources/read`, `ping`, plus the `notifications/initialized` and
+`notifications/cancelled` notifications.
 
 The declared protocol revision is **2025-06-18**. A client asking for a known older
 one (`2025-03-26`, `2024-11-05`) gets its own back — refusing would lock out
@@ -107,6 +110,66 @@ rather than an oversight: the parameter an agent is most likely to invent is
 An ignored `wing` would mean the agent **believes it narrowed its search** when it
 did not. Hearing "no such parameter" costs one retry; being ignored costs a wrong
 conclusion about what the agent has just read.
+
+## Resources — the instructions for agents
+
+The gateway publishes the instruction content for agents as **MCP resources**: the
+recall protocol, the documentation rules, the setup guide and the briefs of the four
+subagents. Every MCP client reads them, not only Claude Code.
+
+| URI | What it is |
+|---|---|
+| `ws-memory://protokol-recall` | search the base **before** answering about past decisions |
+| `ws-memory://jak-dokumentowac` | what is a note, what is a document, how to name a slug and describe a change |
+| `ws-memory://konfiguracja` | issuing an agent token and checking the connection |
+| `ws-memory://agenci/ws-recall` | subagent: everything already decided, before a decision |
+| `ws-memory://agenci/ws-dokumentalista` | subagent: writing up the result of a closed task |
+| `ws-memory://agenci/ws-archiwista` | subagent: duplicates and contradictions, through proposals |
+| `ws-memory://agenci/ws-onboarding` | subagent: answers **only** from the company base |
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"ws-memory://protokol-recall"}}
+```
+
+The shape is the protocol's own: `resources/list` returns entries of
+`{uri, name, title, description, mimeType}`, and `resources/read` returns
+`{"contents":[{"uri","mimeType","text"}]}`. `mimeType` is always `text/markdown`.
+An unknown URI is a **JSON-RPC error** `-32002` (the specification's own code for
+it), not an empty document — D-023.
+
+### Where the content comes from
+
+From `plugin/shared/`, which is its **only** source (D-013). The same content is
+wired up by the plugin as skills and subagents; no packaging copies it. The
+practical consequence: changing an instruction is a **server deployment** rather
+than an update everybody has to install — and porting to Codex, Cursor or Zed
+requires no rewriting of instructions.
+
+The URI-to-file mapping is an **explicit table in the code**
+(`Infrastructure\Instruction\FileInstructionLibrary`), not a directory scan: a
+scan would publish whatever happens to land in that directory to every agent. The
+files carry YAML front matter with `name` and `description` — packaging metadata, so
+it is **kept out of the resource body**, while `description` serves as the
+description on the list. The directory is given by `WS_INSTRUCTIONS_DIR`
+(`docs/05-deployment.md`); a missing file is an error, not an empty resource.
+
+### Reading a resource is not written to the audit journal
+
+A tool call leaves an entry; reading a resource does **not**, and that is a decision
+rather than an oversight. A resource is static text, identical for every token, and
+an MCP client asks for the resource list on **every** connection. The entry would
+therefore say "somebody connected", not "somebody did something".
+
+We have paid for this exact mechanism once already — an event recorded per request
+instead of per real action produced **20,335** fictitious `user.login` rows, half
+the journal on the day the audit screen was first opened
+(`Infrastructure\Security\LoginAuditSubscriber`). A journal whose majority is
+fiction is worse than a short one, because the real entries are somewhere inside it
+and nobody will find them.
+
+**The rate limit covers these methods like every other one** and stays that way:
+looping over the resource catalogue loads the server exactly as much as looping over
+searches.
 
 ## How permissions are enforced
 
@@ -224,6 +287,8 @@ nothing" (D-023).
 | MemPalace unreachable | `-32010`, "memory temporarily unavailable — this does not mean nothing was found" |
 | unknown parameter, wrong type, missing required one | `-32602` with the list of allowed parameters |
 | unknown tool or method | `-32601` with a hint to call `tools/list` |
+| unknown resource URI (`resources/read`) | `-32002` with a hint to call `resources/list` |
+| a published instruction that cannot be read | `-32603` — never an empty document; detail goes to the server log |
 | body is not JSON | `-32700` |
 | batch request, or missing `jsonrpc: "2.0"` | `-32600` |
 | internal error | `-32603`, deliberately without detail — that goes to the server log |

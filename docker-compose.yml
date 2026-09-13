@@ -149,8 +149,15 @@ services:
       # tokeny wystawiane w aplikacji (reguła nienaruszalna nr 1).
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?ustaw JWT_PASSPHRASE w .env}
+      # Instrukcje dla agentów AI: protokół recall, zasady dokumentowania, opisy
+      # podagentów. Treść ma JEDNO źródło w plugin/shared (D-013) i wychodzi na
+      # świat jako zasoby MCP, więc zmiana instrukcji jest deployem serwera, a nie
+      # aktualizacją wtyczki u każdej osoby. Obraz dev nie zawiera kodu — katalog
+      # wchodzi wolumenem tylko do czytania; w obrazie prod jest skopiowany.
+      WS_INSTRUCTIONS_DIR: /opt/ws-memory/instrukcje
     volumes:
       - ./backend:/app
+      - ./plugin/shared:/opt/ws-memory/instrukcje:ro
     mem_limit: ${BACKEND_MEM_LIMIT:-1g}
     healthcheck:
       test: ["CMD-SHELL", "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong"]
@@ -231,8 +238,15 @@ services:
       MEMPALACE_VERSION: ${MEMPALACE_VERSION:-3.9.0}
       MEMPALACE_MCP_HTTP_TOKEN: ${MEMPALACE_MCP_HTTP_TOKEN}
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?ustaw JWT_PASSPHRASE w .env}
+      # Instrukcje dla agentów AI: protokół recall, zasady dokumentowania, opisy
+      # podagentów. Treść ma JEDNO źródło w plugin/shared (D-013) i wychodzi na
+      # świat jako zasoby MCP, więc zmiana instrukcji jest deployem serwera, a nie
+      # aktualizacją wtyczki u każdej osoby. Obraz dev nie zawiera kodu — katalog
+      # wchodzi wolumenem tylko do czytania; w obrazie prod jest skopiowany.
+      WS_INSTRUCTIONS_DIR: /opt/ws-memory/instrukcje
     volumes:
       - ./backend:/app
+      - ./plugin/shared:/opt/ws-memory/instrukcje:ro
     mem_limit: ${WORKER_MEM_LIMIT:-512m}
     healthcheck:
       # Konsument jest procesem numer 1 kontenera, więc pytamy wprost o niego.

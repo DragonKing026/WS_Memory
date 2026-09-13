@@ -1304,3 +1304,122 @@ jest gorszy niż jego brak, bo uczy nie ufać interfejsowi.
 Drugi koszt: kliknięcie nie daje natychmiastowego wyniku, tylko zlecenie
 podejmowane w ciągu minuty. Panel pokazuje stan i dziennik, więc oczekiwanie jest
 widoczne, a nie zagadkowe.
+
+---
+
+## D-033 — Wtyczka mieszka w tym repozytorium, marketplace wskazuje podkatalog
+
+**Data:** 2026-09-13 17:12 · **Stan:** Przyjęta
+
+`plugin/` jest podkatalogiem WS_Memory, a `.claude-plugin/marketplace.json`
+w korzeniu repozytorium wskazuje go wpisem `"source": "./plugin"`. **Bez
+submodułu i bez drugiego repozytorium.**
+
+**Co sprawdzono, zanim to rozstrzygnięto** (w zainstalowanym katalogu wtyczek,
+nie w dokumentacji): większość wpisów w oficjalnym katalogu Anthropica to
+podkatalogi jednego repozytorium (`"./plugins/agent-sdk-dev"`). Obsługiwane
+formy źródła to poza tym `git-subdir` (podkatalog **cudzego** repozytorium),
+`url`, `github`, `npm`, `archive` i `command`. Do tego `claude plugin
+marketplace add` ma flagę `--sparse <ścieżki>`, opisaną wprost jako „for
+monorepos" — ogranicza pobieranie do wskazanych katalogów.
+
+Czyli obie obawy, które motywowały osobne repozytorium, są bezprzedmiotowe:
+wtyczka **da się** trzymać w podkatalogu, a instalujący **nie musi** pobierać
+całej aplikacji.
+
+**Dlaczego nie submoduł:**
+
+1. **Reguły tego repozytorium robią z niego podwójną pracę.** Każda zmiana ma
+   wpis w `CHANGELOG.md` i dokumentację w dwóch językach w tym samym commicie.
+   Zmiana we wtyczce byłaby więc zawsze commitem we wtyczce **plus** commitem
+   w głównym repo (changelog, `docs/04-plugin.md`, `docs/en/04-plugin.md`,
+   podbicie wskaźnika). Dwa pull requesty na jedną myśl — dokładnie ten koszt,
+   przez który odrzuciliśmy stałe gałęzie warstwowe w D-031.
+2. **Backend czyta `plugin/shared/` przy budowaniu obrazu**, bo wystawia tę
+   treść jako zasoby MCP (D-013). Z submodułem CI musiałby pobierać go
+   rekurencyjnie, a **nieprzestawiony wskaźnik oznaczałby serwer serwujący
+   nieaktualne instrukcje** — awaria cicha, widoczna dopiero po tym, jak agent
+   zachowa się według starego protokołu.
+3. Dowiązania symboliczne z `plugin/skills/` i `plugin/agents/` do
+   `plugin/shared/` (D-013: treść istnieje raz) muszą wskazywać **wewnątrz
+   pobranego drzewa**. Z `plugin/` jako całością to działa również przy
+   pobieraniu rzadkim.
+
+**Co odrzucono:**
+
+- **Osobne repozytorium od początku** — wtyczka jest dziś cienką powłoką nad
+  gatewayem i zmienia się razem z nim. Osobne repozytorium ma sens, gdy zaczną
+  żyć w różnym tempie; dziś dokładałoby synchronizacji bez żadnej korzyści.
+- **Submoduł** — powody wyżej.
+
+**Wyjście, gdyby wtyczka miała kiedyś pójść na zewnątrz:** `git subtree split
+--prefix=plugin` zachowuje historię katalogu, a wpis marketplace zamienia
+`"./plugin"` na `git-subdir` albo osobne repozytorium. To zmiana manifestu,
+nie przeprowadzka — i właśnie dlatego można tę decyzję odłożyć.
+
+---
+
+## D-034 — Mechanikę wtyczki sprawdza się narzędziem, nie lekturą
+
+**Data:** 2026-09-13 17:12 · **Stan:** Przyjęta · **Koryguje D-012**
+
+D-012 wymieniła **trzy** mechanizmy Claude Code jako „sprawdzone w dokumentacji",
+a `TODO-009` dołożyło do nich **czwarte** założenie: hook `pre-compact`. Przy
+implementacji sprawdziliśmy wszystkie cztery narzędziem — `claude plugin
+validate`, zainstalowany katalog wtyczek, dokumentacja zdarzeń.
+
+**Dwa się potwierdziły. Dwa nie.**
+
+| Założenie | Skąd | Jak jest naprawdę |
+|---|---|---|
+| `dependencies: ["mempalace"]` | D-012 | **Pole potwierdzone**, dopuszcza też `{"name": …, "version": "~2.1.0"}`. Sama nazwa okazała się jednak niewystarczająca — patrz punkt 2 niżej |
+| `userConfig` z `sensitive: true`, dostępne jako `${user_config.KEY}` w MCP i `CLAUDE_PLUGIN_OPTION_*` w hookach | D-012 | **Potwierdzone**, łącznie z podstawianiem wewnątrz obiektu `headers` |
+| `source: {"type": "command"}` — polecenie **przed instalacją**, miejsce na `pip install mempalace[extract]` i `mempalace init` | D-012 | **Błędne dwukrotnie.** Klucz nazywa się `source`, nie `type`, a samo źródło **nie jest hakiem instalacyjnym**: to polecenie, które **wypisuje ścieżkę do katalogu wtyczki**. Nie ma tam miejsca na instalowanie cudzego pakietu |
+| hook `pre-compact` zapisujący podsumowanie | TODO-009 | **Zdarzenie `PreCompact` nie występuje w udokumentowanej liście zdarzeń** (są m.in. `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `Stop`). Hooki `PreCompact` faktycznie się uruchamiają — robi to wtyczka MemPalace — ale nie ma udokumentowanego sposobu, żeby taki hook **dołożył cokolwiek do kontekstu** |
+
+**Co z tego wynika dla wtyczki:**
+
+1. **Instalacja pakietu `mempalace` zostaje po stronie człowieka**, opisana
+   w skillu `ws-memory-setup` i w `docs/04-plugin.md`. Wtyczka MemPalace sama
+   też tego nie robi — jej wpis w marketplace nie ma żadnego polecenia. Kroku
+   instalacyjnego, którego nie da się wyrazić, nie udajemy.
+2. **Nie ma hooka `pre-compact`.** I nawet gdyby zdarzenie było udokumentowane,
+   nasz hook mógłby wysłać na serwer wyłącznie **surową rozmowę** — skrypt
+   powłoki nie streszcza. To jest wprost zakazane (D-012: żaden bajt surowej
+   rozmowy nie idzie na serwer). Streszczenie ma napisać model, i mówi mu to
+   protokół recall. Mieleniem transkryptu **do lokalnego pałaca** zajmuje się
+   hook MemPalace, który przychodzi z zależnością.
+3. **Nie ma hooka `session-end`.** Publikacja lustra to `TODO-012` i jeszcze nie
+   istnieje. Hook, który nic nie robi, jest gorszy niż jego brak: wygląda jak
+   działająca funkcja.
+4. **Nie ma przełącznika `auto_publish` w `userConfig`.** Sterowałby czymś,
+   czego nie ma. Wejdzie razem z publikacją.
+
+**Dlaczego to jest osobna decyzja, a nie poprawka w D-012:** starych decyzji
+nie edytujemy. Ale przede wszystkim ta rozbieżność jest sama w sobie wnioskiem.
+
+D-012 opisała mechanizmy jako „sprawdzone w dokumentacji, nie założone" —
+i **potwierdzenie polegało na przeczytaniu ich opisu, nie na uruchomieniu
+czegokolwiek**. Połowa nie przetrwała pierwszego kontaktu z walidatorem, przy
+czym akurat ten punkt, który miał zdjąć pracę z użytkownika (automatyczna
+instalacja pakietu), okazał się mechanizmem o zupełnie innym przeznaczeniu.
+
+Reguła na przyszłość: **mechanizm zewnętrznego narzędzia wpisujemy do decyzji
+dopiero po tym, jak go uruchomiliśmy.** „Sprawdzone w dokumentacji" znaczy
+teraz „przeczytane" i tak ma być zapisywane.
+
+**Reguła potwierdziła się w tej samej godzinie, w której powstała.** Wtyczka
+przechodziła `claude plugin validate` bez zastrzeżeń. Prawdziwa instalacja
+(`claude plugin install`) wyłapała trzy rzeczy, których walidator nie widzi:
+
+1. `"hooks": "./hooks/hooks.json"` w manifeście to **błąd ładowania** —
+   `hooks/hooks.json` ładuje się sam, a pole służy do plików dodatkowych;
+2. `dependencies: ["mempalace"]` szuka zależności we **własnym** marketplace;
+   trzeba `["mempalace@mempalace"]`;
+3. dowiązania symboliczne do **plików** w `agents/` **nie ładują się w ogóle** —
+   bez błędu, bez ostrzeżenia, po prostu `Agents (0)`. Działa dowiązanie do
+   **katalogu**. W `skills/` dowiązania do plików działają normalnie.
+
+Trzecia jest najgorszego rodzaju: nic nie pada, po prostu połowa wtyczki nie
+istnieje. Dlatego sprawdzeniem końcowym jest **policzenie składników**
+w `claude plugin details`, a nie zielony walidator.

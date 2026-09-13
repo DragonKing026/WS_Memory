@@ -341,6 +341,18 @@ A change that is not committed does not exist. The rules:
   appears there, the correction goes in a **new** commit. It has already gone
   otherwise once (2026-09-12) and the result was two versions of the same commit
   diverging between the machine and GitHub.
+- **When working in parallel in one tree, commit with an explicit pathspec:**
+  `git commit -- <paths>`, never a bare `git commit`. The index is shared by every
+  session in this directory, so a bare `git commit` takes **everything anyone else
+  has staged** and files it under its own message. It happened on 2026-09-13:
+  a commit titled "backend: dodaj port biblioteki instrukcji w Domain" swallowed
+  the entire Claude Code plugin packaging. Nothing is lost, but the message starts
+  lying — and the message is the only thing that tells you six months later what
+  was going on.
+- **Watch out for symlinked directories.** `git commit -- <path>` pointing at a
+  symlinked directory **follows it** and records the contents as regular files.
+  After such a commit check `git ls-files -s <path>`: a symlink has mode `120000`.
+
 - **This repository has a remote and is sometimes pushed from outside this
   session.** Before changing history and before committing, glance at
   `git log --oneline -3` so as not to overwrite someone else's work.
@@ -387,6 +399,18 @@ many files in `Domain/` would need touching? The answer must be "zero".
 **What we do not do:** build abstractions "just in case". A pattern enters when
 we can name the change it serves — and the changes above are in `TODO/`, not in
 our imagination.
+
+### The plugin — instruction content exists once in the repository
+
+Everything the plugin tells agents (the recall protocol, how to document
+things, the subagent briefs) lives **only** in `plugin/shared/`. The packaging
+— `plugin/skills/`, `plugin/agents/` — consists of **symlinks** to those files,
+not copies. The gateway serves the same content as MCP resources.
+
+Do not copy those files "to adapt them to a client". Diverged instructions are
+worse than none: a Claude agent and a Codex agent would then say different
+things about the same company rule, and nobody would know which one holds.
+Details: D-013, `docs/en/04-plugin.md`.
 
 ### Language
 

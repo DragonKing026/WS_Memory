@@ -328,6 +328,18 @@ Zmiana bez commita nie istnieje. Zasady:
   `git status -sb`; jeśli widnieje tam `origin`, poprawka idzie **nowym**
   commitem. Zdarzyło się już inaczej (2026-09-12) i skutkiem były dwie wersje
   tego samego commitu, rozjechane między maszyną a GitHubem.
+- **Pracując równolegle w jednym drzewie, commituj z podaną ścieżką:**
+  `git commit -- <ścieżki>`, nigdy samo `git commit`. Indeks jest wspólny dla
+  wszystkich sesji w tym katalogu, więc gołe `git commit` zabiera **wszystko, co
+  ktoś inny zdążył zapisać do indeksu** — i wkłada to pod swój opis. Zdarzyło się
+  2026-09-13: commit „backend: dodaj port biblioteki instrukcji w Domain" wciągnął
+  całe pakowanie wtyczki Claude Code. Nic nie ginie, ale opis commita zaczyna
+  kłamać, a to jedyne, po czym za pół roku poznaje się, co się wtedy działo.
+- **Uwaga na dowiązania do katalogów.** `git commit -- <ścieżka>` wskazująca
+  dowiązanie do katalogu **przechodzi przez nie** i zapisuje zawartość jako
+  zwykłe pliki. Po takim commicie sprawdź `git ls-files -s <ścieżka>`: dowiązanie
+  ma tryb `120000`.
+
 - **To repozytorium ma zdalne i bywa wypychane także spoza tej sesji.** Przed
   zmianą historii i przed commitem warto zerknąć na `git log --oneline -3`,
   żeby nie nadpisać cudzej pracy.
@@ -375,6 +387,18 @@ plików w `Domain/` trzeba tknąć? Odpowiedź ma brzmieć „zero".
 **Czego nie robimy:** nie budujemy abstrakcji „na wszelki wypadek". Wzorzec
 wchodzi wtedy, gdy potrafimy nazwać zmianę, której ma służyć — a powyższe
 zmiany są w `TODO/`, nie w wyobraźni.
+
+### Wtyczka — treść instrukcji istnieje w repozytorium raz
+
+Wszystko, co wtyczka mówi agentom (protokół recall, zasady dokumentowania,
+opisy podagentów), mieszka **wyłącznie** w `plugin/shared/`. Opakowania —
+`plugin/skills/`, `plugin/agents/` — to **dowiązania symboliczne** do tych
+plików, a nie kopie. Gateway wystawia tę samą treść jako zasoby MCP.
+
+Nie kopiuj tych plików „żeby dostosować do klienta". Rozjechana instrukcja
+jest gorsza niż jej brak: agent Claude i agent Codeksa mówiliby wtedy co
+innego o tej samej firmowej zasadzie, i nikt by nie wiedział która wersja
+obowiązuje. Szczegóły: D-013, `docs/04-plugin.md`.
 
 ### Język
 

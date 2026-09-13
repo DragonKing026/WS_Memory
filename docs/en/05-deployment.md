@@ -75,6 +75,7 @@ The administrator account arrives together with user management (TODO-002).
 | `MEMPALACE_ENTITY_LANGUAGES` | `pl,en` — entity detection; defaults to `en`, see D-011 |
 | `MEMPALACE_TIMEOUT` | timeout for one palace tool call, in seconds (15 by default, set in `backend/.env`) |
 | `MCP_CALLS_PER_MINUTE` | calls per minute one agent token may make (120 by default, `backend/.env`) |
+| `WS_INSTRUCTIONS_DIR` | directory holding the instruction content published as MCP resources — see below |
 | `FRONTEND_TARGET` | `dev` (Vite with hot reload) or `prod` (static `dist/` served by nginx) |
 | `WS_DEV_PORT` | the port the browser reaches the application on; the HMR websocket must be advertised there, not on Vite's port |
 
@@ -95,6 +96,23 @@ The administrator account arrives together with user management (TODO-002).
 The three MemPalace embedding variables (`MEMPALACE_EMBEDDING_*`) are
 **inseparable** — see D-003. Changing the model invalidates every vector in the
 database.
+
+`WS_INSTRUCTIONS_DIR` points at the directory holding the **instruction content
+for agents** — the recall protocol, the documentation rules, the subagent briefs —
+which the gateway publishes as MCP resources (`docs/03-mcp-gateway.md`). The content
+has a single source, `plugin/shared/` (D-013), but it sits somewhere different in
+every environment:
+
+| Where | Path | How it gets there |
+|---|---|---|
+| tests on a host and in CI | `../plugin/shared` relative to `backend/` | the default; the variable is not set |
+| the `backend` and `worker` containers | `/opt/ws-memory/instrukcje` | the `./plugin/shared:/opt/ws-memory/instrukcje:ro` volume in `docker-compose.yml` |
+| the production image | `/opt/ws-memory/instrukcje` | `COPY plugin/shared/` in the `prod` stage, with `ENV` baked in |
+
+In the production image it is a **copy, not a volume**: the image has to stand on
+its own. A missing or unmounted directory is an **error**, not an empty resource
+list — an instruction served as empty text reads to a model like "there is no
+protocol at all", and the agent simply carries on.
 
 `MEMPALACE_TIMEOUT` is kept **short on purpose**. A database transaction stays
 open for the duration of a palace call (D-020), so a generous timeout buys no

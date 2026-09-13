@@ -1,0 +1,1 @@
+../../shared/jak-dokumentowac.md

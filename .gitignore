@@ -54,3 +54,9 @@ __pycache__/
 # Zrzuty i dzienniki z przeglądarki użytej do sprawdzania interfejsu — artefakty
 # jednego uruchomienia, nie kod.
 .playwright-mcp/
+
+# Lokalne ustawienia Claude Code: która wtyczka jest włączona i skąd pochodzi
+# jej marketplace. Zależne od maszyny, a poza tym powstaje samo przy instalacji
+# wtyczki z tego repozytorium (`plugin/`). Sam token tu nie trafia — Claude Code
+# trzyma go w `~/.claude/.credentials.json`, bo `userConfig` ma `sensitive: true`.
+.claude/settings.local.json
