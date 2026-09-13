@@ -25,8 +25,20 @@ const auth = useAuthStore()
 
 const isAdmin = computed(() => auth.user?.isGlobalAdmin === true)
 
-/** One place to add the next administration screen; there will be several (TODO-008). */
-const sections = [{ label: 'Zależności', to: { name: 'admin-dependencies' } }] as const
+/**
+ * One place to add the next administration screen.
+ *
+ * Ordered by how often a person arrives for it, not by how the backend groups it: people
+ * first (who may use this, and who is waiting to), then what they may use, then the record
+ * of what was done, and the machinery of the installation last.
+ */
+const sections = [
+  { label: 'Konta', to: { name: 'admin-users' } },
+  { label: 'Zaproszenia', to: { name: 'admin-invitations' } },
+  { label: 'Przestrzenie', to: { name: 'admin-spaces' } },
+  { label: 'Dziennik audytu', to: { name: 'admin-audit' } },
+  { label: 'Zależności', to: { name: 'admin-dependencies' } },
+] as const
 </script>
 
 <template>
