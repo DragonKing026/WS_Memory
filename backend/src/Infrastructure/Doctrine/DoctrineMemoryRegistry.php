@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Infrastructure\Doctrine;
 
 use App\Domain\Memory\DrawerId;
+use App\Domain\Memory\EntryFacts;
+use App\Domain\Memory\MemoryKind;
 use App\Domain\Memory\MemoryRegistry;
 use App\Domain\Memory\MemoryWrite;
 use App\Domain\Space\SpaceId;
@@ -74,6 +76,73 @@ final readonly class DoctrineMemoryRegistry implements MemoryRegistry
                 $write->space->value,
             ));
         }
+    }
+
+    public function describe(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        $unique = [];
+        foreach ($ids as $id) {
+            $unique[$id->value] = $id->value;
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            <<<'SQL'
+                SELECT
+                    e.drawer_id,
+                    e.kind,
+                    e.title,
+                    e.created_at,
+                    -- One author column is always set and only one (the schema
+                    -- enforces it), so the token column alone answers "AI or not".
+                    (e.author_agent_token_id IS NOT NULL) AS by_ai,
+                    d.slug                                AS document_slug,
+                    (d.verified_at IS NOT NULL)           AS verified
+                FROM ws.memory_entries e
+                LEFT JOIN ws.documents d ON d.id = e.document_id
+                WHERE e.drawer_id IN (:ids)
+                SQL,
+            ['ids' => array_values($unique)],
+            ['ids' => ArrayParameterType::STRING],
+        );
+
+        $facts = [];
+        foreach ($rows as $row) {
+            $kind = MemoryKind::tryFrom((string) $row['kind']);
+            if (null === $kind) {
+                // A kind written by a newer version of the application. Skipped
+                // rather than guessed: a result labelled as the wrong class of
+                // knowledge is worse than one the caller treats as undescribed.
+                continue;
+            }
+
+            $filedAt = null;
+            if (\is_string($row['created_at']) && '' !== $row['created_at']) {
+                try {
+                    $filedAt = new \DateTimeImmutable($row['created_at']);
+                } catch (\Exception) {
+                    $filedAt = null;
+                }
+            }
+
+            $facts[(string) $row['drawer_id']] = new EntryFacts(
+                kind: $kind,
+                title: (string) $row['title'],
+                byAi: (bool) $row['by_ai'],
+                // Only documents can be verified; for anything else the LEFT JOIN
+                // gives NULL, which casts to false — the honest answer.
+                verified: (bool) $row['verified'],
+                documentSlug: \is_string($row['document_slug']) && '' !== $row['document_slug']
+                    ? $row['document_slug']
+                    : null,
+                filedAt: $filedAt,
+            );
+        }
+
+        return $facts;
     }
 
     public function spacesFor(array $ids): array

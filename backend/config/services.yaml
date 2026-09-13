@@ -62,6 +62,7 @@ services:
     # a container that suddenly cannot decide.
     App\Domain\Memory\MemoryStore: '@App\Infrastructure\MemPalace\McpMemoryStore'
     App\Domain\Memory\MemoryRegistry: '@App\Infrastructure\Doctrine\DoctrineMemoryRegistry'
+    App\Domain\Memory\LexicalIndex: '@App\Infrastructure\Doctrine\DoctrineLexicalIndex'
     App\Domain\Space\SpaceCatalog: '@App\Infrastructure\Doctrine\DoctrineSpaceCatalog'
     App\Domain\Space\SpaceMembershipRepository: '@App\Infrastructure\Doctrine\DoctrineSpaceMembershipRepository'
     App\Domain\Identity\AgentTokenDirectory: '@App\Infrastructure\Doctrine\DoctrineAgentTokenDirectory'

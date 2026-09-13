@@ -8,6 +8,7 @@ use App\Domain\Audit\AuditTrail;
 use App\Domain\Identity\Actor;
 use App\Domain\Memory\DrawerId;
 use App\Domain\Memory\KnowledgeFact;
+use App\Domain\Memory\LexicalIndex;
 use App\Domain\Memory\MemoryAccessDenied;
 use App\Domain\Memory\MemoryFragment;
 use App\Domain\Memory\MemoryKind;
@@ -16,7 +17,9 @@ use App\Domain\Memory\MemoryRegistry;
 use App\Domain\Memory\MemoryStore;
 use App\Domain\Memory\MemoryWrite;
 use App\Domain\Memory\PalaceWing;
+use App\Domain\Memory\SearchMode;
 use App\Domain\Memory\StoredMemory;
+use App\Domain\Search\SearchHit;
 use App\Domain\Space\SpaceAccessResolver;
 use App\Domain\Space\SpaceCatalog;
 use App\Domain\Space\SpaceId;
@@ -45,6 +48,7 @@ final readonly class MemoryService
 {
     public function __construct(
         private MemoryStore $store,
+        private LexicalIndex $lexical,
         private MemoryRegistry $registry,
         private SpaceAccessResolver $access,
         private SpaceCatalog $spaces,
@@ -107,6 +111,45 @@ final readonly class MemoryService
         ]);
 
         return $fragments;
+    }
+
+    /**
+     * Exact-term search, over the text we hold ourselves (D-029).
+     *
+     * Deliberately routed through this class rather than letting a controller
+     * hold the LexicalIndex: the set of spaces an actor may read is computed in
+     * one place, and a second door that computed it again would eventually
+     * compute it differently. What differs between the two modes is where the
+     * text is; who may see it is decided identically.
+     *
+     * @param list<SpaceId>|null $inSpaces narrows the set; never widens it
+     *
+     * @return list<SearchHit>
+     */
+    public function searchLexically(Actor $actor, MemoryQuery $query, ?array $inSpaces = null): array
+    {
+        $allowed = $this->readableSpaces($actor, $inSpaces);
+
+        if ([] === $allowed) {
+            $this->audit->record('memory.search', $actor, null, [
+                'query' => $query->text,
+                'mode' => SearchMode::Lexical->value,
+                'results' => 0,
+            ]);
+
+            return [];
+        }
+
+        $hits = $this->lexical->search($allowed, $query);
+
+        $this->audit->record('memory.search', $actor, null, [
+            'query' => $query->text,
+            'mode' => SearchMode::Lexical->value,
+            'spaces' => array_map(static fn (SpaceId $s): string => $s->value, $allowed),
+            'results' => \count($hits),
+        ]);
+
+        return $hits;
     }
 
     /**

@@ -15,6 +15,46 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 10:08 — TODO-007: wyszukiwanie działa po stronie API
+
+Endpoint `GET /api/search`, oba tryby, z filtrami (przestrzeń, klasa wiedzy,
+zakres dat, limit). Sprawdzone na żywym stosie, na pięciu prawdziwych polskich
+dokumentach — nie tylko w testach.
+
+**Tryb semantyczny znajduje bez wspólnych słów:** „wolne dni" → *Zasady
+urlopów*, „jak rozliczyć hotel" → *Zwrot kosztów podróży* (nocleg), „nowy
+pracownik pierwszy dzień" → *Wdrożenie nowej osoby*. Za każdym razem właściwy
+dokument pierwszy.
+
+**Znaleziona i naprawiona usterka, która cicho psułaby cały tryb leksykalny.**
+Tokenizowałem zapytanie w PHP wyrażeniem `[\p{L}\p{N}_]+`. Postgres tokenizuje
+`D-029` jako `d` **oraz `-029`** — z minusem, bo czyta to jako liczbę ze znakiem.
+Zapytanie o `029` nie pasowało do niczego, więc szukanie identyfikatora decyzji
+albo zgłoszenia zwracało pustkę. Teraz zapytanie tokenizuje **ten sam parser**,
+co treść, a `quote_literal` pilnuje bezpieczeństwa. Dwa testy padają, jeśli ktoś
+wróci do tokenizacji ręcznej — sprawdzone przez cofnięcie poprawki.
+
+**Przedrostek tylko na ostatnim słowie.** Na wszystkich robił szum: `D-029` →
+`d:*` łapało „do", „dokument", „dostęp" w trybie, którego całym zadaniem jest
+dokładność. Ostatnie słowo to to, które użytkownik właśnie pisze.
+
+**Próg słabych wyników jest względny, nie bezwzględny** — i to wynik pomiaru,
+nie preferencja. Trafność właściwego dokumentu to 0,477–0,611, a szumu
+0,29–0,44: przedziały zachodzą na siebie, więc żadna stała nie rozdziela ich
+poprawnie. Stały jest *odstęp*, dlatego mocny wynik to „w granicach jednej
+czwartej od najlepszego w tej odpowiedzi".
+
+**Podświetlenie jedzie jako struktura, nigdy jako HTML z bazy** — treść pisana
+przez ludzi i agentów może zawierać wszystko, a znacznik `<script>` z bazy
+wyrenderowany jako HTML to trwały XSS. Test pilnuje tego wprost.
+
+Odpowiedź niesie też **własne pokrycie**: tryb leksykalny mówi, że pełną treść
+przeszukuje tylko w dokumentach. Limit z D-029 jedzie razem z wynikami, żeby
+interfejs nie musiał go powtarzać ani zgadywać.
+
+Testy: 242 (było 215), PHPStan czysty.
+
+---
 ## 2026-09-13 09:48 — TODO-007: fundament wyszukiwania i dwie decyzje
 
 Początek TODO-007. Zanim powstał choć jeden ekran, trafiły się trzy ustalenia,

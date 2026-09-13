@@ -38,6 +38,23 @@ interface MemoryRegistry
     public function spaceFor(DrawerId $id): ?SpaceId;
 
     /**
+     * Who wrote each of these, and whether anybody has checked it.
+     *
+     * Separate from spacesFor() because it answers a different question and is
+     * needed at a different moment: permissions are decided before the palace is
+     * asked, this is read after, to describe what came back. Folding the two into
+     * one call would mean fetching authorship for content nobody may see.
+     *
+     * Identifiers absent from the map are unknown to us — the same non-answer as
+     * everywhere else in this port.
+     *
+     * @param list<DrawerId> $ids
+     *
+     * @return array<string, EntryFacts> keyed by identifier
+     */
+    public function describe(array $ids): array;
+
+    /**
      * The drawer a document's content currently lives in, if it has been published.
      *
      * One row per document, which the schema enforces. Without this lookup a

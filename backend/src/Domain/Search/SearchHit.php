@@ -37,7 +37,7 @@ final readonly class SearchHit
         public SpaceId $space,
         public MemoryKind $kind,
         public string $title,
-        public string $snippet,
+        public Snippet $snippet,
         public SearchMode $mode,
         public ?float $score,
         /**

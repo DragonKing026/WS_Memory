@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Application\Memory;
 
 use App\Domain\Memory\DrawerId;
+use App\Domain\Memory\EntryFacts;
 use App\Domain\Memory\MemoryRegistry;
 use App\Domain\Memory\MemoryWrite;
 use App\Domain\Space\SpaceId;
@@ -45,6 +46,31 @@ final class InMemoryMemoryRegistry implements MemoryRegistry
         }
 
         return $spaces;
+    }
+
+    public function describe(array $ids): array
+    {
+        $facts = [];
+        foreach ($ids as $id) {
+            $row = $this->rows[$id->value] ?? null;
+            if (null === $row) {
+                continue;
+            }
+
+            $facts[$id->value] = new EntryFacts(
+                kind: $row->kind,
+                title: $row->title,
+                // The registry row records a token only for an agent, exactly as
+                // the real table does.
+                byAi: null !== $row->author->agentTokenId,
+                // Verification is a property of a document, and the fake holds no
+                // documents — a test that needs a verified hit builds the hit.
+                verified: false,
+                documentSlug: null,
+            );
+        }
+
+        return $facts;
     }
 
     public function spaceFor(DrawerId $id): ?SpaceId

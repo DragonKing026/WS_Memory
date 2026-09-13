@@ -33,12 +33,14 @@ final class MemoryServiceTest extends TestCase
     private const STRANGER = 'user-2';
 
     private InMemoryMemoryStore $palace;
+    private RecordingLexicalIndex $lexical;
     private InMemoryMemoryRegistry $registry;
     private RecordingAuditTrail $audit;
 
     protected function setUp(): void
     {
         $this->palace = new InMemoryMemoryStore();
+        $this->lexical = new RecordingLexicalIndex();
         $this->registry = new InMemoryMemoryRegistry();
         $this->audit = new RecordingAuditTrail();
     }
@@ -458,6 +460,7 @@ final class MemoryServiceTest extends TestCase
 
         return new MemoryService(
             $this->palace,
+            $this->lexical,
             $this->registry,
             new SpaceAccessResolver(new FixedMemberships($memberships)),
             new FakeSpaceCatalog($slugs, $privateSpaceOwner, $privateSpaceSlug),
