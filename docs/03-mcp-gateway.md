@@ -6,11 +6,12 @@ tags: [ws-memory, dokumentacja, mcp, uprawnienia, agenci-ai, bezpieczenstwo]
 
 # Gateway MCP
 
-Stan: **działa** (2026-09-12, `TODO-004` i `TODO-005`). Jedenaście narzędzi,
-tokeny agentów, limit tempa i audyt każdego wywołania. Zestaw jest kompletny —
-kolejne narzędzia dojdą dopiero z mostkiem do lokalnych pałaców (`TODO-012`). Od
-`TODO-009` gateway wystawia dodatkowo **zasoby MCP** z treścią instrukcji dla
-agentów — patrz „Zasoby".
+Stan: **działa** (2026-09-13, `TODO-004` i `TODO-005`). Jedenaście narzędzi,
+tokeny agentów, limit tempa i audyt każdego wywołania. Od `TODO-009` gateway
+wystawia dodatkowo **zasoby MCP** z treścią instrukcji dla agentów — patrz
+„Zasoby". Mostek z lokalnych pałaców (`TODO-012`) **nie dodał narzędzia MCP**:
+publikacja jest trasą REST `POST /api/publish`, opisaną niżej w „Publikacja
+z lokalnego pałaca".
 
 Backend wystawia pod `/mcp` serwer MCP po HTTP (JSON-RPC 2.0) z **kurowanym
 zestawem narzędzi firmowych** — nie przepuszcza 44 narzędzi MemPalace na wylot
@@ -250,6 +251,21 @@ konta, która jest zapisana.
 Lista pokazuje `lastUsedAt`. To pole, bez którego nikt nie odważy się wycofać
 żadnego tokena, więc lista rośnie w nieskończoność.
 
+### Trasa, na której token agenta działa poza `/mcp`
+
+Jedna: `POST /api/publish` i `POST /api/publish/{batch}/revert`. Poza nimi
+podział jest bez wyjątków — agenci mówią przez `/mcp`, ludzie przez `/api`.
+
+Authenticator tokenów agenta przejmuje żądanie na tej trasie **tylko wtedy**, gdy
+nagłówek ma postać `Authorization: Bearer wsm_…`. Dzieli firewall z listenerem
+JWT, więc przejmowanie każdego żądania z nagłówkiem `Bearer` sprawiłoby, że
+odpowiadałby za każdą zalogowaną osobę; prefiks `wsm_` rozdziela oba
+poświadczenia (D-036).
+
+Wyjątek istnieje dlatego, że nadawcą jest **kolejka wyjściowa działająca bez
+nadzoru** na czyimś laptopie (D-015). Ośmiogodzinny token dostępowy (D-017) nie
+jest poświadczeniem, które taki proces może utrzymać.
+
 ### Limit tempa
 
 **120 wywołań na minutę na token** (`MCP_CALLS_PER_MINUTE`), liczone w bazie
@@ -260,6 +276,115 @@ Limit jest **per token, nie per konto**: rozbiegana pętla w jednym agencie nie
 zatrzymuje wszystkiego, co dana osoba ma uruchomione. Liczą się wszystkie
 metody, `tools/list` włącznie — pętla po katalogu narzędzi obciąża tak samo jak
 pętla po wyszukiwaniach.
+
+## Publikacja z lokalnego pałaca
+
+`POST /api/publish` — jedyna droga, którą wiedza z lokalnego pałaca wchodzi do
+wspólnej bazy (reguła nienaruszalna 10). Nigdy wprost do bazy: `DSN` wystawiony
+na zewnątrz ominąłby token, role i audyt, czyli całą warstwę, po którą ten
+projekt istnieje.
+
+Ciało żądania:
+
+```json
+{
+  "replica": "laptop-artura",
+  "space": "wiedza",
+  "preview": false,
+  "drawers": [
+    {
+      "id": "drawer_ws-memory_technical_9f1a",
+      "wing": "ws-memory",
+      "room": "technical",
+      "content": "Treść dosłowna, tak jak leży w lokalnym pałacu.",
+      "filedAt": "2026-09-13T10:12:00+02:00",
+      "title": "Ustalenie o publikacji",
+      "tags": ["mostek"],
+      "sourcePath": "backend/src/Domain/Publishing/LandingRule.php"
+    }
+  ]
+}
+```
+
+Czego w tym ciele **nie ma i nie będzie**:
+
+- **autora.** Tożsamość wynika z poświadczenia (reguła nienaruszalna 2), a ta
+  trasa jest miejscem, w którym ta reguła najbardziej się przydaje: woła ją
+  maszyna, opisując treść, której sama nie napisała;
+- **przestrzeni docelowej** poza trybem ręcznym. Nadawca mówi, z jakiego
+  **skrzydła** treść pochodzi; gdzie wyląduje, rozstrzyga reguła lądowania
+  (D-014). Pole `space` to wyłącznik dla `/ws-publish` i wskazanie przestrzeni
+  jej **nie przyznaje** — bez roli `writer` żądanie jest odrzucone, nie
+  przekierowane.
+
+Co robi serwer, w tej kolejności i **przed pierwszym zapisem**:
+
+1. ustala przestrzeń docelową dla każdej szuflady (reguła lądowania);
+2. przepuszcza treść przez **filtr sekretów** — po stronie serwera, nie tylko
+   klienta. Wtyczka robi to samo przed wysłaniem; filtr, który działa wyłącznie
+   na laptopie, działa czasami;
+3. sprawdza rolę `writer` w **każdej** przestrzeni docelowej i przy braku
+   choćby jednej odrzuca **całą** partię.
+
+Dopiero potem, w jednej transakcji: zapis szuflad i wiersz partii. Partia jest
+zakładana **na przestrzeń docelową** (D-036), więc odpowiedź zawiera listę.
+
+Odpowiedź podaje wynik **szuflada po szufladzie**, bo nadawcą jest kolejka,
+która musi wiedzieć, co odhaczyć, a co przynieść z powrotem — „9 z 10" nie
+wskazuje niczego:
+
+```json
+{
+  "replica": "laptop-artura",
+  "preview": false,
+  "written": 1,
+  "skipped": 1,
+  "batches": [
+    {"id": "0199…", "space": "wiedza", "mode": "mirror", "status": "applied",
+     "drawers": 1, "skipped": 1, "mirror": "018f…"}
+  ],
+  "drawers": [
+    {"sourceDrawerId": "drawer_…_9f1a", "space": "wiedza", "landing": "mapped",
+     "landingNote": "skrzydło zmapowane na przestrzeń zespołową",
+     "outcome": "filed", "drawer": "drawer_wing_wiedza_general_1",
+     "batch": "0199…", "skipped": null},
+    {"sourceDrawerId": "drawer_…_ab02", "space": "wiedza", "landing": "mapped",
+     "landingNote": "skrzydło zmapowane na przestrzeń zespołową",
+     "outcome": "skipped", "drawer": null, "batch": "0199…",
+     "skipped": {"drawer": "drawer_…_ab02", "reason": "secret",
+                 "detail": "klucz prywatny (wiersz 12)",
+                 "note": "filtr sekretów odrzucił treść: klucz prywatny (wiersz 12)"}}
+  ]
+}
+```
+
+`landing` mówi **dlaczego** treść wylądowała tam, gdzie wylądowała:
+`mapped`, `unmapped`, `unconfirmed`, `paused`, `excluded_room`, `requested`.
+Cztery z nich kończą się w przestrzeni prywatnej i są rozróżniane celowo —
+wymagają zupełnie różnych reakcji, a nadawca, który ich nie rozróżnia, dochodzi
+do wniosku, że mapowanie jest zepsute.
+
+`outcome` to `filed`, `updated` albo `skipped`. `updated` znaczy, że ta sama
+szuflada z tej samej repliki już tu była — i **tak ma być**: kolejka ponawia,
+dopóki serwer nie potwierdzi, więc powtórka jest zwykłym przebiegiem, nie błędem.
+
+`preview: true` zwraca **ten sam raport bez żadnego zapisu** — z lądowaniem,
+odrzuceniami filtru i powtórzeniami. Podgląd, który nie liczyłby powtórzeń,
+powiedziałby komuś „sto szuflad", a zapisał cztery.
+
+`POST /api/publish/{batch}/revert` — usuwa szuflady partii **przez API
+MemPalace** (nigdy SQL-em w schemacie `palace`), usuwa wiersze rejestru i
+zostawia partię ze statusem `reverted`. Autoryzuje **własność partii**, nie rola
+w przestrzeni: wycofanie ma działać dla kogoś, komu właśnie odebrano dostęp po
+pomyłkowej publikacji (D-036).
+
+| Sytuacja | Odpowiedź |
+|---|---|
+| brak repliki, pusta partia, partia ponad limit, nieczytelny znacznik czasu | `400` |
+| przestrzeń docelowa bez roli `writer` | `403` — powiedziane wprost, bo milczenie zostawiłoby kolejkę w pętli |
+| nieznana partia albo cudza | `404` — identycznie, bo „istnieje, ale nie twoja" samo jest ujawnieniem |
+| partia już wycofana | `409` — kolejka ma przestać, nie zrezygnować ze wszystkiego |
+| MemPalace niedostępny | `503` + `Retry-After` — jedyna odpowiedź znacząca „zatrzymaj partię i wróć" |
 
 ## Błędy
 

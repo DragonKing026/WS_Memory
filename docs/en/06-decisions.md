@@ -1436,3 +1436,153 @@ that is how it is to be written down.
 The third is of the worst kind: nothing breaks, half the plugin simply does not
 exist. That is why the final check is **counting the components** in `claude
 plugin details`, not a green validator.
+
+---
+
+## D-036 — The shape of the bridge's server side: one batch per space, the filter in Domain, one exception in the firewall
+
+**Date:** 2026-09-13 18:40 · **Status:** Accepted · **Refines D-010, D-014, D-015**
+
+D-014 says **that** everything goes to the server and **where** it lands. It does
+not say what the endpoint receiving it should look like. Implementing it
+(TODO-012, points 1–4) forced eight choices; none is large enough to be a
+decision of its own, and every one of them changes how the system behaves enough
+that it has to be written down.
+
+### 1. One request yields one batch **per target space**
+
+The landing rule splits a single send: mapped wings go to team spaces, the rest
+to the private one. `publish_batches.space_id` is `NOT NULL`, so a batch belongs
+to exactly one space, and a request covering three wings produces two or three
+batches.
+
+**Why:** a batch is the unit of undoing. "Take back what the team can see" has to
+be possible without also erasing a week of private transcripts that went out in
+the same run.
+
+**Rejected:** *a nullable `space_id` for a mixed batch* — one batch per request is
+simpler to report and impossible to undo in part.
+
+### 2. The secret filter: port in `Domain/`, implementation **also** in `Domain/`
+
+`SecretScanner` is the interface, `PatternSecretScanner` the reference
+implementation, and both live in `Domain/Publishing/`.
+
+**Why:** the filter depends on nothing outside PHP — no HTTP, no database, not
+even a clock. What counts as a secret is a **rule of the business**, exactly like
+"a write with no space lands in the private one". The port sits beside it for the
+reason ports exist: an organisation-specific pattern list, or an allowance for a
+space that legitimately holds configuration samples, becomes **another adapter**
+rather than another branch inside this one.
+
+**A consequence worth naming:** the filter deliberately leans towards refusing,
+because a miss writes a secret into a shared, searchable, backed-up database
+while a false positive costs one drawer, named in the batch's skip report, with
+the local original untouched (D-015). What keeps it usable is **recognising
+placeholders**: `postgres://ws_app:USTAW_W_COMPOSE@db` is documentation and
+`postgres://ws_app:8fd1…@db` is an incident. Without that distinction the filter
+would refuse our own `.env.example` — the file that exists so nobody writes real
+passwords down.
+
+**Rejected:** *entropy scoring instead of prefixes* — it flags hashes, UUIDs,
+minified code and base64 images, which in a system whose main volume is mined
+repositories means flagging most of the content.
+
+### 3. A mapping that did not apply routes content **privately**, not nowhere
+
+A mapping that is unconfirmed, deactivated, paused or excludes the room in
+question does not send to the team space — but the content still lands in the
+owner's private space.
+
+**Why:** D-014's invariant reads "everything is on the server always, nothing
+becomes visible to the team without a mapping". Excluding a room is a statement
+about **visibility to the team**, not about the backup. The report gives a
+separate reason for each of the four cases, because they all end the same way and
+call for completely different reactions — and a sender who cannot tell them apart
+concludes the mapping is broken.
+
+**Rejected:** *excluded room = do not send at all* — it breaks "everything is on
+the server", and the user loses a backup in exchange for something they did not
+ask for.
+
+### 4. The source room is for routing, not for filing
+
+A drawer from a local palace is filed as `kind = transcript`, that is into room
+`general`. The source room is accepted and used solely to check a mirror's
+exclusions.
+
+**Why:** the mapping from class of knowledge to room has **one owner**
+(`MemoryKind`), and its drifting apart does not produce an error — it produces
+content filed where nobody looks. Letting in a foreign room taxonomy would
+destroy that invariant in exchange for information nothing on the server queries.
+
+**Rejected:** *a `source_room` column in `memory_entries`* — worth revisiting when
+a screen needs it. Today it would be a column written and never read.
+
+### 5. `/api/publish` accepts an **agent token** — the only exception to the surface split
+
+The agent-token authenticator claims `/mcp` unconditionally, and `/api/publish`
+only when the `Authorization: Bearer` header carries the `wsm_` prefix.
+
+**Why:** the sender is an outbox running unattended on a laptop (D-015). An
+eight-hour JWT (D-017) is not a credential such a process can hold. The exception
+is narrow because the authenticator shares its firewall with the JWT listener:
+claiming every request with a `Bearer` header would make it answer for every
+signed-in person on the route. The `wsm_` prefix separates the two credentials —
+and that is the **second** job the prefix was given, beside letting the secret
+filter recognise our own tokens.
+
+**Rejected:**
+- *publication as an MCP tool* — it would preserve the split, but the task says
+  `POST /api/publish` outright, and a batch needs a drawer-by-drawer report that
+  an MCP tool's contract does not carry comfortably;
+- *a separate firewall on `^/api/publish`* — the same change, spelled out in two
+  places instead of one condition in `supports()`.
+
+### 6. Undoing deletes **from the palace first**, then the rows
+
+The opposite order to a write, which books a row after the palace has accepted it.
+
+**Why:** an interrupted deletion leaves either rows pointing at drawers that are
+gone, or drawers nothing points at. The first is **detectable** — integrity rule 5
+reports exactly that — and a repeated undo finishes the job, because a palace
+asked twice to forget the same drawer says "not there" and moves on. The second is
+invisible content sitting in a database somebody asked to have emptied, and
+nothing will ever notice it again.
+
+We delete **through the MemPalace API**, never with SQL against the `palace`
+schema — that is D-004 read in the other direction. Our connection can read those
+tables, so a `DELETE` would look successful while leaving the vector and the graph
+edges behind.
+
+### 7. The batch foreign key is **deferred** (`DEFERRABLE INITIALLY DEFERRED`)
+
+`memory_entries.publish_batch_id` is checked at `COMMIT`, not at each `INSERT`.
+
+**Why:** the batch can then be written **after** its drawers, with the counts that
+actually happened. Checked immediately, the order would have to be reversed — the
+batch row inserted with counters it cannot yet know, and a second `UPDATE` to
+correct them. One of those two shapes can lie after a crash; this is the other
+one. The constraint still holds at every moment observable from outside.
+
+### 8. Undoing is authorised by **ownership of the batch**, not by a role in the space
+
+**Why:** undoing exists for the moment somebody notices content went somewhere it
+should not have. Requiring the `writer` role would block exactly the person who
+needs it most: whoever published by mistake and had their access removed as the
+first response. Somebody else's batch answers `404`, not `403` — telling a caller
+that a batch exists but belongs to another person is itself a disclosure
+(inviolable rule 7).
+
+### 9. Republishing **moves** a drawer when its wing has since been mapped
+
+The source pair is the drawer's identity, and the landing rule is authoritative.
+Confirming a mapping and resending moves content from the private space to the
+team one: one row, a changed `space_id`, a changed wing in the palace.
+
+**Why:** otherwise a confirmed mapping would half-apply — new drawers visible to
+the team, older ones invisible, with no trace of why. The move has to cover
+**both** places at once, because `MemoryService::get()` refuses to hand out a
+drawer whose palace wing disagrees with the space it authorised. The change of
+visibility gets its own key in the audit trail (`movedFrom`), because it is the
+one thing in this flow somebody may later want to ask the audit log about.

@@ -2,16 +2,17 @@
 tags: [ws-memory, documentation, mcp, permissions, ai-agents, security]
 ---
 
-> Translated from [`docs/03-mcp-gateway.md`](../03-mcp-gateway.md) (synced 2026-09-12).
+> Translated from [`docs/03-mcp-gateway.md`](../03-mcp-gateway.md) (synced 2026-09-13).
 > **The Polish version is authoritative.**
 
 # MCP gateway
 
-Status: **working** (2026-09-12, `TODO-004` and `TODO-005`). Eleven tools, agent
-tokens, a rate limit and an audit entry for every call. The set is complete — further
-tools arrive only with the bridge to local palaces (`TODO-012`). Since `TODO-009` the gateway
+Status: **working** (2026-09-13, `TODO-004` and `TODO-005`). Eleven tools, agent
+tokens, a rate limit and an audit entry for every call. Since `TODO-009` the gateway
 additionally publishes **MCP resources** carrying the instruction content for
-agents — see "Resources".
+agents — see "Resources". The bridge from local palaces (`TODO-012`) **added no MCP
+tool**: publishing is a REST route, `POST /api/publish`, described below under
+"Publishing from a local palace".
 
 The backend exposes an MCP server over HTTP (JSON-RPC 2.0) at `/mcp` with a
 **curated set of company tools** — it does not pass MemPalace's 44 tools
@@ -254,6 +255,21 @@ deactivating the account, which is recorded.
 The listing shows `lastUsedAt`. It is the field without which nobody dares retire
 any token, so the list only ever grows.
 
+### The one route where an agent token works outside `/mcp`
+
+One: `POST /api/publish` and `POST /api/publish/{batch}/revert`. Everywhere else
+the split has no exceptions — agents speak through `/mcp`, people through `/api`.
+
+The agent-token authenticator claims a request on that route **only when** the
+header reads `Authorization: Bearer wsm_…`. It shares its firewall with the JWT
+listener, so claiming every request with a `Bearer` header would make it answer
+for every signed-in person; the `wsm_` prefix separates the two credentials
+(D-036).
+
+The exception exists because the sender is an **outbox running unattended** on
+somebody's laptop (D-015). An eight-hour access token (D-017) is not a credential
+such a process can hold.
+
 ### Rate limit
 
 **120 calls per minute per token** (`MCP_CALLS_PER_MINUTE`), counted in the
@@ -264,6 +280,117 @@ The limit is **per token, not per account**: a runaway loop in one agent does no
 stop everything else that person has running. Every method counts, `tools/list`
 included — looping over the tool catalogue loads the palace just as much as looping
 over searches.
+
+## Publishing from a local palace
+
+`POST /api/publish` — the only way knowledge from a local palace enters the shared
+base (inviolable rule 10). Never straight into the database: a `DSN` handed
+outside would bypass the token, the roles and the audit trail, which is the whole
+layer this project exists for.
+
+Request body:
+
+```json
+{
+  "replica": "laptop-artura",
+  "space": "wiedza",
+  "preview": false,
+  "drawers": [
+    {
+      "id": "drawer_ws-memory_technical_9f1a",
+      "wing": "ws-memory",
+      "room": "technical",
+      "content": "The content verbatim, as it sits in the local palace.",
+      "filedAt": "2026-09-13T10:12:00+02:00",
+      "title": "A finding about publishing",
+      "tags": ["mostek"],
+      "sourcePath": "backend/src/Domain/Publishing/LandingRule.php"
+    }
+  ]
+}
+```
+
+What this body does **not** contain, and will not:
+
+- **an author.** Identity comes from the credential (inviolable rule 2), and this
+  route is where that rule earns its keep most: the caller is a machine describing
+  content it did not write itself;
+- **a target space**, outside manual mode. The sender says which **wing** the
+  content came from; where it lands is decided by the landing rule (D-014). The
+  `space` field is the escape hatch for `/ws-publish`, and naming a space does
+  **not** grant it — without the `writer` role the request is refused, not
+  redirected.
+
+What the server does, in this order and **before the first write**:
+
+1. decides the target space for every drawer (the landing rule);
+2. puts the content through the **secret filter** — on the server, not only on the
+   client. The plugin does the same before sending; a filter that runs only on a
+   laptop runs sometimes;
+3. checks the `writer` role in **every** target space and refuses the **whole**
+   batch if even one is missing.
+
+Only then, in one transaction: the drawers and the batch row. A batch is opened
+**per target space** (D-036), so the answer carries a list.
+
+The answer reports the outcome **drawer by drawer**, because the sender is a queue
+that has to know what to tick off and what to bring back — "9 of 10" identifies
+nothing:
+
+```json
+{
+  "replica": "laptop-artura",
+  "preview": false,
+  "written": 1,
+  "skipped": 1,
+  "batches": [
+    {"id": "0199…", "space": "wiedza", "mode": "mirror", "status": "applied",
+     "drawers": 1, "skipped": 1, "mirror": "018f…"}
+  ],
+  "drawers": [
+    {"sourceDrawerId": "drawer_…_9f1a", "space": "wiedza", "landing": "mapped",
+     "landingNote": "skrzydło zmapowane na przestrzeń zespołową",
+     "outcome": "filed", "drawer": "drawer_wing_wiedza_general_1",
+     "batch": "0199…", "skipped": null},
+    {"sourceDrawerId": "drawer_…_ab02", "space": "wiedza", "landing": "mapped",
+     "landingNote": "skrzydło zmapowane na przestrzeń zespołową",
+     "outcome": "skipped", "drawer": null, "batch": "0199…",
+     "skipped": {"drawer": "drawer_…_ab02", "reason": "secret",
+                 "detail": "klucz prywatny (wiersz 12)",
+                 "note": "filtr sekretów odrzucił treść: klucz prywatny (wiersz 12)"}}
+  ]
+}
+```
+
+The human-readable fields (`landingNote`, `note`) are Polish: they are shown to
+the person whose drawer was refused, like every other user-facing message.
+
+`landing` says **why** the content landed where it did: `mapped`, `unmapped`,
+`unconfirmed`, `paused`, `excluded_room`, `requested`. Four of those end in the
+private space and are told apart deliberately — they call for completely different
+reactions, and a sender who cannot tell them apart concludes the mapping is broken.
+
+`outcome` is `filed`, `updated` or `skipped`. `updated` means the same drawer from
+the same replica has been here before — and that is **as intended**: the queue
+retries until the server confirms, so a repeat is an ordinary run, not an error.
+
+`preview: true` returns **the same report with no writes at all** — landing,
+filter refusals and duplicates included. A preview that did not count duplicates
+would tell somebody "a hundred drawers" and then file four.
+
+`POST /api/publish/{batch}/revert` — removes the batch's drawers **through the
+MemPalace API** (never with SQL against the `palace` schema), removes the registry
+rows and leaves the batch with status `reverted`. It is authorised by **ownership
+of the batch**, not by a role in the space: undoing has to work for somebody whose
+access was just removed after publishing by mistake (D-036).
+
+| Situation | Answer |
+|---|---|
+| no replica, empty batch, batch over the limit, unreadable timestamp | `400` |
+| target space without the `writer` role | `403` — said out loud, because silence would leave the queue in a loop |
+| unknown batch, or somebody else's | `404` — identically, because "it exists but is not yours" is itself a disclosure |
+| batch already reverted | `409` — the queue should stop, not give up on everything |
+| MemPalace unavailable | `503` + `Retry-After` — the one answer meaning "keep the batch and come back" |
 
 ## Errors
 
