@@ -438,6 +438,47 @@ final class MemoryServiceTest extends TestCase
         );
     }
 
+    /**
+     * Writing the same thing twice is ordinary, not an error.
+     *
+     * The palace merges identical content within a wing and answers with the drawer it
+     * already holds; booking that a second time violates the registry's unique index.
+     * Found in practice, as an opaque HTTP 500 from `ws_remember` — which is what an
+     * agent gets for retrying a call, or for two agents recording the same finding.
+     */
+    public function testWritingTheSameContentTwiceAnswersWithTheSameDrawer(): void
+    {
+        $service = $this->serviceFor([self::OWNER => ['alfa' => SpaceRole::Writer]]);
+
+        $first = $service->remember(Actor::human(self::OWNER), 'dokładnie ta sama treść', new SpaceId('alfa'));
+        $second = $service->remember(Actor::human(self::OWNER), 'dokładnie ta sama treść', new SpaceId('alfa'));
+
+        self::assertSame($first->drawer->value, $second->drawer->value);
+        self::assertCount(1, $this->registry->rows, 'druga próba nie może dokładać wiersza');
+    }
+
+    /**
+     * The same drawer showing up under a different space is a different matter.
+     *
+     * That means our registry and the palace disagree about who owns a piece of
+     * content (integrity rule 5), and answering "fine, it is yours" would hand one
+     * space's content to another.
+     */
+    public function testTheSameDrawerInAnotherSpaceIsRefused(): void
+    {
+        $service = $this->serviceFor([
+            self::OWNER => ['alfa' => SpaceRole::Writer, 'beta' => SpaceRole::Writer],
+        ]);
+
+        // The drawer the fake palace will hand back for a write into `beta`, booked in
+        // advance under `alfa`. That is precisely the drift the check exists for: our
+        // registry and the palace disagreeing about which space owns a piece of content.
+        $this->registerDrawer('drawer_wing_beta_technical_1', 'alfa');
+
+        $this->expectException(\DomainException::class);
+        $service->remember(Actor::human(self::OWNER), 'treść wędrująca', new SpaceId('beta'));
+    }
+
     // ------------------------------------------------------------------ setup
 
     /**

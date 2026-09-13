@@ -169,7 +169,7 @@ final readonly class DoctrineLexicalIndex implements LexicalIndex
      * sequential scan over every revision in the base.
      */
     private const SQL = <<<'SQL'
-        WITH q AS (
+        WITH q AS MATERIALIZED (
             SELECT to_tsquery('simple', (
                 SELECT string_agg(
                     quote_literal(lexeme) || CASE WHEN positions[1] = last_pos THEN ':*' ELSE '' END,
@@ -180,28 +180,53 @@ final readonly class DoctrineLexicalIndex implements LexicalIndex
                     FROM unnest(to_tsvector('simple', :text))
                 ) tokens
             )) AS query
-        )
+        ),
 
-        SELECT * FROM (
+        -- Both hit sets start FROM the full-text predicate, and that is the whole
+        -- performance story. Written the obvious way — from `documents`, joining the
+        -- current revision, with `@@` as a condition on the join — the planner drives
+        -- from `documents`, reads every revision by primary key and evaluates
+        -- `to_tsvector` on each: 157 ms over 10 000 documents, growing linearly.
+        -- Driving from the predicate lets it use the GIN index: 2 ms for the same
+        -- query. Measured, not assumed. MATERIALIZED keeps the planner from inlining
+        -- these back into the join and undoing it.
+        trafienia_dokumentow AS MATERIALIZED (
             SELECT
-                'document'                                          AS kind,
-                s.slug                                              AS space_slug,
-                d.title                                             AS title,
-                d.slug                                              AS document_slug,
-                e.drawer_id                                         AS drawer_id,
-                d.authored_by_ai                                    AS by_ai,
-                (d.verified_at IS NOT NULL)                         AS verified,
-                d.updated_at                                        AS at,
-                ts_rank(to_tsvector('simple', r.content), q.query)  AS score,
-                ts_headline('simple', r.content, q.query, :headline) AS snippet
-            FROM ws.documents d
+                r.id      AS revision_id,
+                r.content AS body,
+                ts_rank(to_tsvector('simple', r.content), q.query) AS score
+            FROM ws.document_revisions r
             CROSS JOIN q
-            JOIN ws.document_revisions r ON r.id = d.current_revision_id
-            JOIN ws.spaces s             ON s.id = d.space_id
+            WHERE to_tsvector('simple', r.content) @@ q.query
+        ),
+        trafienia_wpisow AS MATERIALIZED (
+            SELECT
+                e.id AS entry_id,
+                ts_rank(to_tsvector('simple', e.title), q.query) AS score
+            FROM ws.memory_entries e
+            CROSS JOIN q
+            WHERE to_tsvector('simple', e.title) @@ q.query
+               OR to_tsvector('simple', jsonb_path_query_array(e.tags, '$[*]')::text) @@ q.query
+        ),
+
+        polaczone AS (
+            SELECT
+                'document'                            AS kind,
+                s.slug                                AS space_slug,
+                d.title                               AS title,
+                d.slug                                AS document_slug,
+                e.drawer_id                           AS drawer_id,
+                d.authored_by_ai                      AS by_ai,
+                (d.verified_at IS NOT NULL)           AS verified,
+                d.updated_at                          AS at,
+                h.score                               AS score,
+                h.body                                AS body
+            FROM trafienia_dokumentow h
+            JOIN ws.documents d ON d.current_revision_id = h.revision_id
+            JOIN ws.spaces s    ON s.id = d.space_id
             LEFT JOIN ws.memory_entries e ON e.document_id = d.id
             WHERE s.slug IN (:slugs)
               AND d.archived_at IS NULL
-              AND to_tsvector('simple', r.content) @@ q.query
               AND (:kind::text IS NULL OR :kind = 'document')
               AND (:since::timestamp IS NULL OR d.updated_at >= :since)
               AND (:before::timestamp IS NULL OR d.updated_at < :before)
@@ -209,32 +234,45 @@ final readonly class DoctrineLexicalIndex implements LexicalIndex
             UNION ALL
 
             SELECT
-                e.kind                                              AS kind,
-                s.slug                                              AS space_slug,
-                e.title                                             AS title,
-                NULL                                                AS document_slug,
-                e.drawer_id                                         AS drawer_id,
-                (e.author_agent_token_id IS NOT NULL)               AS by_ai,
-                FALSE                                               AS verified,
-                e.created_at                                        AS at,
-                ts_rank(to_tsvector('simple', e.title), q.query)    AS score,
-                e.title                                             AS snippet
-            FROM ws.memory_entries e
-            CROSS JOIN q
-            JOIN ws.spaces s ON s.id = e.space_id
+                e.kind,
+                s.slug,
+                e.title,
+                NULL,
+                e.drawer_id,
+                (e.author_agent_token_id IS NOT NULL),
+                FALSE,
+                e.created_at,
+                h.score,
+                -- No body to quote from: for anything but a document we hold the title
+                -- and the tags, and the title is what a person recognises it by (D-029).
+                NULL
+            FROM trafienia_wpisow h
+            JOIN ws.memory_entries e ON e.id = h.entry_id
+            JOIN ws.spaces s         ON s.id = e.space_id
             WHERE s.slug IN (:slugs)
-              -- Documents are the first branch's business; without this they
-              -- would appear twice, once with their body and once with a title.
+              -- Documents are the first branch's business; without this they would
+              -- appear twice, once with their body and once with a title.
               AND e.document_id IS NULL
-              AND (
-                    to_tsvector('simple', e.title) @@ q.query
-                 OR to_tsvector('simple', jsonb_path_query_array(e.tags, '$[*]')::text) @@ q.query
-              )
               AND (:kind::text IS NULL OR e.kind = :kind)
               AND (:since::timestamp IS NULL OR e.created_at >= :since)
               AND (:before::timestamp IS NULL OR e.created_at < :before)
-        ) AS hits
+        ),
+
+        najlepsze AS (
+            SELECT * FROM polaczone
+            ORDER BY score DESC, at DESC NULLS LAST
+            LIMIT :limit
+        )
+
+        -- ts_headline re-parses the whole document, so it runs after the limit, on the
+        -- handful of rows actually going back — not on every match.
+        SELECT
+            kind, space_slug, title, document_slug, drawer_id, by_ai, verified, at, score,
+            CASE
+                WHEN body IS NULL THEN title
+                ELSE ts_headline('simple', body, (SELECT query FROM q), :headline)
+            END AS snippet
+        FROM najlepsze
         ORDER BY score DESC, at DESC NULLS LAST
-        LIMIT :limit
         SQL;
 }

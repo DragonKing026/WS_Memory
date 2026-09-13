@@ -5,7 +5,7 @@ import {
   documentListSchema,
   documentSchema,
   type DocumentDetail,
-  type DocumentListItem,
+  type DocumentList,
 } from './schemas'
 
 /** A slug may contain slashes (`umowy/najem`), so each segment is encoded separately —
@@ -15,12 +15,21 @@ function encodeSlug(slug: string): string {
 }
 
 export const documentService = {
-  async list(space: string): Promise<DocumentListItem[]> {
+  async list(space: string, offset = 0): Promise<DocumentList> {
+    // The listing is paged server-side and the page size is the server's business:
+    // asking for "everything" is what made this endpoint fall over on a space with
+    // ten thousand documents.
+    const params = new URLSearchParams()
+    if (offset > 0) {
+      params.set('offset', String(offset))
+    }
+
+    const query = params.toString()
     const answer = await useApi().get<unknown>(
-      `/spaces/${encodeURIComponent(space)}/documents`,
+      `/spaces/${encodeURIComponent(space)}/documents${query === '' ? '' : `?${query}`}`,
     )
 
-    return parseOrExplain(documentListSchema, answer, 'lista dokumentów').documents
+    return parseOrExplain(documentListSchema, answer, 'lista dokumentów')
   },
 
   async read(space: string, slug: string): Promise<DocumentDetail> {

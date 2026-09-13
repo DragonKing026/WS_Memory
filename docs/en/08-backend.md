@@ -62,6 +62,11 @@ the **persistence model**, and the rules live in `Domain/`.
 | `Memory/MemoryStore.php` | **Port**: the memory engine. `search()` takes a `PalaceWing` as its first, non-optional argument — that is where the filter guarantee comes from. One wing per call, because the palace filters by one. |
 | `Memory/MemoryRegistry.php` | **Port**: our own register of content in the palace. It also draws the transaction boundary — a write is real once it is booked (D-020). |
 | `Memory/MemoryWrite.php` | The row to be booked. A parameter object, because the list will grow when publishing from local palaces lands (TODO-012). Derives the title and the content digest in one place. |
+| `Memory/SearchMode.php` | Semantic or lexical. Not "better and worse" but two different questions — and since the palace has no lexical mode (D-029), this type is also the boundary between two data sources with different coverage. |
+| `Memory/LexicalIndex.php` | **Port**: exact-term search over the text we hold ourselves. Deliberately **not** a second `MemoryStore`: it answers from our own tables and sees less — full content for documents only. The list of spaces is a mandatory argument, exactly as the wing is in `MemoryStore`. |
+| `Memory/EntryFacts.php` | What we know about a drawer that the palace does not: who wrote it (person or agent) and whether anybody has checked it. In a base half-written by agents, that is the difference between a result a reader can weigh and one they must take on faith. |
+| `Search/SearchHit.php` | One result as a person reads it. A separate type from `MemoryFragment` because it carries authorship and verification, and its identifier is **optional**: a document is searchable from the moment it is saved, while the worker files its drawer a moment later. `score` is comparable only within one mode — the scales differ. |
+| `Search/Snippet.php`, `Search/SnippetPart.php` | The snippet with its matches marked **as structure, not as markup**. Content written by people and agents can contain any HTML; a marked-up string rendered in a browser is stored XSS. Structure cannot be injected into. |
 | `Memory/MemoryUnavailable.php` | "I could not look", kept separate from "I found nothing". An agent told "there is nothing" writes the knowledge again, next to the copy it could not see. |
 | `Document/DocumentSlug.php` | A document's address as a value object. It **refuses** a malformed one rather than tidying it: somebody linking to "Umowy Najmu" and getting a document at "umowy-najmu" has a broken link they cannot see. `fromTitle()` offers a suggestion when asked. |
 | `Document/DocumentStatus.php` | `draft` / `published`. **Not** a review gate — an agent's document is visible at once (D-005); draft is the state of a person who has not finished. |
@@ -90,6 +95,7 @@ the **persistence model**, and the rules live in `Domain/`.
 | `Document/PublishDocumentHandler.php` | Idempotent and order-proof: a job older than the current revision is **dropped** (D-025). The palace copy is authored by the revision's author rather than "the worker" — for an agent the owner comes from `AgentTokenDirectory::ownerOf()`. |
 | `Document/DocumentNotFound.php`, `Document/ProposalRequired.php` | One exception for "no such thing" and "not yours"; the other **names the way through**, because an error saying only "denied" would have an agent retrying the same call. |
 | `Memory/MemoryService.php` | **The only way into memory.** REST and MCP call this class and nothing below it, so choosing a different door cannot get you a different answer (D-008). This is where the fan-out across wings lives, the re-ranking, the second filtering layer (D-019), the private-space default (rule 6) and the author label. Nothing above this layer may hold a `MemoryStore`. |
+| `Search/SearchService.php` | Search as a person reads it: one call, two modes. It does **not** decide permissions — it calls `MemoryService` for both modes so that no second place works out which spaces an actor may read. What it adds is what only a human needs: the author, the verification, and the **weak-match cut**, computed relative to the best hit in that answer, because a constant does not separate the measured bands. |
 
 ### `Infrastructure/` — port adapters
 
@@ -100,6 +106,7 @@ the **persistence model**, and the rules live in `Domain/`.
 | `Doctrine/DatabaseHealthProbe.php` | Probe: does the database respond. |
 | `Doctrine/DoctrineMemoryRegistry.php` | The registry on DBAL. Resolves the space by slug **inside the INSERT** — a separate SELECT would open a window in which the space disappears between the check and the write. It also holds the transaction boundary. |
 | `Doctrine/DoctrineSpaceCatalog.php` | A space's wing and a user's private space. The private one is checked **by the slug convention AND by the flag** — a space hand-named `priv_<uuid>` without the flag must not become the place somebody else's writes land in. |
+| `Doctrine/DoctrineLexicalIndex.php` | Exact-term search on PostgreSQL full text. Two things here are non-obvious and both were measured: the query is tokenised by **the same parser** as the content (`simple` reads `D-029` as `d` and `-029`, so a hand-rolled tokeniser finds nothing), and both hit sets start **from the text predicate** — written "from documents", the query does not use the GIN index and reads every revision: 157 ms against 2 ms over 10 000 documents. |
 | `MemPalace/MemPalaceClient.php` | A thin JSON-RPC client. Two non-obvious behaviours: it **retries reads only** (a repeated write files a second drawer) and it **never lets the token into an error message** — that is how secrets most often escape. |
 | `MemPalace/CallOutcome.php` | The result of one tool call. It exists because MemPalace reports failure **inside** the payload: HTTP 200, no error in the envelope, and the cause next to an empty result list. It also separates "no such drawer" from an outage. |
 | `MemPalace/McpMemoryStore.php` | The memory port's adapter — **the only place that knows MemPalace tool names** and the shape of their answers. Upgrading the palace (D-001) touches this file and no other. |
@@ -121,6 +128,7 @@ the **persistence model**, and the rules live in `Domain/`.
 | `GET /api/spaces`, `GET /api/spaces/{slug}` | `Api/SpaceController.php` | A space outside your permissions answers **byte for byte** like one that does not exist. |
 | `POST /api/spaces`, `POST /api/spaces/{slug}/members` | `Api/SpaceAdministrationController.php` | Creating spaces and granting roles. The creator becomes its administrator at once; the `priv_` prefix is reserved; a private space cannot be shared. |
 | `POST /api/invitations/accept` | `Api/AcceptInvitationController.php` | Public by necessity — the caller has no account yet. The password policy is enforced here, not in the browser. |
+| `GET /api/search` | `Api/SearchController.php` | Both modes, filters, and two things a plain result list would not do: **weak hits travel separately** (semantic search always answers, only progressively worse) and the answer **states its own coverage** — lexical mode admits that it searches full content in documents only. |
 | `GET /api/spaces/{s}/documents`, `GET/PUT .../{slug}`, `.../history`, `.../diff`, `.../rollback`, `.../verify`, `.../archive` | `Api/DocumentController.php` | The routes use `{slug<.+>}`, because an address may contain a slash — without it "umowy/najem" would be unreachable. The mapping from refusals to HTTP lives in one place, because that is where a mistake becomes a disclosure. |
 | `GET/POST /api/spaces/{s}/proposals`, `POST /api/proposals/{id}/accept`, `/reject` | `Api/ProposalController.php` | Review is a human act, so there is no MCP counterpart (D-005). |
 | `GET/POST /api/agent-tokens`, `DELETE /api/agent-tokens/{id}` | `Api/AgentTokenController.php` | One's **own** tokens only, global administrators included (D-016). The plain value appears in one response — the one that created it. |
@@ -213,6 +221,25 @@ an `invitation.accepted` entry.
 5. **The second layer:** the registry says which space each drawer sits in.
    Anything it does not know, or places elsewhere, is dropped (D-019).
 6. An audit entry: the query, the spaces, the number of results.
+
+### Lexical search
+
+1. `SearchService` branches on the mode and, for lexical, calls
+   `MemoryService::searchLexically()` — **through the same permission path** as the
+   semantic one. What differs is where the text is; who may see it is decided
+   identically.
+2. `DoctrineLexicalIndex` receives a **non-empty** list of spaces. An empty one would
+   be indistinguishable from "no filter", so the port forbids it by type and the
+   adapter checks at runtime — a PHPDoc type is not enforced.
+3. The user's query is tokenised by `to_tsvector`, and a `to_tsquery` is rebuilt from
+   the resulting lexemes. **Only the last word gets `:*`** — the one being typed.
+   `quote_literal` makes it impossible for input to be read as query syntax.
+4. Two hit sets: documents by the full content of the current revision, everything else
+   by title and tags. Both **start from the text predicate**, so the planner reaches for
+   the GIN index.
+5. `ts_headline` runs **after** the limit — it reparses the whole document, so running
+   it on every match would be waste.
+6. An audit entry: query, mode, spaces, number of results.
 
 ### Writing to memory
 
@@ -317,6 +344,8 @@ returns them unqualified. The correct pattern **excludes** `palace`.
 | `Infrastructure/Doctrine/DoctrineMemoryRegistryTest.php` | What a double cannot check: the unique index, the foreign key, the transaction rollback, `tags` round-tripping. |
 | `Infrastructure/Doctrine/DoctrineSpaceCatalogTest.php` | A wing differing from its slug, the private space created on accepting an invitation, a `priv_*` impostor without the flag. |
 | `Api/McpGatewayTest.php` | The gateway as an agent meets it: the protocol, version negotiation, no batch requests, `401` for a revoked token, an expired one and one whose owner was deactivated, **a foreign space as an empty result rather than an error**, a refused write, an unknown parameter, the per-token rate limit, auditing of successful and failed calls. Deliberately **needs no palace** — all of it happens before memory, so it runs on every commit. |
+| `Api/SearchTest.php` | Search through the door people use — **lexical only**, because that mode runs entirely on our own tables and needs no palace. It guards the two things that would break quietly: a query reaching into a space the searcher may not read (including when a stranger names it explicitly), and an identifier with a hyphen that naive tokenisation does not find. |
+| `Domain/Search/SnippetTest.php` | Turning `ts_headline` output into structure: the right words marked, **the markers gone**, an unclosed marker not swallowing the rest of the text, and `<script>` in the content staying plain text. |
 | `Api/WikiTest.php` | The wiki without a palace: revisions, history carrying each era's title, the diff, a rollback that moves **forward**, verification cleared by a new revision, no path at all for an agent to verify, an address with a slash, the review queue. Asserts that the publish job was **enqueued**. |
 | `Integration/WikiOnLivePalaceTest.php` | What a double cannot show: a second revision **replaces** the first in the palace (the old content stops being findable, so `update_drawer` really does recompute the vector) and three quick saves with the queue drained **newest first** end with the newest text. |
 | `Domain/Document/RevisionDiffTest.php` | The only real algorithm in the project. A wrong diff is not an error anybody sees — it is a reviewer trusting a change on the strength of a picture that does not match the text. |

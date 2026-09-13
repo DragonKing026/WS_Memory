@@ -58,6 +58,11 @@ mieszkają w `Domain/`.
 | `Memory/MemoryStore.php` | **Port**: silnik pamięci. `search()` przyjmuje `PalaceWing` jako pierwszy, nieopcjonalny argument — stąd gwarancja filtra. Jedno skrzydło na wywołanie, bo pałac filtruje po jednym. |
 | `Memory/MemoryRegistry.php` | **Port**: nasz rejestr treści w pałacu. Wyznacza też granicę transakcji — zapis jest realny, gdy jest zaksięgowany (D-020). |
 | `Memory/MemoryWrite.php` | Wiersz do zaksięgowania. Obiekt parametrów, bo lista będzie rosła przy publikacji z lokalnych pałaców (TODO-012). Tytuł i skrót treści wylicza w jednym miejscu. |
+| `Memory/SearchMode.php` | Semantycznie czy leksykalnie. Nie „lepiej i gorzej", tylko dwa różne pytania — a że pałac trybu leksykalnego nie ma (D-029), ten typ jest zarazem granicą między dwoma źródłami danych o różnym pokryciu. |
+| `Memory/LexicalIndex.php` | **Port**: szukanie dokładnych słów w tekście, który trzymamy u siebie. Świadomie **nie** drugi `MemoryStore`: odpowiada z naszych tabel i widzi mniej — pełną treść tylko dokumentów. Lista przestrzeni jest argumentem obowiązkowym, tak jak skrzydło w `MemoryStore`. |
+| `Memory/EntryFacts.php` | Co wiemy o szufladzie, czego pałac nie wie: kto pisał (człowiek czy agent) i czy ktoś to sprawdził. W bazie pisanej w połowie przez agentów to różnica między wynikiem, który da się ocenić, a takim, który trzeba wziąć na wiarę. |
+| `Search/SearchHit.php` | Jeden wynik tak, jak czyta go człowiek. Osobny typ od `MemoryFragment`, bo niesie autorstwo i weryfikację, a jego identyfikator jest **opcjonalny**: dokument jest znajdowalny od zapisu, a szufladę zakłada pracownik chwilę później. `score` porównywalny wyłącznie w obrębie jednego trybu — skale są różne. |
+| `Search/Snippet.php`, `Search/SnippetPart.php` | Fragment z zaznaczonymi trafieniami **jako struktura, nie jako znaczniki**. Treść pisana przez ludzi i agentów może zawierać dowolny HTML; string ze znacznikami wyrenderowany w przeglądarce to trwały XSS. W strukturę nie da się wstrzyknąć. |
 | `Memory/MemoryUnavailable.php` | „Nie mogłem sprawdzić" — odrębne od „nic nie znalazłem". Agent, któremu powiemy „nic nie ma", zapisze tę wiedzę drugi raz obok kopii, której nie zobaczył. |
 | `Document/DocumentSlug.php` | Adres dokumentu jako obiekt wartości. **Odrzuca** niepoprawny, nie sprząta go: kto linkuje do „Umowy Najmu" i dostanie dokument pod „umowy-najmu", ma zepsuty odsyłacz, którego nie widzi. `fromTitle()` daje podpowiedź, gdy ktoś o nią prosi. |
 | `Document/DocumentStatus.php` | `draft` / `published`. **Nie** jest bramką przeglądu — dokument agenta jest widoczny od razu (D-005); szkic to stan człowieka, który jeszcze nie skończył. |
@@ -86,6 +91,7 @@ mieszkają w `Domain/`.
 | `Document/PublishDocumentHandler.php` | Idempotentny i odporny na kolejność: zlecenie starsze niż bieżąca rewizja jest **porzucane** (D-025). Autorem kopii w pałacu jest autor rewizji, nie „pracownik" — dla agenta właściciela tokena ustala `AgentTokenDirectory::ownerOf()`. |
 | `Document/DocumentNotFound.php`, `Document/ProposalRequired.php` | Jeden wyjątek na „nie ma" i „nie twoje"; drugi **nazywa drogę dalej**, bo błąd mówiący tylko „odmowa" kazałby agentowi powtarzać to samo wywołanie. |
 | `Memory/MemoryService.php` | **Jedyne wejście do pamięci.** REST i MCP wołają tę klasę i nic pod nią, więc wybór drzwi nie zmienia odpowiedzi (D-008). Tu mieszka rozsyłanie zapytania po skrzydłach, przerankowanie wyników, druga warstwa filtrowania (D-019), domyślna przestrzeń prywatna (reguła 6) i etykieta autora. Nic powyżej tej warstwy nie ma prawa trzymać `MemoryStore`. |
+| `Search/SearchService.php` | Wyszukiwanie tak, jak czyta je człowiek: jedno wywołanie, dwa tryby. Uprawnień **nie liczy** — woła o nie `MemoryService` w obu trybach, żeby nie istniało drugie miejsce wyznaczające dozwolone przestrzenie. Dokłada to, co widzi tylko człowiek: autora, weryfikację i **próg słabych wyników**, liczony względem najlepszego trafienia w tej odpowiedzi, bo stała nie rozdziela zmierzonych przedziałów. |
 
 ### `Infrastructure/` — adaptery portów
 
@@ -96,6 +102,7 @@ mieszkają w `Domain/`.
 | `Doctrine/DatabaseHealthProbe.php` | Sonda: czy baza odpowiada. |
 | `Doctrine/DoctrineMemoryRegistry.php` | Rejestr na DBAL. Przestrzeń rozwiązuje **wewnątrz INSERT-a** po slugu — osobny SELECT otwierałby okno, w którym przestrzeń znika między sprawdzeniem a zapisem. Trzyma też granicę transakcji. |
 | `Doctrine/DoctrineSpaceCatalog.php` | Skrzydło przestrzeni i przestrzeń prywatna użytkownika. Prywatną sprawdza **po konwencji slugu ORAZ po fladze** — przestrzeń nazwana ręcznie `priv_<uuid>` bez flagi nie może stać się miejscem, gdzie lądują cudze zapisy. |
+| `Doctrine/DoctrineLexicalIndex.php` | Szukanie dokładnych słów na pełnym tekście PostgreSQL. Dwie rzeczy są tu nieoczywiste i obie zmierzone: zapytanie tokenizuje **ten sam parser** co treść (`simple` czyta `D-029` jako `d` i `-029`, więc ręczna tokenizacja nie znajduje niczego), a oba zbiory trafień startują **od predykatu tekstowego** — napisane „od dokumentów" zapytanie nie używa indeksu GIN i czyta wszystkie rewizje: 157 ms wobec 2 ms na 10 tys. dokumentów. |
 | `MemPalace/MemPalaceClient.php` | Cienki klient JSON-RPC. Dwie rzeczy nieoczywiste: **ponawia wyłącznie odczyty** (powtórzony zapis zakłada drugą szufladę) i **nigdy nie wpuszcza tokena do komunikatu błędu** — tak sekrety najczęściej wyciekają. |
 | `MemPalace/CallOutcome.php` | Wynik jednego wywołania narzędzia. Istnieje, bo MemPalace zgłasza awarię **wewnątrz** payloadu: HTTP 200, koperta bez błędu, a przyczyna obok pustej listy wyników. Rozróżnia też „nie ma takiej szuflady" od awarii. |
 | `MemPalace/McpMemoryStore.php` | Adapter portu pamięci — **jedyne miejsce znające nazwy narzędzi MemPalace** i kształt ich odpowiedzi. Aktualizacja pałaca (D-001) dotyka tego pliku i żadnego innego. |
@@ -117,6 +124,7 @@ mieszkają w `Domain/`.
 | `GET /api/spaces`, `GET /api/spaces/{slug}` | `Api/SpaceController.php` | Przestrzeń poza uprawnieniami odpowiada **bajt w bajt** tak samo jak nieistniejąca. |
 | `POST /api/spaces`, `POST /api/spaces/{slug}/members` | `Api/SpaceAdministrationController.php` | Tworzenie przestrzeni i nadawanie ról. Twórca od razu zostaje administratorem; prefiks `priv_` zarezerwowany; przestrzeni prywatnej nie da się udostępnić. |
 | `POST /api/invitations/accept` | `Api/AcceptInvitationController.php` | Publiczna z konieczności — wołający nie ma jeszcze konta. Polityka haseł egzekwowana tutaj, nie w przeglądarce. |
+| `GET /api/search` | `Api/SearchController.php` | Oba tryby, filtry, i dwie rzeczy, których zwykła lista wyników by nie zrobiła: **słabe trafienia jadą osobno** (semantyka zawsze coś zwraca, tylko coraz gorszego) i odpowiedź **mówi o własnym pokryciu** — tryb leksykalny przyznaje, że pełną treść przeszukuje tylko w dokumentach. |
 | `GET /api/spaces/{s}/documents`, `GET/PUT .../{slug}`, `.../history`, `.../diff`, `.../rollback`, `.../verify`, `.../archive` | `Api/DocumentController.php` | Trasy używają `{slug<.+>}`, bo adres może zawierać ukośnik — bez tego „umowy/najem" byłoby nieosiągalne. Mapowanie odmów na HTTP jest w jednym miejscu, bo tam błąd zamienia się w ujawnienie. |
 | `GET/POST /api/spaces/{s}/proposals`, `POST /api/proposals/{id}/accept`, `/reject` | `Api/ProposalController.php` | Przegląd jest czynnością człowieka, więc nie ma odpowiednika MCP (D-005). |
 | `GET/POST /api/agent-tokens`, `DELETE /api/agent-tokens/{id}` | `Api/AgentTokenController.php` | Wyłącznie **własne** tokeny, również dla administratora globalnego (D-016). Jawna wartość w jednej odpowiedzi — tej, która token utworzyła. |
@@ -208,6 +216,26 @@ konto, prywatną przestrzeń i członkostwo w jednej transakcji → wpis
 5. **Druga warstwa:** rejestr mówi, w której przestrzeni siedzi każda szuflada.
    Czego nie zna albo co umieszcza gdzie indziej — wypada (D-019).
 6. Wpis w audycie: zapytanie, przestrzenie, liczba wyników.
+
+### Szukanie leksykalne
+
+1. `SearchService` rozgałęzia po trybie i dla leksykalnego woła
+   `MemoryService::searchLexically()` — **tą samą drogą przez uprawnienia**, co
+   semantyczne. Różni się, gdzie leży tekst; kto może go zobaczyć, liczone jest
+   identycznie.
+2. `DoctrineLexicalIndex` dostaje **niepustą** listę przestrzeni. Pusta byłaby
+   nieodróżnialna od „bez filtra", więc port zabrania jej typem, a adapter
+   sprawdza w czasie działania — adnotacja nie jest egzekwowana.
+3. Zapytanie użytkownika tokenizuje `to_tsvector`, po czym z powstałych leksemów
+   budowany jest `to_tsquery`. **Przedrostek `:*` dostaje tylko ostatnie słowo**
+   — to, które użytkownik właśnie pisze. `quote_literal` sprawia, że nic
+   z wpisanego tekstu nie da się odczytać jako składni zapytania.
+4. Dwa zbiory trafień: dokumenty po pełnej treści bieżącej rewizji, wszystko inne
+   po tytule i tagach. Oba **startują od predykatu tekstowego**, żeby planista
+   sięgnął po indeks GIN.
+5. `ts_headline` liczy się **po** obcięciu do limitu — przeparsowuje cały
+   dokument, więc na wszystkich trafieniach byłby marnotrawstwem.
+6. Wpis w audycie: zapytanie, tryb, przestrzenie, liczba wyników.
 
 ### Zapis do pamięci
 
@@ -309,6 +337,8 @@ kwalifikacji schematem. Poprawny wzorzec **wyklucza** `palace`.
 | `Infrastructure/Doctrine/DoctrineMemoryRegistryTest.php` | To, czego podwójka sprawdzić nie może: indeks unikalny, klucz obcy, wycofanie transakcji, `tags` w obie strony. |
 | `Infrastructure/Doctrine/DoctrineSpaceCatalogTest.php` | Skrzydło różne od slugu, przestrzeń prywatna po akceptacji zaproszenia, podróbka `priv_*` bez flagi. |
 | `Api/McpGatewayTest.php` | Gateway tak, jak spotyka go agent: protokół, uzgodnienie wersji, brak żądań wsadowych, 401 dla tokena unieważnionego, wygasłego i po wyłączeniu konta właściciela, **obca przestrzeń jako pusty wynik, nie błąd**, odmowa zapisu, nieznany parametr, limit tempa per token, audyt wywołań udanych i nieudanych. Celowo **nie potrzebuje pałaca** — wszystko to dzieje się przed pamięcią, więc chodzi przy każdym commicie. |
+| `Api/SearchTest.php` | Wyszukiwanie drzwiami, których używa człowiek — **tylko leksykalnie**, bo ten tryb chodzi w całości na naszych tabelach i nie potrzebuje pałaca. Pilnuje dwóch rzeczy, które psułyby się po cichu: zapytania sięgającego do przestrzeni bez uprawnień (również wtedy, gdy obcy wskaże ją wprost) i identyfikatora z łącznikiem, którego naiwna tokenizacja nie znajduje. |
+| `Domain/Search/SnippetTest.php` | Zamiana wyjścia `ts_headline` w strukturę: właściwe słowa zaznaczone, **znaczniki znikają**, niedomknięty znacznik nie połyka reszty tekstu, a `<script>` w treści zostaje zwykłym tekstem. |
 | `Api/WikiTest.php` | Wiki bez pałaca: rewizje, historia z tytułem z epoki, różnica, cofnięcie idące **do przodu**, weryfikacja czyszczona nową rewizją, brak jakiejkolwiek drogi dla agenta do weryfikacji, adres z ukośnikiem, kolejka propozycji. Sprawdza, że zlecenie publikacji **zostało złożone**. |
 | `Integration/WikiOnLivePalaceTest.php` | To, czego podwójka pokazać nie może: druga rewizja **zastępuje** pierwszą w pałacu (stara treść przestaje być znajdowalna, czyli `update_drawer` naprawdę przelicza wektor) i trzy szybkie zapisy z kolejką opróżnioną **od najnowszego** kończą się najnowszym tekstem. |
 | `Domain/Document/RevisionDiffTest.php` | Jedyny prawdziwy algorytm w projekcie. Zły diff nie jest błędem, który ktoś zobaczy — jest recenzentem ufającym zmianie na podstawie obrazka, który nie odpowiada tekstowi. |

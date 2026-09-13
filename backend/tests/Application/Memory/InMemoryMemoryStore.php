@@ -80,6 +80,15 @@ final class InMemoryMemoryStore implements MemoryStore
             'addedBy' => $addedBy,
         ];
 
+        // The real palace merges identical content within a wing and answers with the
+        // drawer it already holds. Reproduced here, because the interesting case in
+        // MemoryService is exactly what happens on that second write.
+        foreach ($this->drawers as $existing) {
+            if ($existing->wing->equals($wing) && $existing->room === $kind->room() && $existing->content === $content) {
+                return $existing->id;
+            }
+        }
+
         $drawer = new DrawerId(\sprintf('drawer_%s_%s_%d', $wing->value, $kind->room(), ++$this->counter));
         $this->drawers[$drawer->value] = new MemoryFragment($drawer, $wing, $kind->room(), $content);
 

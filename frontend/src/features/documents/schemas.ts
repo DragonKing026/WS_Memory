@@ -45,7 +45,13 @@ export const documentListItemSchema = z.object({
 
 export const documentListSchema = z.object({
   documents: z.array(documentListItemSchema),
+  /** The size of this page, not of the space — see `hasMore`. */
+  count: z.number(),
+  limit: z.number(),
+  offset: z.number(),
+  hasMore: z.boolean(),
 })
 
 export type DocumentDetail = z.infer<typeof documentSchema>
 export type DocumentListItem = z.infer<typeof documentListItemSchema>
+export type DocumentList = z.infer<typeof documentListSchema>

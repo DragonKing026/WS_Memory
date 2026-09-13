@@ -25,6 +25,9 @@ const slug = computed(() => (typeof route.params.space === 'string' ? route.para
 const space = computed(() => auth.spaceBySlug(slug.value))
 
 const documents = ref<DocumentListItem[]>([])
+/** The listing is paged server-side: an unpaged one fell over on a space with ten
+ *  thousand documents, and the server now decides how much comes at a time. */
+const hasMore = ref(false)
 const busy = ref(false)
 const problem = ref<string | null>(null)
 const showArchived = ref(false)
@@ -46,13 +49,20 @@ async function load(): Promise<void> {
     return
   }
 
+  // A fresh space means a fresh listing; without this, switching spaces would append
+  // one space's documents to another's.
+  if (documents.value.length === 0) {
+    hasMore.value = false
+  }
+
   busy.value = true
   problem.value = null
 
   try {
-    const list = await documentService.list(slug.value)
+    const page = await documentService.list(slug.value, documents.value.length)
 
-    documents.value = [...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    documents.value = [...documents.value, ...page.documents]
+    hasMore.value = page.hasMore
   } catch (error) {
     documents.value = []
     problem.value = error instanceof Error ? error.message : 'Nie udało się wczytać listy.'
@@ -69,7 +79,15 @@ function formatDate(value: string): string {
     : date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-watch(slug, () => void load(), { immediate: true })
+watch(
+  slug,
+  () => {
+    documents.value = []
+    hasMore.value = false
+    void load()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -111,6 +129,7 @@ watch(slug, () => void load(), { immediate: true })
           <span>
             {{ visible.length }}
             {{ visible.length === 1 ? 'dokument' : 'dokumentów' }}
+            <template v-if="hasMore">(i więcej)</template>
           </span>
           <span v-if="byAiUnverified > 0">
             · {{ byAiUnverified }} napisanych przez AI i niesprawdzonych
@@ -172,6 +191,17 @@ watch(slug, () => void load(), { immediate: true })
             </div>
           </li>
         </ul>
+
+        <UButton
+          v-if="hasMore"
+          variant="subtle"
+          size="sm"
+          :loading="busy"
+          class="mt-3"
+          @click="load"
+        >
+          Pokaż kolejne
+        </UButton>
       </template>
     </template>
 

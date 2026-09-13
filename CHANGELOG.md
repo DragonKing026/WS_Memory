@@ -15,6 +15,39 @@ Format: `## RRRR-MM-DD GG:MM — tytuł`.
 i umieściły dwa wpisy w przyszłości.
 
 ---
+## 2026-09-13 10:45 — Dwie usterki znalezione bazą testową
+
+Zasilanie bazy do pomiaru wydajności wywlokło dwa realne błędy. Oba są na
+głównych ścieżkach i oba zdarzyłyby się bez żadnych danych testowych — po prostu
+później i u kogoś innego.
+
+**Lista dokumentów nie miała stronicowania i przewracała się na 10 tys. wpisów.**
+`GET /api/spaces/{s}/documents` ładował wszystkie dokumenty przestrzeni jako
+encje Doctrine. Przy dziesięciu tysiącach PHP wyczerpywał 128 MB, a błąd
+krytyczny szedł jako HTML **po** wysłaniu nagłówka 200 — czyli klient dostawał
+udaną odpowiedź zawierającą stronę błędu. Teraz strona po 100 pozycji, maksimum
+500, z `hasMore`. Odpowiedź: 27 kB w 0,25 s zamiast błędu.
+
+To Zod na granicy pokazał, po co tam jest: zamiast `undefined` trzy ekrany dalej
+frontend napisał wprost, że odpowiedź nie zgadza się z kontraktem.
+
+**Zapisanie tej samej treści dwa razy kończyło się błędem 500.** Pałac scala
+identyczną treść w obrębie skrzydła i oddaje szufladę, którą już ma; nasz rejestr
+odrzucał ją przez indeks unikalny `uniq_entries_drawer`. Agent ponawiający
+wywołanie albo dwóch agentów zapisujących to samo ustalenie dostawali nieczytelne
+500. Teraz to wynik poprawny i idempotentny — treść **jest** w pamięci, o to
+chodziło — a wpis w audycie niesie `duplicate: true`, bo „nic nowego nie
+zapisano" to dokładnie ta informacja, której ktoś czytający ślad potrzebuje.
+Ta sama szuflada zaksięgowana w **innej** przestrzeni nadal jest błędem: to
+rozjazd rejestru z pałacem (reguła 5), a nie duplikat.
+
+**Poprawka wydajności wyszukiwania leksykalnego, też z pomiaru.** Zapytanie
+napisane „od dokumentów" nie używało indeksu GIN — planista czytał wszystkie
+rewizje i liczył `to_tsvector` dla każdej. Oba zbiory trafień startują teraz od
+predykatu tekstowego: **157 ms → 2 ms** przy 10 tys. dokumentów. `ts_headline`
+liczy się po obcięciu do limitu, a nie na wszystkich trafieniach.
+
+---
 ## 2026-09-13 10:26 — TODO-007: ekrany wyszukiwania, przestrzeni i dokumentu
 
 Ekran `/` to teraz wyszukiwarka: przełącznik trybu z jednozdaniowym wyjaśnieniem

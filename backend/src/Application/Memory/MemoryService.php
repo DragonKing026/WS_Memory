@@ -215,6 +215,38 @@ final readonly class MemoryService
         return $this->registry->transactional(function () use ($actor, $content, $target, $wing, $kind, $room, $tags): StoredMemory {
             $drawer = $this->store->store($wing, $kind, $content, $this->palaceAuthor($actor));
 
+            // The palace merges identical content within a wing and answers with the
+            // drawer it already holds. Writing the same note twice is ordinary — a
+            // retry, or two agents recording the same finding — so it must not be an
+            // error: the content IS in memory, which is what the caller wanted.
+            //
+            // Only when we already know that drawer under the same space, though. The
+            // same drawer booked in a different space would mean our registry and the
+            // palace disagree about who owns content (integrity rule 5), and that is
+            // worth failing loudly over rather than papering over with a happy answer.
+            $known = $this->registry->spaceFor($drawer);
+            if (null !== $known) {
+                if (!$known->equals($target)) {
+                    throw new \DomainException(\sprintf(
+                        'Szuflada %s jest już zaksięgowana w przestrzeni „%s" — zapis do „%s" zostawiłby dwie prawdy.',
+                        $drawer->value,
+                        $known->value,
+                        $target->value,
+                    ));
+                }
+
+                $this->audit->record('memory.remember', $actor, $target->value, [
+                    'drawer' => $drawer->value,
+                    'kind' => $kind->value,
+                    'room' => $room,
+                    // Recorded rather than hidden: "nothing new was written" is exactly
+                    // what somebody reading the trail later needs to know.
+                    'duplicate' => true,
+                ]);
+
+                return new StoredMemory($drawer, $target, $kind);
+            }
+
             $this->registry->register(MemoryWrite::ofContent($drawer, $target, $kind, $actor, $content, $tags));
 
             $this->audit->record('memory.remember', $actor, $target->value, [

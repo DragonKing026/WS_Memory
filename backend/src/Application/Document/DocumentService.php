@@ -39,6 +39,12 @@ use Symfony\Component\Messenger\MessageBusInterface;
  */
 final readonly class DocumentService
 {
+    /** How many documents one page of a listing holds. */
+    public const PAGE_SIZE = 100;
+
+    /** The most a caller may ask for in one page — a limit somebody would otherwise raise until it broke again. */
+    public const MAX_PAGE_SIZE = 500;
+
     public function __construct(
         private EntityManagerInterface $entityManager,
         private SpaceAccessResolver $access,
@@ -137,10 +143,22 @@ final readonly class DocumentService
     /**
      * Documents in a space, newest change first.
      *
+     * **Paged, and not optionally.** Listing every document was fine until a space
+     * held ten thousand of them: hydrating that many entities exhausted PHP's memory
+     * limit, and the fatal error went out as HTML **after** the 200 header, so the
+     * caller received a successful response containing an error page. An unpaged list
+     * is not a convenience with a slow worst case — it is an endpoint that stops
+     * working at a size the base is meant to reach.
+     *
      * @return list<Document>
      */
-    public function list(Actor $actor, SpaceId $space, bool $includeArchived = false): array
-    {
+    public function list(
+        Actor $actor,
+        SpaceId $space,
+        bool $includeArchived = false,
+        int $limit = self::PAGE_SIZE,
+        int $offset = 0,
+    ): array {
         if (!$this->access->canRead($actor, $space)) {
             // An empty list rather than an error: the caller learns nothing about
             // whether the space exists.
@@ -159,7 +177,7 @@ final readonly class DocumentService
 
         /** @var list<Document> $documents */
         $documents = $this->entityManager->getRepository(Document::class)
-            ->findBy($criteria, ['updatedAt' => 'DESC']);
+            ->findBy($criteria, ['updatedAt' => 'DESC'], $limit, $offset);
 
         return $documents;
     }

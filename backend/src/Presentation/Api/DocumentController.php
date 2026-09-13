@@ -41,15 +41,27 @@ final readonly class DocumentController
     #[Route('/api/spaces/{space}/documents', name: 'api_documents_list', methods: ['GET'])]
     public function list(string $space, Request $request): JsonResponse
     {
+        $limit = $request->query->getInt('limit', DocumentService::PAGE_SIZE);
+        $limit = max(1, min($limit, DocumentService::MAX_PAGE_SIZE));
+        $offset = max(0, $request->query->getInt('offset'));
+
         $documents = $this->documents->list(
             $this->actor(),
             new SpaceId($space),
             $request->query->getBoolean('archived'),
+            $limit,
+            $offset,
         );
 
         return new JsonResponse([
             'documents' => array_map($this->summarise(...), $documents),
+            // The size of THIS page, not of the space. Named `count` for the callers
+            // that already read it; `hasMore` is what tells a client to ask again,
+            // and it costs no extra query.
             'count' => \count($documents),
+            'limit' => $limit,
+            'offset' => $offset,
+            'hasMore' => \count($documents) === $limit,
         ]);
     }
 
