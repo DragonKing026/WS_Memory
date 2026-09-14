@@ -214,7 +214,7 @@ jobs:
 
       - name: Ślady z nieudanych testów E2E
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-slady
           path: frontend/test-results/
